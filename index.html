@@ -1,0 +1,1702 @@
+<!DOCTYPE html>
+<html lang="en" data-density="auto">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Void Break</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='46' fill='%23241708' stroke='%23c9a24a' stroke-width='6'/%3E%3Ctext x='50' y='68' font-size='56' text-anchor='middle' fill='%23e6c25c'%3E%E2%9A%94%3C/text%3E%3C/svg%3E">
+<style>
+:root{
+  --c-bg-dark:#241708;
+  --c-bg-mid:#3e2a1a;
+  --c-brass:#c9a24a;
+  --c-brass-bright:#e6c25c;
+  --c-parchment:#f0dca8;
+  --c-blood:#c9432e;
+  --c-ink:#1a1006;
+  --c-wood-light:#5a3f24;
+  --c-wood-dark:#2c1c0e;
+
+  /* density-scaled tokens (Phone default) */
+  --font-base:16px;
+  --font-sm:12px;
+  --font-lg:20px;
+  --font-xl:28px;
+  --pad-card:10px;
+  --gap:8px;
+  --joystick-size:110px;
+  --joystick-knob:46px;
+  --hud-icon:22px;
+  --tab-h:52px;
+  --card-radius:10px;
+  --btn-h:44px;
+}
+:root[data-density="tablet"]{
+  --font-base:19px;
+  --font-sm:15px;
+  --font-lg:26px;
+  --font-xl:38px;
+  --pad-card:16px;
+  --gap:14px;
+  --joystick-size:150px;
+  --joystick-knob:64px;
+  --hud-icon:30px;
+  --tab-h:64px;
+  --card-radius:14px;
+  --btn-h:56px;
+}
+
+*{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+html,body{
+  margin:0; padding:0; width:100%; height:100%; overflow:hidden;
+  background:var(--c-bg-dark);
+  color:var(--c-parchment);
+  font-family:Georgia,'Palatino Linotype',Palatino,'Book Antiqua',serif;
+  font-size:var(--font-base);
+  user-select:none;
+  -webkit-user-select:none;
+  touch-action:none;
+}
+#app{position:fixed; inset:0; width:100%; height:100%; overflow:hidden;
+  background:
+    radial-gradient(ellipse at 50% 0%, #4a3218 0%, transparent 60%),
+    linear-gradient(180deg, var(--c-bg-mid) 0%, var(--c-bg-dark) 100%);
+}
+
+::-webkit-scrollbar{width:8px; height:8px;}
+::-webkit-scrollbar-track{background:var(--c-bg-dark);}
+::-webkit-scrollbar-thumb{background:var(--c-wood-light); border-radius:4px;}
+
+button{font-family:inherit;}
+
+/* ---------- Wooden panel / bevel primitives ---------- */
+.panel{
+  background:linear-gradient(180deg, var(--c-wood-light) 0%, var(--c-wood-dark) 100%);
+  border:3px solid var(--c-ink);
+  border-radius:var(--card-radius);
+  box-shadow:
+    inset 0 2px 0 rgba(230,194,92,0.25),
+    inset 0 -3px 6px rgba(0,0,0,0.5),
+    0 3px 8px rgba(0,0,0,0.6);
+  padding:var(--pad-card);
+}
+.parchment{
+  background:
+    linear-gradient(180deg, rgba(240,220,168,0.06), rgba(240,220,168,0.0)),
+    var(--c-bg-mid);
+  border:2px solid var(--c-wood-dark);
+  border-radius:calc(var(--card-radius) - 2px);
+}
+.btn{
+  display:inline-flex; align-items:center; justify-content:center;
+  min-height:var(--btn-h);
+  padding:0 16px;
+  background:linear-gradient(180deg, #d8b25a 0%, #a8792e 55%, #8a611f 100%);
+  color:var(--c-ink);
+  border:2px solid var(--c-ink);
+  border-radius:8px;
+  font-weight:bold;
+  font-size:var(--font-base);
+  box-shadow:
+    inset 0 1px 0 rgba(255,240,200,0.6),
+    inset 0 -3px 4px rgba(80,50,10,0.5),
+    0 2px 3px rgba(0,0,0,0.5);
+  cursor:pointer;
+  letter-spacing:0.02em;
+}
+.btn:active{
+  transform:translateY(2px);
+  box-shadow:inset 0 2px 4px rgba(0,0,0,0.5);
+}
+.btn.secondary{
+  background:linear-gradient(180deg, #6a5432 0%, #4a3a20 100%);
+  color:var(--c-parchment);
+}
+.btn.danger{
+  background:linear-gradient(180deg, #d3583e 0%, #8f2a1a 100%);
+  color:#fff2e0;
+}
+.btn:disabled{opacity:0.45; cursor:default; filter:grayscale(0.4);}
+.btn.small{min-height:calc(var(--btn-h) * 0.72); padding:0 10px; font-size:var(--font-sm);}
+
+h1,h2,h3{font-family:Georgia,'Palatino Linotype',Palatino,serif; margin:0 0 6px 0; color:var(--c-brass-bright); text-shadow:0 2px 2px rgba(0,0,0,0.6);}
+.muted{color:#c9b48a; opacity:0.85;}
+.gold-text{color:var(--c-brass-bright);}
+.blood-text{color:var(--c-blood);}
+
+/* =====================  HUB  ===================== */
+#hub{position:absolute; inset:0; display:flex; flex-direction:column;}
+#hub-header{
+  display:flex; align-items:center; justify-content:space-between;
+  padding:calc(var(--gap)) var(--gap);
+  padding-right:104px;
+  background:linear-gradient(180deg, var(--c-wood-dark), var(--c-bg-dark));
+  border-bottom:3px solid var(--c-ink);
+}
+#hub-header .title{font-size:var(--font-lg); color:var(--c-brass-bright); font-weight:bold; text-shadow:0 2px 2px #000;}
+#currency-bar{display:flex; gap:var(--gap);}
+.currency-pill{
+  display:flex; align-items:center; gap:6px;
+  background:var(--c-bg-dark); border:2px solid var(--c-brass);
+  border-radius:20px; padding:4px 10px; font-size:var(--font-sm); font-weight:bold;
+}
+.currency-pill .icon{font-size:var(--hud-icon); line-height:1;}
+#hub-body{flex:1; overflow-y:auto; padding:var(--gap); padding-bottom:calc(var(--tab-h) + var(--gap)*2);}
+#hub-tabs{
+  position:absolute; left:0; right:0; bottom:0;
+  display:flex; height:var(--tab-h);
+  background:linear-gradient(180deg, var(--c-wood-dark), var(--c-bg-dark));
+  border-top:3px solid var(--c-ink);
+  overflow-x:auto;
+}
+.hub-tab{
+  flex:1 0 auto; min-width:64px;
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  gap:2px; color:#a8916a; font-size:var(--font-sm); font-weight:bold;
+  border-right:1px solid rgba(0,0,0,0.4);
+  cursor:pointer;
+}
+.hub-tab.active{color:var(--c-brass-bright); background:rgba(201,162,74,0.15); box-shadow:inset 0 3px 0 var(--c-brass-bright);}
+.hub-tab .tab-icon{font-size:calc(var(--font-lg));}
+
+.section-title{font-size:var(--font-lg); margin-bottom:var(--gap); color:var(--c-brass-bright);}
+.card-grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:var(--gap);}
+.card{
+  background:linear-gradient(180deg, var(--c-wood-light), var(--c-wood-dark));
+  border:2px solid var(--c-ink); border-radius:var(--card-radius);
+  padding:var(--pad-card); display:flex; flex-direction:column; gap:4px;
+  box-shadow:inset 0 1px 0 rgba(230,194,92,0.2), 0 2px 4px rgba(0,0,0,0.5);
+}
+.card.locked{opacity:0.55; filter:grayscale(0.5);}
+.card.selected{border-color:var(--c-brass-bright); box-shadow:0 0 0 2px var(--c-brass-bright), inset 0 1px 0 rgba(230,194,92,0.3);}
+.card .name{font-weight:bold; color:var(--c-parchment); font-size:var(--font-base);}
+.card .tier{font-size:var(--font-sm); font-weight:bold; padding:1px 6px; border-radius:6px; display:inline-block; align-self:flex-start;}
+.tier-Common{background:#5a5a52; color:#eee;}
+.tier-Rare{background:#2e5a8a; color:#eaf3ff;}
+.tier-Legendary{background:#8a5a1a; color:#fff0d0;}
+.tier-Mythic{background:#6a1a5a; color:#ffe0fa;}
+.tier-Utility{background:#3a5a2e; color:#eaffe0;}
+.card .desc{font-size:var(--font-sm); color:#c9b48a; flex:1;}
+.card .stats{font-size:var(--font-sm); color:var(--c-brass);}
+
+.hero-portrait{
+  width:100%; aspect-ratio:1; border-radius:8px; border:2px solid var(--c-ink);
+  display:flex; align-items:center; justify-content:center; font-size:2em;
+  background:radial-gradient(circle at 35% 30%, rgba(255,255,255,0.25), transparent 60%);
+}
+
+/* =====================  RUN / GAMEPLAY  ===================== */
+#run{position:absolute; inset:0; display:none;}
+#run.active{display:block;}
+#gameCanvas{position:absolute; inset:0; width:100%; height:100%; touch-action:none;}
+#hud{position:absolute; top:0; left:0; right:0; padding:8px; display:flex; flex-direction:column; gap:4px; pointer-events:none; z-index:10;}
+#hud-top-row{display:flex; align-items:center; gap:8px;}
+.bar-wrap{position:relative; flex:1; height:16px; border-radius:8px; background:rgba(20,12,4,0.75); border:2px solid var(--c-ink); overflow:hidden;}
+.bar-fill{height:100%; transition:width 0.15s linear;}
+.bar-fill.hp{background:linear-gradient(180deg,#e0533c,#8f2a1a);}
+.bar-fill.xp{background:linear-gradient(180deg,var(--c-brass-bright),#a8792e);}
+.bar-label{position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:10px; font-weight:bold; color:#fff2e0; text-shadow:0 1px 2px #000;}
+#hud-info{
+  display:flex; justify-content:space-between; font-size:var(--font-sm); font-weight:bold;
+  color:var(--c-parchment); text-shadow:0 1px 3px #000;
+  background:rgba(20,12,4,0.55); border-radius:8px; padding:4px 8px;
+}
+#pause-btn{
+  position:absolute; top:8px; right:8px; pointer-events:auto; z-index:11;
+  width:38px; height:38px; border-radius:50%;
+  background:rgba(20,12,4,0.7); border:2px solid var(--c-brass); color:var(--c-brass-bright);
+  display:flex; align-items:center; justify-content:center; font-size:18px;
+}
+
+#joystick-zone{position:absolute; inset:0; z-index:5;}
+#joystick{
+  position:absolute; width:var(--joystick-size); height:var(--joystick-size);
+  border-radius:50%; border:3px solid rgba(201,162,74,0.6);
+  background:radial-gradient(circle, rgba(60,40,20,0.35), rgba(20,12,4,0.25));
+  display:none; pointer-events:none;
+}
+#joystick-knob{
+  position:absolute; width:var(--joystick-knob); height:var(--joystick-knob);
+  border-radius:50%; left:50%; top:50%; transform:translate(-50%,-50%);
+  background:radial-gradient(circle at 35% 30%, #e6c25c, #8a611f);
+  border:2px solid var(--c-ink);
+}
+
+#levelup-overlay, #pause-overlay, #death-overlay{
+  position:absolute; inset:0; background:rgba(10,6,2,0.82);
+  display:none; align-items:center; justify-content:center; flex-direction:column; z-index:20; padding:16px;
+}
+#levelup-overlay.active,#pause-overlay.active,#death-overlay.active{display:flex;}
+.upgrade-cards{display:flex; gap:var(--gap); flex-wrap:wrap; justify-content:center; max-width:900px;}
+.upgrade-card{
+  width:180px; min-height:180px; display:flex; flex-direction:column; gap:8px;
+  align-items:center; text-align:center; cursor:pointer;
+}
+.upgrade-card .name{font-size:var(--font-base); font-weight:bold; color:var(--c-brass-bright);}
+.upgrade-card .desc{font-size:var(--font-sm); color:var(--c-parchment);}
+
+#death-overlay .summary-panel{max-width:420px; width:90%;}
+.summary-row{display:flex; justify-content:space-between; padding:4px 0; border-bottom:1px dashed rgba(201,162,74,0.3); font-size:var(--font-base);}
+
+/* Toast */
+#toast{
+  position:absolute; left:50%; bottom:12%; transform:translateX(-50%);
+  background:rgba(20,12,4,0.9); border:2px solid var(--c-brass); color:var(--c-brass-bright);
+  padding:8px 16px; border-radius:8px; font-size:var(--font-base); z-index:50;
+  opacity:0; transition:opacity 0.3s; pointer-events:none; text-align:center; max-width:80%;
+}
+#toast.show{opacity:1;}
+
+/* density toggle button */
+#density-toggle{
+  position:fixed; top:6px; right:6px; z-index:100;
+  font-size:11px; padding:4px 8px; min-height:0; height:26px; opacity:0.85;
+}
+#run.active ~ #density-toggle{ display:none; }
+
+.row{display:flex; align-items:center; justify-content:space-between; gap:8px;}
+.wrap-row{display:flex; flex-wrap:wrap; gap:8px;}
+.hidden{display:none !important;}
+.flex-col{display:flex; flex-direction:column; gap:6px;}
+
+.gacha-odds{font-size:var(--font-sm); color:#c9b48a; margin:6px 0;}
+.gacha-odds div{display:flex; justify-content:space-between;}
+.pip-bar{height:8px; border-radius:4px; background:rgba(0,0,0,0.4); border:1px solid var(--c-ink); overflow:hidden; margin:4px 0;}
+.pip-fill{height:100%; background:linear-gradient(90deg,var(--c-brass),var(--c-brass-bright));}
+
+.meta-card .level-track{display:flex; gap:2px; margin:4px 0;}
+.pip{width:8px; height:8px; border-radius:2px; background:rgba(0,0,0,0.4); border:1px solid var(--c-ink);}
+.pip.filled{background:var(--c-brass-bright);}
+
+.item-icon{width:28px; height:28px; border-radius:5px; display:flex; align-items:center; justify-content:center; font-size:16px; border:1px solid var(--c-ink);}
+
+select, input[type=range]{
+  font-family:inherit; background:var(--c-bg-dark); color:var(--c-parchment);
+  border:2px solid var(--c-brass); border-radius:6px; padding:4px;
+}
+
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ============================= HUB ============================= -->
+  <div id="hub">
+    <div id="hub-header">
+      <div class="title">⚜ Void Break ⚜</div>
+      <div id="currency-bar">
+        <div class="currency-pill"><span class="icon">⛀</span><span id="gold-amt">0</span></div>
+        <div class="currency-pill"><span class="icon">♦</span><span id="gem-amt">0</span></div>
+        <div class="currency-pill"><span class="icon">✦</span><span id="dust-amt">0</span></div>
+      </div>
+    </div>
+    <div id="hub-body"></div>
+    <div id="hub-tabs"></div>
+  </div>
+
+  <!-- ============================= RUN ============================= -->
+  <div id="run">
+    <canvas id="gameCanvas"></canvas>
+    <div id="joystick-zone">
+      <div id="joystick"><div id="joystick-knob"></div></div>
+    </div>
+    <div id="hud">
+      <div id="hud-top-row">
+        <div class="bar-wrap"><div class="bar-fill hp" id="hp-fill" style="width:100%"></div><div class="bar-label" id="hp-label">0/0</div></div>
+      </div>
+      <div id="hud-top-row">
+        <div class="bar-wrap"><div class="bar-fill xp" id="xp-fill" style="width:0%"></div><div class="bar-label" id="xp-label">Lv 1</div></div>
+      </div>
+      <div id="hud-info">
+        <span id="hud-biome">Forest</span>
+        <span id="hud-wave">Wave 1</span>
+        <span id="hud-timer">0:00</span>
+        <span id="hud-kills">0 kills</span>
+      </div>
+    </div>
+    <div id="pause-btn">⏸</div>
+
+    <div id="levelup-overlay">
+      <h2 id="levelup-title">Level Up!</h2>
+      <div id="levelup-cards" class="upgrade-cards"></div>
+    </div>
+
+    <div id="pause-overlay">
+      <div class="panel flex-col" style="width:260px;align-items:center;">
+        <h2>Run Paused</h2>
+        <button class="btn" id="resume-btn" style="width:100%">Resume</button>
+        <button class="btn danger" id="abandon-btn" style="width:100%">Abandon Run</button>
+      </div>
+    </div>
+
+    <div id="death-overlay">
+      <div class="panel flex-col summary-panel">
+        <h2>The Run Ends</h2>
+        <div id="death-summary"></div>
+        <button class="btn" id="return-hub-btn" style="width:100%;margin-top:10px;">Return to Hub</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast"></div>
+  <button class="btn" id="density-toggle">Density: auto</button>
+</div>
+
+<script>
+const DATA = {"heroes":[{"id":"squire_aldric","name":"Squire Aldric","free":true,"hp":433,"dmg":14,"spd":150,"fireRate":2.0,"projSpeed":400,"passive":"regen","passiveName":"Second Wind","passiveDesc":"Regenerate 1% of max HP every second.","desc":"A steadfast recruit of the border watch, trained to hold the line.","color":"#8a6a3a"},{"id":"huntress_wren","name":"Huntress Wren","free":true,"hp":419,"dmg":12,"spd":210,"fireRate":2.6,"projSpeed":520,"passive":"pierce","passiveName":"Broadhead Arrows","passiveDesc":"Arrows pierce through 1 additional enemy.","desc":"Raised in the deep wood, she never lets an arrow go to waste.","color":"#4a7a3a"},{"id":"friar_tomas","name":"Friar Tomas","free":true,"hp":480,"dmg":10,"spd":120,"fireRate":1.6,"projSpeed":350,"passive":"aoe","passiveName":"Censer of Wrath","passiveDesc":"Projectiles burst in a small radius on impact.","desc":"A militant friar whose blessed censer burns those who stray too close.","color":"#c9a24a"},{"id":"ironclad_brogan","name":"Ironclad Brogan","free":false,"hp":493,"dmg":9,"spd":110,"fireRate":1.4,"projSpeed":300,"passive":"tanky","passiveName":"Bulwark Stance","passiveDesc":"Take 20% less damage from all sources.","desc":"Encased in plate a generation old, Brogan has never once retreated.","color":"#5a5a5a"},{"id":"shadowmere_lira","name":"Shadowmere Lira","free":false,"hp":360,"dmg":20,"spd":200,"fireRate":2.2,"projSpeed":560,"passive":"crit","passiveName":"Assassin's Eye","passiveDesc":"25% chance to strike for double damage.","desc":"A blade-for-hire who trades in silence and second thoughts.","color":"#3a1a3a"},{"id":"pyromancer_ignis","name":"Pyromancer Ignis","free":false,"hp":406,"dmg":18,"spd":140,"fireRate":1.8,"projSpeed":380,"passive":"aoe_big","passiveName":"Wildfire Bloom","passiveDesc":"Projectiles explode in a large radius on impact.","desc":"Excommunicated for setting the seminary ablaze. Twice.","color":"#c9432e"},{"id":"frostweaver_sable","name":"Frostweaver Sable","free":false,"hp":412,"dmg":16,"spd":160,"fireRate":2.0,"projSpeed":420,"passive":"slow","passiveName":"Rime Touch","passiveDesc":"Enemies hit are slowed 30% for 1.5 seconds.","desc":"She speaks little; the frost on her cloak speaks for her.","color":"#8ac9e0"},{"id":"warlord_gundric","name":"Warlord Gundric","free":false,"hp":419,"dmg":17,"spd":130,"fireRate":1.7,"projSpeed":340,"passive":"thorns","passiveName":"Spiked Plate","passiveDesc":"Reflect 15% of damage taken back at attackers.","desc":"A deposed warlord who now spends his fury on lesser beasts.","color":"#7a3a1a"},{"id":"ranger_thalis","name":"Ranger Thalis","free":false,"hp":442,"dmg":11,"spd":180,"fireRate":2.1,"projSpeed":460,"passive":"multishot","passiveName":"Fan of Arrows","passiveDesc":"Fires 2 additional projectiles in a spread.","desc":"Thalis never draws a single arrow when three will do.","color":"#4a6a2a"},{"id":"cleric_elowen","name":"Cleric Elowen","free":false,"hp":473,"dmg":9,"spd":150,"fireRate":1.9,"projSpeed":360,"passive":"lifesteal","passiveName":"Blood Ward","passiveDesc":"Heal for 8% of damage dealt.","desc":"Elowen's hymns are as sharp as any sword, in the right hands.","color":"#e6c25c"},{"id":"berserker_ragnar","name":"Berserker Ragnar","free":false,"hp":359,"dmg":22,"spd":170,"fireRate":1.9,"projSpeed":330,"passive":"rampage","passiveName":"Bloodrage","passiveDesc":"Deal up to 40% more damage as your HP drops.","desc":"Ragnar fights best with his back against the wall, and his blood up.","color":"#8a1a1a"},{"id":"arcanist_vesper","name":"Arcanist Vesper","free":false,"hp":373,"dmg":19,"spd":190,"fireRate":2.0,"projSpeed":500,"passive":"chain","passiveName":"Arc of Sparks","passiveDesc":"Bolts chain to 1 additional nearby enemy.","desc":"Vesper studies the Void so that others need not.","color":"#5a3a8a"}],"enemies":[{"id":"e0","name":"Bramble Stalker","biome":"Forest","boss":false,"hp":18,"dmg":6,"spd":70},{"id":"e1","name":"Moss-Back Boar","biome":"Forest","boss":false,"hp":34,"dmg":9,"spd":55},{"id":"e2","name":"Thistle Sprite","biome":"Forest","boss":false,"hp":12,"dmg":4,"spd":100},{"id":"e3","name":"Rootfang Wolf","biome":"Forest","boss":false,"hp":22,"dmg":8,"spd":90},{"id":"e4","name":"Hollow Antler Stag","biome":"Forest","boss":false,"hp":28,"dmg":7,"spd":80},{"id":"e5","name":"The Green Warden","biome":"Forest","boss":true,"hp":420,"dmg":22,"spd":45},{"id":"e6","name":"Dune Scorpion","biome":"Desert","boss":false,"hp":24,"dmg":9,"spd":75},{"id":"e7","name":"Sand Wraith","biome":"Desert","boss":false,"hp":16,"dmg":7,"spd":95},{"id":"e8","name":"Cracked Scarab","biome":"Desert","boss":false,"hp":14,"dmg":5,"spd":60},{"id":"e9","name":"Mirage Jackal","biome":"Desert","boss":false,"hp":20,"dmg":8,"spd":105},{"id":"e10","name":"Bone Nomad","biome":"Desert","boss":false,"hp":30,"dmg":10,"spd":65},{"id":"e11","name":"The Sun-Scorched Colossus","biome":"Desert","boss":true,"hp":520,"dmg":26,"spd":40},{"id":"e12","name":"Frost Imp","biome":"Ice Cavern","boss":false,"hp":16,"dmg":6,"spd":85},{"id":"e13","name":"Glacier Bat","biome":"Ice Cavern","boss":false,"hp":12,"dmg":5,"spd":110},{"id":"e14","name":"Rime Wolf","biome":"Ice Cavern","boss":false,"hp":26,"dmg":9,"spd":95},{"id":"e15","name":"Icicle Shard Golem","biome":"Ice Cavern","boss":false,"hp":40,"dmg":11,"spd":40},{"id":"e16","name":"Permafrost Wisp","biome":"Ice Cavern","boss":false,"hp":18,"dmg":7,"spd":70},{"id":"e17","name":"The Hollow King of Frost","biome":"Ice Cavern","boss":true,"hp":600,"dmg":28,"spd":42},{"id":"e18","name":"Ember Whelp","biome":"Volcano","boss":false,"hp":20,"dmg":8,"spd":90},{"id":"e19","name":"Cinder Hound","biome":"Volcano","boss":false,"hp":24,"dmg":9,"spd":100},{"id":"e20","name":"Magma Crab","biome":"Volcano","boss":false,"hp":38,"dmg":10,"spd":50},{"id":"e21","name":"Ashen Revenant","biome":"Volcano","boss":false,"hp":22,"dmg":8,"spd":75},{"id":"e22","name":"Sulfur Wraith","biome":"Volcano","boss":false,"hp":18,"dmg":9,"spd":95},{"id":"e23","name":"The Molten Devourer","biome":"Volcano","boss":true,"hp":680,"dmg":32,"spd":44},{"id":"e24","name":"Void Shard","biome":"The Void","boss":false,"hp":16,"dmg":8,"spd":100},{"id":"e25","name":"Null Stalker","biome":"The Void","boss":false,"hp":26,"dmg":10,"spd":90},{"id":"e26","name":"Whispering Husk","biome":"The Void","boss":false,"hp":22,"dmg":9,"spd":80},{"id":"e27","name":"Abyssal Tendril","biome":"The Void","boss":false,"hp":30,"dmg":11,"spd":60},{"id":"e28","name":"Starless Wraith","biome":"The Void","boss":false,"hp":20,"dmg":10,"spd":110},{"id":"e29","name":"The Unmaker","biome":"The Void","boss":true,"hp":780,"dmg":36,"spd":46}],"biomes":["Forest","Desert","Ice Cavern","Volcano","The Void"],"items":[{"id":"i0","name":"Whittled Oak Dagger","tier":"Common","type":"gear","stats":{"dmg":2},"desc":"A simple blade any village whittler could carve."},{"id":"i1","name":"Boiled Leather Vest","tier":"Common","type":"gear","stats":{"hp":15},"desc":"Cheap, stiff, and just enough to slow a blade."},{"id":"i2","name":"Frayed Bowstring","tier":"Common","type":"gear","stats":{"fireRate":0.05},"desc":"Restrung more times than its owner can count."},{"id":"i3","name":"Iron Nail Bracer","tier":"Common","type":"gear","stats":{"dmg":1,"hp":5},"desc":"Forge scraps hammered into something wearable."},{"id":"i4","name":"Cracked Clay Flask","tier":"Common","type":"gear","stats":{"hp":10},"desc":"Holds just enough tonic to matter."},{"id":"i5","name":"Rusted Buckle Belt","tier":"Common","type":"gear","stats":{"spd":4},"desc":"Loose enough to run in, tight enough to hold."},{"id":"i6","name":"Tallow Candle Charm","tier":"Common","type":"gear","stats":{"hp":8},"desc":"Villagers light one for luck before the hunt."},{"id":"i7","name":"Plain Wool Cloak","tier":"Common","type":"gear","stats":{"hp":12},"desc":"Warm, drab, and unremarkable."},{"id":"i8","name":"Splintered Ash Bow","tier":"Common","type":"gear","stats":{"dmg":2,"fireRate":0.02},"desc":"Strung from the same tree it was cut."},{"id":"i9","name":"Dull Bronze Ring","tier":"Common","type":"gear","stats":{"dmg":1},"desc":"Worn smooth by a hundred years of hands."},{"id":"i10","name":"Sackcloth Quiver","tier":"Common","type":"gear","stats":{"fireRate":0.03},"desc":"Holds arrows, mostly."},{"id":"i11","name":"Copper Thimble Charm","tier":"Common","type":"gear","stats":{"hp":6,"dmg":1},"desc":"A seamstress's ward, repurposed."},{"id":"i12","name":"Wicker Buckler","tier":"Common","type":"gear","stats":{"hp":14},"desc":"Better than nothing. Barely."},{"id":"i13","name":"Knotted Hemp Sling","tier":"Common","type":"gear","stats":{"dmg":3},"desc":"The first weapon most farmhands learn."},{"id":"i14","name":"Faded Traveler's Boots","tier":"Common","type":"gear","stats":{"spd":6},"desc":"Worn thin on a hundred roads."},{"id":"i15","name":"Chipped Flint Arrowhead","tier":"Common","type":"gear","stats":{"dmg":2},"desc":"Still sharp enough to matter."},{"id":"i16","name":"Homespun Tunic","tier":"Common","type":"gear","stats":{"hp":10},"desc":"Stitched by hand, patched twice over."},{"id":"i17","name":"Pewter Luck Coin","tier":"Common","type":"gear","stats":{"dmg":1,"hp":3},"desc":"Flipped before every fight."},{"id":"i18","name":"Waxed Twine Bowstring","tier":"Common","type":"gear","stats":{"fireRate":0.04},"desc":"Holds its tension in the rain."},{"id":"i19","name":"Rough-Hewn Cudgel","tier":"Common","type":"gear","stats":{"dmg":3,"spd":-2},"desc":"Heavy, blunt, and effective."},{"id":"i20","name":"Steel-Banded Warbow","tier":"Rare","type":"gear","stats":{"dmg":6,"fireRate":0.1},"desc":"Strung by the Ashford armory's finest."},{"id":"i21","name":"Silverline Cuirass","tier":"Rare","type":"gear","stats":{"hp":40,"spd":-3},"desc":"Silver inlay wards off more than steel."},{"id":"i22","name":"Huntsman's Fletched Quiver","tier":"Rare","type":"gear","stats":{"fireRate":0.15},"desc":"Every arrow flies true from this quiver."},{"id":"i23","name":"Tempered Bronze Greaves","tier":"Rare","type":"gear","stats":{"spd":12,"hp":10},"desc":"Light enough to sprint, strong enough to hold."},{"id":"i24","name":"Warden's Signet Ring","tier":"Rare","type":"gear","stats":{"dmg":5,"hp":15},"desc":"Marks its bearer as sworn to the wood."},{"id":"i25","name":"Gale-Touched Cloak","tier":"Rare","type":"gear","stats":{"spd":18},"desc":"Stitched with feathers from a storm hawk."},{"id":"i26","name":"Blacksteel Shortsword","tier":"Rare","type":"gear","stats":{"dmg":8},"desc":"Quenched in oil, not water, for a darker edge."},{"id":"i27","name":"Runed Oak Buckler","tier":"Rare","type":"gear","stats":{"hp":35,"dmg":2},"desc":"Faint sigils glow when struck."},{"id":"i28","name":"Falconer's Leather Gloves","tier":"Rare","type":"gear","stats":{"fireRate":0.08,"dmg":3},"desc":"Grip trained on a hundred hunts."},{"id":"i29","name":"Moonsilver Amulet","tier":"Rare","type":"gear","stats":{"hp":25,"spd":6},"desc":"Cool to the touch, even by the forge."},{"id":"i30","name":"Battleworn Chain Vest","tier":"Rare","type":"gear","stats":{"hp":45},"desc":"Links reforged after three campaigns."},{"id":"i31","name":"Ashford Longbow","tier":"Rare","type":"gear","stats":{"dmg":7,"fireRate":0.06},"desc":"Carries the maker's mark of Ashford."},{"id":"i32","name":"Traveler's Brass Compass","tier":"Rare","type":"gear","stats":{"spd":10,"hp":8},"desc":"Never once pointed wrong."},{"id":"i33","name":"Wolfhide Mantle","tier":"Rare","type":"gear","stats":{"hp":30,"dmg":3},"desc":"Taken from a beast twice a man's size."},{"id":"i34","name":"Etched Iron Vambrace","tier":"Rare","type":"gear","stats":{"dmg":6,"hp":12},"desc":"Etchings ward off the worst of the blow."},{"id":"i35","name":"Piper's Lucky Charm","tier":"Rare","type":"gear","stats":{"dmg":4,"spd":8},"desc":"Said to have saved its last three owners."},{"id":"i36","name":"Reinforced Yew Longbow","tier":"Rare","type":"gear","stats":{"dmg":6,"fireRate":0.09},"desc":"Yew from the old grove, reinforced with sinew."},{"id":"i37","name":"Guildmark Pendant","tier":"Rare","type":"gear","stats":{"hp":20,"dmg":4},"desc":"Marks a journeyman's rank, hard-earned."},{"id":"i38","name":"Quicksilver Draught Flask","tier":"Rare","type":"gear","stats":{"fireRate":0.12},"desc":"One sip and the world seems to slow."},{"id":"i39","name":"Hardened Bronze Sabatons","tier":"Rare","type":"gear","stats":{"hp":22,"spd":5},"desc":"Forged for a march that never ends."},{"id":"i40","name":"Emberfall Greatbow","tier":"Legendary","type":"gear","stats":{"dmg":16,"fireRate":0.2},"desc":"Once wielded at the siege of Emberfall."},{"id":"i41","name":"Warden's Aegis Plate","tier":"Legendary","type":"gear","stats":{"hp":90,"dmg":4},"desc":"Forged for the last Warden of the Wood."},{"id":"i42","name":"Stormcaller's Mantle","tier":"Legendary","type":"gear","stats":{"spd":30,"dmg":8},"desc":"Lightning still dances along its seams."},{"id":"i43","name":"Bloodroot Fang Blade","tier":"Legendary","type":"gear","stats":{"dmg":20},"desc":"Its edge never truly dries."},{"id":"i44","name":"Crown of the Hollow King","tier":"Legendary","type":"gear","stats":{"hp":60,"dmg":10},"desc":"Taken from a throne long since buried in ice."},{"id":"i45","name":"Sunscorch Warhammer","tier":"Legendary","type":"gear","stats":{"dmg":22,"spd":-6},"desc":"Still radiates the volcano's heat."},{"id":"i46","name":"Nightveil Assassin's Cloak","tier":"Legendary","type":"gear","stats":{"dmg":12,"spd":20},"desc":"Woven from shadow-silk, or so it's said."},{"id":"i47","name":"Ironroot Bulwark","tier":"Legendary","type":"gear","stats":{"hp":100},"desc":"A shield grown, not forged, from the world-tree's root."},{"id":"i48","name":"Gale-Forged Recurve Bow","tier":"Legendary","type":"gear","stats":{"dmg":14,"fireRate":0.22},"desc":"Strung with a captured storm's own wind."},{"id":"i49","name":"Ashen Reliquary Amulet","tier":"Legendary","type":"gear","stats":{"hp":50,"dmg":8},"desc":"Once held the ashes of a fallen saint."},{"id":"i50","name":"Frostbrand Longsword","tier":"Legendary","type":"gear","stats":{"dmg":18,"spd":6},"desc":"Never warms, no matter the forge."},{"id":"i51","name":"Dragoncoil Chainmail","tier":"Legendary","type":"gear","stats":{"hp":80,"spd":8},"desc":"Links salvaged from a wyrm's own hide."},{"id":"i52","name":"Voidglass Warstaff","tier":"Legendary","type":"gear","stats":{"dmg":17,"fireRate":0.15},"desc":"Its core holds a sliver of the Void."},{"id":"i53","name":"Guardian's Last Vow Shield","tier":"Legendary","type":"gear","stats":{"hp":95,"dmg":5},"desc":"Sworn to protect long after its bearer fell."},{"id":"i54","name":"Talon of the Green Warden","tier":"Legendary","type":"gear","stats":{"dmg":15,"spd":14},"desc":"A relic claw from the forest's oldest guardian."},{"id":"i55","name":"Suncrest Plate Armor","tier":"Legendary","type":"gear","stats":{"hp":85,"dmg":6},"desc":"Blazoned with the sigil of a fallen kingdom."},{"id":"i56","name":"Wyrmscale Buckler","tier":"Legendary","type":"gear","stats":{"hp":70,"dmg":9},"desc":"Scales that turn steel like water."},{"id":"i57","name":"Ravenfeather Longbow","tier":"Legendary","type":"gear","stats":{"dmg":15,"fireRate":0.18},"desc":"Fletched with feathers that never molt."},{"id":"i58","name":"Molten Core Gauntlets","tier":"Legendary","type":"gear","stats":{"dmg":19,"hp":20},"desc":"Warm enough to keep forging, cold be damned."},{"id":"i59","name":"Duskbound Warblade","tier":"Legendary","type":"gear","stats":{"dmg":21,"spd":4},"desc":"Drinks in the last light of day."},{"id":"i60","name":"Heart of the Green Warden","tier":"Mythic","type":"gear","stats":{"hp":140,"dmg":14,"spd":10},"desc":"Still beats, faintly, centuries on."},{"id":"i61","name":"Shard of the Unmaker","tier":"Mythic","type":"gear","stats":{"dmg":32,"fireRate":0.3},"desc":"A fragment of something that should not be."},{"id":"i62","name":"Crown of the Sun-Scorched Colossus","tier":"Mythic","type":"gear","stats":{"hp":120,"dmg":18},"desc":"Melts nothing it does not choose to."},{"id":"i63","name":"Aegis of the Hollow King","tier":"Mythic","type":"gear","stats":{"hp":160,"dmg":10},"desc":"Frost that never thaws, will that never breaks."},{"id":"i64","name":"Emberheart of the Molten Devourer","tier":"Mythic","type":"gear","stats":{"dmg":28,"hp":60},"desc":"A coal that has never once gone cold."},{"id":"i65","name":"Whisper of the Starless Wraith","tier":"Mythic","type":"gear","stats":{"dmg":24,"spd":26},"desc":"Speaks in a tongue no living ear should hear."},{"id":"i66","name":"Fang of the First Wolf","tier":"Mythic","type":"gear","stats":{"dmg":26,"spd":12},"desc":"Older than the forests it was found in."},{"id":"i67","name":"Chalice of Endless Tide","tier":"Mythic","type":"gear","stats":{"hp":110,"dmg":12},"desc":"Never runs dry, never runs still."},{"id":"i68","name":"Diadem of the Ashfallen Queen","tier":"Mythic","type":"gear","stats":{"hp":100,"dmg":16,"spd":8},"desc":"Worn by a queen who ruled in embers."},{"id":"i69","name":"Godsplinter Warblade","tier":"Mythic","type":"gear","stats":{"dmg":34},"desc":"A shard of something once wielded by legend."},{"id":"i70","name":"Mantle of the Void-Touched","tier":"Mythic","type":"gear","stats":{"dmg":22,"spd":24},"desc":"Threads that unravel into nothing at the edges."},{"id":"i71","name":"Warhorn of the Last Bastion","tier":"Mythic","type":"gear","stats":{"hp":130,"dmg":13},"desc":"Its call once turned back an army."},{"id":"i72","name":"Everember Battlestaff","tier":"Mythic","type":"gear","stats":{"dmg":27,"fireRate":0.25},"desc":"Never cools, never dims, never rests."},{"id":"i73","name":"Relic Core of the Colossus","tier":"Mythic","type":"gear","stats":{"hp":150,"dmg":8},"desc":"The engine that once moved a mountain."},{"id":"i74","name":"Starless Aegis","tier":"Mythic","type":"gear","stats":{"hp":90,"dmg":20},"desc":"A shield forged from a hole in the sky."},{"id":"i75","name":"Crown of Embers Eternal","tier":"Mythic","type":"gear","stats":{"dmg":25,"hp":70},"desc":"It is said this crown has never gone cold."},{"id":"i76","name":"Vial of Vigor Tonic","tier":"Utility","type":"utility","stats":{"hp":18},"desc":"A field medic's favorite brew."},{"id":"i77","name":"Pouch of Enchant Dust","tier":"Utility","type":"utility","stats":{"dust":3},"desc":"Fine golden dust, humming faintly."},{"id":"i78","name":"Traveler's Ration Pack","tier":"Utility","type":"utility","stats":{"hp":10,"spd":3},"desc":"Dried meat and hard bread, but it works."},{"id":"i79","name":"Whetstone of Sharpening","tier":"Utility","type":"utility","stats":{"dmg":3},"desc":"A few strokes and the edge sings again."},{"id":"i80","name":"Sachet of Swift Herbs","tier":"Utility","type":"utility","stats":{"spd":8},"desc":"Chew one and the road feels shorter."},{"id":"i81","name":"Brass Compass of Bearing","tier":"Utility","type":"utility","stats":{"spd":5,"hp":5},"desc":"Always finds true north, and safe ground."},{"id":"i82","name":"Alchemist's Mixing Flask","tier":"Utility","type":"utility","stats":{"dust":2},"desc":"Used to distill enchanting reagents."},{"id":"i83","name":"Sunfired Clay Talisman","tier":"Utility","type":"utility","stats":{"dmg":4},"desc":"Baked in a kiln blessed by the chapel."},{"id":"i84","name":"Woodcarver's Lucky Token","tier":"Utility","type":"utility","stats":{"hp":8,"dmg":1},"desc":"Carved from the same oak, every time."},{"id":"i85","name":"Pouch of Gold Dust","tier":"Utility","type":"utility","stats":{"gold":10},"desc":"A trader's parting gift."},{"id":"i86","name":"Gem-Flecked Waterskin","tier":"Utility","type":"utility","stats":{"hp":14},"desc":"The water inside never quite runs out."},{"id":"i87","name":"Scroll of Minor Warding","tier":"Utility","type":"utility","stats":{"hp":20},"desc":"A single-use ward, bound in old ink."},{"id":"i88","name":"Vial of Enchanter's Oil","tier":"Utility","type":"utility","stats":{"dust":4},"desc":"Slick, golden, and faintly warm."},{"id":"i89","name":"Bundle of Fletching Feathers","tier":"Utility","type":"utility","stats":{"fireRate":0.05},"desc":"Enough to refletch a whole quiver."},{"id":"i90","name":"Trader's Weighing Scale","tier":"Utility","type":"utility","stats":{"gold":15},"desc":"Never once caught cheating."},{"id":"i91","name":"Satchel of Camp Provisions","tier":"Utility","type":"utility","stats":{"hp":16,"spd":2},"desc":"Everything needed for one more night out."},{"id":"i92","name":"Reliquary Dust Bundle","tier":"Utility","type":"utility","stats":{"dust":5},"desc":"Swept from the floor of an old shrine."},{"id":"i93","name":"Cracked Hourglass Charm","tier":"Utility","type":"utility","stats":{"fireRate":0.07},"desc":"Sand that never quite stops falling."},{"id":"i94","name":"Merchant's Brass Token","tier":"Utility","type":"utility","stats":{"gold":20},"desc":"Redeemable for goods, or so it once was."},{"id":"i95","name":"Field Surgeon's Kit","tier":"Utility","type":"utility","stats":{"hp":22},"desc":"Bandages, thread, and steady hands."},{"id":"i96","name":"Sack of Polishing Grit","tier":"Utility","type":"utility","stats":{"dust":2,"dmg":1},"desc":"Used to finish a blade's final edge."},{"id":"i97","name":"Wanderer's Waxed Map","tier":"Utility","type":"utility","stats":{"spd":6,"gold":5},"desc":"Marks every shortcut worth taking."},{"id":"i98","name":"Chapel Blessing Candle","tier":"Utility","type":"utility","stats":{"hp":12,"dust":1},"desc":"Lit before every dangerous crossing."},{"id":"i99","name":"Prospector's Grubstake Pouch","tier":"Utility","type":"utility","stats":{"gold":25},"desc":"A small fortune, if spent wisely."}],"recipes":[{"id":"r0","output":"Steel-Banded Warbow","inputs":["Whittled Oak Dagger","Boiled Leather Vest"],"gold":40},{"id":"r1","output":"Silverline Cuirass","inputs":["Boiled Leather Vest","Frayed Bowstring"],"gold":45},{"id":"r2","output":"Huntsman's Fletched Quiver","inputs":["Frayed Bowstring","Iron Nail Bracer"],"gold":50},{"id":"r3","output":"Tempered Bronze Greaves","inputs":["Iron Nail Bracer","Cracked Clay Flask"],"gold":55},{"id":"r4","output":"Warden's Signet Ring","inputs":["Cracked Clay Flask","Rusted Buckle Belt"],"gold":60},{"id":"r5","output":"Gale-Touched Cloak","inputs":["Rusted Buckle Belt","Tallow Candle Charm"],"gold":65},{"id":"r6","output":"Blacksteel Shortsword","inputs":["Tallow Candle Charm","Plain Wool Cloak"],"gold":70},{"id":"r7","output":"Runed Oak Buckler","inputs":["Plain Wool Cloak","Splintered Ash Bow"],"gold":75},{"id":"r8","output":"Falconer's Leather Gloves","inputs":["Splintered Ash Bow","Dull Bronze Ring"],"gold":80},{"id":"r9","output":"Moonsilver Amulet","inputs":["Dull Bronze Ring","Sackcloth Quiver"],"gold":85},{"id":"r10","output":"Battleworn Chain Vest","inputs":["Sackcloth Quiver","Copper Thimble Charm"],"gold":90},{"id":"r11","output":"Ashford Longbow","inputs":["Copper Thimble Charm","Wicker Buckler"],"gold":95},{"id":"r12","output":"Traveler's Brass Compass","inputs":["Wicker Buckler","Knotted Hemp Sling"],"gold":100},{"id":"r13","output":"Wolfhide Mantle","inputs":["Knotted Hemp Sling","Faded Traveler's Boots"],"gold":105},{"id":"r14","output":"Etched Iron Vambrace","inputs":["Faded Traveler's Boots","Chipped Flint Arrowhead"],"gold":110},{"id":"r15","output":"Piper's Lucky Charm","inputs":["Chipped Flint Arrowhead","Homespun Tunic"],"gold":115},{"id":"r16","output":"Reinforced Yew Longbow","inputs":["Homespun Tunic","Pewter Luck Coin"],"gold":120},{"id":"r17","output":"Guildmark Pendant","inputs":["Pewter Luck Coin","Waxed Twine Bowstring"],"gold":125},{"id":"r18","output":"Quicksilver Draught Flask","inputs":["Waxed Twine Bowstring","Rough-Hewn Cudgel"],"gold":130},{"id":"r19","output":"Hardened Bronze Sabatons","inputs":["Rough-Hewn Cudgel","Whittled Oak Dagger"],"gold":135},{"id":"r20","output":"Emberfall Greatbow","inputs":["Steel-Banded Warbow","Tempered Bronze Greaves"],"gold":120},{"id":"r21","output":"Warden's Aegis Plate","inputs":["Silverline Cuirass","Warden's Signet Ring"],"gold":130},{"id":"r22","output":"Stormcaller's Mantle","inputs":["Huntsman's Fletched Quiver","Gale-Touched Cloak"],"gold":140},{"id":"r23","output":"Bloodroot Fang Blade","inputs":["Tempered Bronze Greaves","Blacksteel Shortsword"],"gold":150},{"id":"r24","output":"Crown of the Hollow King","inputs":["Warden's Signet Ring","Runed Oak Buckler"],"gold":160},{"id":"r25","output":"Sunscorch Warhammer","inputs":["Gale-Touched Cloak","Falconer's Leather Gloves"],"gold":170},{"id":"r26","output":"Nightveil Assassin's Cloak","inputs":["Blacksteel Shortsword","Moonsilver Amulet"],"gold":180},{"id":"r27","output":"Ironroot Bulwark","inputs":["Runed Oak Buckler","Battleworn Chain Vest"],"gold":190},{"id":"r28","output":"Gale-Forged Recurve Bow","inputs":["Falconer's Leather Gloves","Ashford Longbow"],"gold":200},{"id":"r29","output":"Ashen Reliquary Amulet","inputs":["Moonsilver Amulet","Traveler's Brass Compass"],"gold":210},{"id":"r30","output":"Frostbrand Longsword","inputs":["Battleworn Chain Vest","Wolfhide Mantle"],"gold":220},{"id":"r31","output":"Dragoncoil Chainmail","inputs":["Ashford Longbow","Etched Iron Vambrace"],"gold":230},{"id":"r32","output":"Voidglass Warstaff","inputs":["Traveler's Brass Compass","Piper's Lucky Charm"],"gold":240},{"id":"r33","output":"Guardian's Last Vow Shield","inputs":["Wolfhide Mantle","Reinforced Yew Longbow"],"gold":250},{"id":"r34","output":"Talon of the Green Warden","inputs":["Etched Iron Vambrace","Guildmark Pendant"],"gold":260},{"id":"r35","output":"Heart of the Green Warden","inputs":["Emberfall Greatbow","Ironroot Bulwark","Pouch of Enchant Dust"],"gold":300},{"id":"r36","output":"Shard of the Unmaker","inputs":["Warden's Aegis Plate","Gale-Forged Recurve Bow","Vial of Enchanter's Oil"],"gold":320},{"id":"r37","output":"Crown of the Sun-Scorched Colossus","inputs":["Stormcaller's Mantle","Ashen Reliquary Amulet","Reliquary Dust Bundle"],"gold":340},{"id":"r38","output":"Aegis of the Hollow King","inputs":["Bloodroot Fang Blade","Frostbrand Longsword","Pouch of Enchant Dust"],"gold":360},{"id":"r39","output":"Emberheart of the Molten Devourer","inputs":["Crown of the Hollow King","Dragoncoil Chainmail","Vial of Enchanter's Oil"],"gold":380},{"id":"r40","output":"Whisper of the Starless Wraith","inputs":["Sunscorch Warhammer","Voidglass Warstaff","Reliquary Dust Bundle"],"gold":400},{"id":"r41","output":"Fang of the First Wolf","inputs":["Nightveil Assassin's Cloak","Guardian's Last Vow Shield","Pouch of Enchant Dust"],"gold":420},{"id":"r42","output":"Chalice of Endless Tide","inputs":["Ironroot Bulwark","Talon of the Green Warden","Vial of Enchanter's Oil"],"gold":440},{"id":"r43","output":"Diadem of the Ashfallen Queen","inputs":["Gale-Forged Recurve Bow","Suncrest Plate Armor","Reliquary Dust Bundle"],"gold":460},{"id":"r44","output":"Godsplinter Warblade","inputs":["Ashen Reliquary Amulet","Wyrmscale Buckler","Pouch of Enchant Dust"],"gold":480},{"id":"r45","output":"Suncrest Plate Armor","inputs":["Vial of Vigor Tonic","Woodcarver's Lucky Token","Reliquary Dust Bundle"],"gold":150},{"id":"r46","output":"Wyrmscale Buckler","inputs":["Pouch of Enchant Dust","Pouch of Gold Dust","Cracked Hourglass Charm"],"gold":160},{"id":"r47","output":"Ravenfeather Longbow","inputs":["Traveler's Ration Pack","Gem-Flecked Waterskin","Merchant's Brass Token"],"gold":170},{"id":"r48","output":"Molten Core Gauntlets","inputs":["Whetstone of Sharpening","Scroll of Minor Warding","Field Surgeon's Kit"],"gold":180},{"id":"r49","output":"Duskbound Warblade","inputs":["Sachet of Swift Herbs","Vial of Enchanter's Oil","Sack of Polishing Grit"],"gold":190}],"passives":[{"id":"p0","name":"Whetstone Edge","key":"dmg_pct","value":8,"descTemplate":"Increase damage by {v}%."},{"id":"p1","name":"Forge-Tempered Blade","key":"dmg_pct","value":8,"descTemplate":"Increase damage by {v}%."},{"id":"p2","name":"Swift Boots","key":"spd_pct","value":10,"descTemplate":"Increase move speed by {v}%."},{"id":"p3","name":"Wind-Sworn Cloak","key":"spd_pct","value":10,"descTemplate":"Increase move speed by {v}%."},{"id":"p4","name":"Stalwart Heart","key":"hp_pct","value":15,"descTemplate":"Increase max HP by {v}%."},{"id":"p5","name":"Oaken Resolve","key":"hp_pct","value":15,"descTemplate":"Increase max HP by {v}%."},{"id":"p6","name":"Hearthfire Regeneration","key":"regen","value":1,"descTemplate":"Regenerate {v}% of max HP per second."},{"id":"p7","name":"Blessed Poultice","key":"regen","value":1,"descTemplate":"Regenerate {v}% of max HP per second."},{"id":"p8","name":"Falcon's Focus","key":"crit_chance","value":8,"descTemplate":"Increase critical hit chance by {v}%."},{"id":"p9","name":"Executioner's Instinct","key":"crit_dmg","value":25,"descTemplate":"Increase critical hit damage by {v}%."},{"id":"p10","name":"Broadhead Fletching","key":"pierce","value":1,"descTemplate":"Projectiles pierce {v} additional enemy."},{"id":"p11","name":"Ashford Quickdraw","key":"fire_rate_pct","value":12,"descTemplate":"Increase fire rate by {v}%."},{"id":"p12","name":"Windrunner's Draft","key":"proj_speed_pct","value":15,"descTemplate":"Increase projectile speed by {v}%."},{"id":"p13","name":"Ranger's Wide Aim","key":"aoe_pct","value":20,"descTemplate":"Increase splash radius by {v}%."},{"id":"p14","name":"Golden Harvest","key":"xp_pct","value":15,"descTemplate":"Increase XP gained by {v}%."},{"id":"p15","name":"Merchant's Eye","key":"gold_pct","value":15,"descTemplate":"Increase gold gained by {v}%."},{"id":"p16","name":"Fan of Blades","key":"multishot","value":1,"descTemplate":"Fire {v} additional projectile."},{"id":"p17","name":"Twin-Nocked Bow","key":"multishot","value":1,"descTemplate":"Fire {v} additional projectile."},{"id":"p18","name":"Blood Ward Sigil","key":"lifesteal","value":4,"descTemplate":"Heal for {v}% of damage dealt."},{"id":"p19","name":"Barbed Plate","key":"thorns","value":10,"descTemplate":"Reflect {v}% of damage taken."},{"id":"p20","name":"Sure Footing","key":"dodge","value":5,"descTemplate":"Gain {v}% chance to dodge an attack."},{"id":"p21","name":"Lodestone Charm","key":"magnet","value":40,"descTemplate":"Increase pickup radius by {v}."},{"id":"p22","name":"Chapel Armor","key":"armor","value":6,"descTemplate":"Reduce incoming damage by {v}%."},{"id":"p23","name":"Rime Aura","key":"slow_aura","value":15,"descTemplate":"Enemies near you are slowed by {v}%."},{"id":"p24","name":"Storm-Touched Rounds","key":"chain","value":1,"descTemplate":"Attacks chain to {v} additional enemy."},{"id":"p25","name":"Powder Keg Rounds","key":"explosive","value":15,"descTemplate":"Attacks explode for {v}% splash damage."},{"id":"p26","name":"Frostbrand Coating","key":"freeze_chance","value":10,"descTemplate":"Attacks have {v}% chance to freeze briefly."},{"id":"p27","name":"Cinderfall Coating","key":"burn_chance","value":12,"descTemplate":"Attacks have {v}% chance to ignite for burn damage."},{"id":"p28","name":"Warhammer's Momentum","key":"knockback","value":20,"descTemplate":"Attacks knock enemies back {v}% farther."},{"id":"p29","name":"Guardian Angel Vow","key":"revive","value":1,"descTemplate":"Survive a fatal blow once per run (min. {v} time)."}],"pets":[{"id":"pet_ember_fox","name":"Ember Fox","tier":"Common","statKey":"dmg_pct","base":1.0,"perLevel":0.4,"desc":"A small fox with coals for eyes, forever underfoot."},{"id":"pet_stone_badger","name":"Stone Badger","tier":"Common","statKey":"hp_pct","base":1.5,"perLevel":0.6,"desc":"Digs in and refuses to budge, much like its owner."},{"id":"pet_field_sparrow","name":"Field Sparrow","tier":"Common","statKey":"gold_pct","base":1.0,"perLevel":0.5,"desc":"Always seems to know where the coin purses fell."},{"id":"pet_moonlit_owl","name":"Moonlit Owl","tier":"Rare","statKey":"crit_chance","base":1.5,"perLevel":0.5,"desc":"Sees the weak point in everything, given enough moonlight."},{"id":"pet_iron_scaled_newt","name":"Iron-Scaled Newt","tier":"Rare","statKey":"armor","base":1.0,"perLevel":0.4,"desc":"Its hide has turned aside more blades than most shields."},{"id":"pet_bramble_hare","name":"Bramble Hare","tier":"Rare","statKey":"spd_pct","base":2.0,"perLevel":0.6,"desc":"Faster than anything with legs that short should be."},{"id":"pet_storm_griffin_chick","name":"Storm Griffin Chick","tier":"Legendary","statKey":"fire_rate_pct","base":2.0,"perLevel":0.8,"desc":"Too young to fly, but its shrieks quicken every hand nearby."},{"id":"pet_ashwing_drake","name":"Ashwing Drake","tier":"Legendary","statKey":"dmg_pct","base":2.5,"perLevel":0.9,"desc":"A drake the size of a hound, and twice as short-tempered."},{"id":"pet_voidling_wisp","name":"Voidling Wisp","tier":"Mythic","statKey":"xp_pct","base":3.0,"perLevel":1.1,"desc":"A fragment of the Void that chose, for reasons unknown, to follow."},{"id":"pet_aureate_phoenix","name":"Aureate Phoenix","tier":"Mythic","statKey":"regen","base":0.3,"perLevel":0.12,"desc":"Its feathers smolder gold; it has died before and did not mind."}],"guilds":[{"id":"guild_brass_anvil","name":"Order of the Brass Anvil","statKey":"gold_pct","value":10,"desc":"Guild of smiths and traders. Members find more gold in every run."},{"id":"guild_silver_bow","name":"Circle of the Silver Bow","statKey":"crit_chance","value":6,"desc":"Guild of marksmen. Members strike true more often."},{"id":"guild_ember_vow","name":"Hearth of the Ember Vow","statKey":"dmg_pct","value":8,"desc":"Guild of zealots. Members burn brighter in battle."},{"id":"guild_deep_root","name":"Wardens of the Deep Root","statKey":"hp_pct","value":12,"desc":"Guild of druids. Members are hardier of body."},{"id":"guild_hollow_star","name":"Covenant of the Hollow Star","statKey":"xp_pct","value":10,"desc":"Guild of Void-touched scholars. Members learn faster from every kill."}],"metaUpgrades":[{"id":"meta_vitality","name":"Vitality Shrine","statKey":"hp_pct","perLevel":4,"maxLevel":10,"baseCost":100,"currency":"gold","desc":"A shrine blessing that thickens the blood. +{v}% max HP per level."},{"id":"meta_tempering","name":"Forge Tempering","statKey":"dmg_pct","perLevel":4,"maxLevel":10,"baseCost":120,"currency":"gold","desc":"Every weapon is quenched twice. +{v}% damage per level."},{"id":"meta_march","name":"Swift March","statKey":"spd_pct","perLevel":3,"maxLevel":10,"baseCost":90,"currency":"gold","desc":"Drilled marching footwork. +{v}% move speed per level."},{"id":"meta_luckycoin","name":"Lucky Coin","statKey":"gold_pct","perLevel":5,"maxLevel":10,"baseCost":110,"currency":"gold","desc":"A coin that always lands favorably. +{v}% gold found per level."},{"id":"meta_reservoir","name":"Arcane Reservoir","statKey":"xp_pct","perLevel":5,"maxLevel":10,"baseCost":110,"currency":"gold","desc":"Bottled insight from a hundred fallen scholars. +{v}% XP gained per level."},{"id":"meta_gemcutter","name":"Gemcutter's Eye","statKey":"gem_chance","perLevel":2,"maxLevel":10,"baseCost":30,"currency":"gems","desc":"Trains the eye to spot flaws worth cutting. +{v}% chance bosses drop bonus gems."},{"id":"meta_ironwill","name":"Iron Will","statKey":"armor","perLevel":2,"maxLevel":10,"baseCost":130,"currency":"gold","desc":"Discipline that steels the body against pain. +{v}% damage reduction per level."},{"id":"meta_secondchance","name":"Second Chance","statKey":"revive_chance","perLevel":8,"maxLevel":5,"baseCost":60,"currency":"gems","desc":"A ward against the final blow. +{v}% chance to survive a killing hit once per run."}],"banners":{"hero":{"id":"banner_hero","name":"Champion's Call","currency":"gems","cost":100,"pity":50,"odds":[{"label":"Random unlockable hero (9 available)","chance":100}]},"item":{"id":"banner_item","name":"Vault of Relics","currency":"gems","cost":50,"pity":10,"odds":[{"label":"Common","chance":45},{"label":"Rare","chance":30},{"label":"Legendary","chance":18},{"label":"Mythic","chance":7}]},"pet":{"id":"banner_pet","name":"Menagerie Draw","currency":"gems","cost":60,"pity":10,"odds":[{"label":"Common","chance":55},{"label":"Rare","chance":30},{"label":"Legendary","chance":12},{"label":"Mythic","chance":3}]}}};
+
+</script>
+<script>
+/* =========================================================================
+   VOID BREAK - game engine
+   ========================================================================= */
+(function(){
+"use strict";
+
+const SAVE_KEY = "voidbreak_save_v1";
+const TIERS = ["Common","Rare","Legendary","Mythic"];
+const ITEM_TIER_WEIGHT_DEFAULT = {Common:45,Rare:30,Legendary:18,Mythic:7};
+
+// ------------------------------------------------------------------ utils
+function uid(){ return Math.random().toString(36).slice(2)+Date.now().toString(36); }
+function clamp(v,a,b){ return Math.max(a,Math.min(b,v)); }
+function rand(a,b){ return a + Math.random()*(b-a); }
+function pick(arr){ return arr[Math.floor(Math.random()*arr.length)]; }
+function fmtTime(s){ s=Math.floor(s); const m=Math.floor(s/60); const r=s%60; return m+":"+String(r).padStart(2,"0"); }
+function weightedPick(items, weightFn){
+  const total = items.reduce((a,i)=>a+weightFn(i),0);
+  let r = Math.random()*total;
+  for(const it of items){ r -= weightFn(it); if(r<=0) return it; }
+  return items[items.length-1];
+}
+function byId(list,id){ return list.find(x=>x.id===id); }
+function byName(list,name){ return list.find(x=>x.name===name); }
+function itemByName(name){ return byName(DATA.items,name); }
+function heroBudget(h){ return h.hp + h.dmg*8 + h.spd*0.5; }
+
+// ------------------------------------------------------------------ state
+let state = null;
+
+function defaultState(){
+  return {
+    gold: 150, gems: 0, enchantDust: 0,
+    ownedHeroes: DATA.heroes.filter(h=>h.free).map(h=>h.id),
+    selectedHero: DATA.heroes.find(h=>h.free).id,
+    equipped: [null,null,null],
+    inventory: [], // {uid,itemId,enchant}
+    pets: [], // {uid,petId,level}
+    activePets: [null,null],
+    guildId: null,
+    metaLevels: {},
+    gachaPity: {hero:0,item:0,pet:0},
+    stats: {totalRuns:0,totalKills:0,bestWave:0,bestTime:0},
+    density: "auto",
+    firstRunDone: false,
+  };
+}
+
+function loadState(){
+  try{
+    const raw = localStorage.getItem(SAVE_KEY);
+    if(!raw) return defaultState();
+    const s = JSON.parse(raw);
+    const d = defaultState();
+    // shallow-merge with defaults so new fields survive old saves
+    for(const k in d){ if(!(k in s)) s[k]=d[k]; }
+    return s;
+  }catch(e){ console.warn("save load failed", e); return defaultState(); }
+}
+function saveState(){
+  try{ localStorage.setItem(SAVE_KEY, JSON.stringify(state)); }
+  catch(e){ console.warn("save failed", e); }
+}
+
+// ------------------------------------------------------------------ derived helpers
+function invAdd(itemId, count){
+  count = count||1;
+  for(let i=0;i<count;i++) state.inventory.push({uid:uid(), itemId, enchant:0});
+}
+function invCountOf(itemId){ return state.inventory.filter(x=>x.itemId===itemId && !state.equipped.includes(x.uid)).length; }
+function invAllCountOf(itemId){ return state.inventory.filter(x=>x.itemId===itemId).length; }
+function invRemoveOneOf(itemId){
+  const idx = state.inventory.findIndex(x=>x.itemId===itemId && !state.equipped.includes(x.uid));
+  if(idx>=0) state.inventory.splice(idx,1);
+}
+function invFindInstance(uidv){ return state.inventory.find(x=>x.uid===uidv); }
+
+function petOwned(petId){ return state.pets.find(p=>p.petId===petId); }
+
+function metaLevel(id){ return state.metaLevels[id]||0; }
+function metaCost(def, lvl){ return Math.ceil(def.baseCost * (1 + lvl*0.6)); }
+
+// aggregate effective stat bonuses (percent-style keys) from meta+guild+pets (persistent, not run passives)
+function persistentBonuses(){
+  const b = {};
+  function add(key,val){ b[key]=(b[key]||0)+val; }
+  // meta
+  for(const m of DATA.metaUpgrades){
+    const lvl = metaLevel(m.id);
+    if(lvl>0) add(m.statKey, m.perLevel*lvl);
+  }
+  // guild
+  if(state.guildId){
+    const g = byId(DATA.guilds, state.guildId);
+    if(g) add(g.statKey, g.value);
+  }
+  // active pets
+  for(const slot of state.activePets){
+    if(!slot) continue;
+    const inst = petOwned(slot);
+    if(!inst) continue;
+    const def = byId(DATA.pets, inst.petId);
+    if(!def) continue;
+    add(def.statKey, def.base + def.perLevel*(inst.level-1));
+  }
+  return b;
+}
+
+function currentDensity(){
+  if(state.density && state.density!=="auto") return state.density;
+  return Math.min(window.innerWidth, window.innerHeight) >= 600 ? "tablet" : "phone";
+}
+function applyDensity(){
+  document.documentElement.setAttribute("data-density", currentDensity());
+}
+
+// ------------------------------------------------------------------ toast
+let toastTimer=null;
+function toast(msg){
+  const el = document.getElementById("toast");
+  el.textContent = msg;
+  el.classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=>el.classList.remove("show"), 1800);
+}
+
+/* =========================================================================
+   HUB UI
+   ========================================================================= */
+const TABS = [
+  {id:"play", label:"Play", icon:"⚔"},
+  {id:"heroes", label:"Heroes", icon:"♚"},
+  {id:"pets", label:"Pets", icon:"🐾"},
+  {id:"guild", label:"Guild", icon:"☄"},
+  {id:"craft", label:"Craft", icon:"⚒"},
+  {id:"enchant", label:"Enchant", icon:"✦"},
+  {id:"gacha", label:"Gacha", icon:"♦"},
+  {id:"meta", label:"Meta", icon:"◈"},
+  {id:"bank", label:"Bank", icon:"⛁"},
+];
+let activeTab = "play";
+
+function renderHubHeader(){
+  document.getElementById("gold-amt").textContent = state.gold;
+  document.getElementById("gem-amt").textContent = state.gems;
+  document.getElementById("dust-amt").textContent = state.enchantDust;
+}
+
+function renderTabs(){
+  const bar = document.getElementById("hub-tabs");
+  bar.innerHTML = "";
+  for(const t of TABS){
+    const el = document.createElement("div");
+    el.className = "hub-tab" + (t.id===activeTab ? " active":"");
+    el.innerHTML = `<div class="tab-icon">${t.icon}</div><div>${t.label}</div>`;
+    el.onclick = ()=>{ activeTab=t.id; renderHub(); };
+    bar.appendChild(el);
+  }
+}
+
+function renderHub(){
+  renderHubHeader();
+  renderTabs();
+  const body = document.getElementById("hub-body");
+  body.innerHTML = "";
+  body.scrollTop = 0;
+  const renderers = {
+    play: renderPlayTab, heroes: renderHeroesTab, pets: renderPetsTab,
+    guild: renderGuildTab, craft: renderCraftTab, enchant: renderEnchantTab,
+    gacha: renderGachaTab, meta: renderMetaTab, bank: renderBankTab,
+  };
+  renderers[activeTab](body);
+}
+
+function tierClass(tier){ return "tier-"+tier; }
+
+function itemIcon(item){
+  const icons = {gear:"⚔", utility:"⚗"};
+  return icons[item.type]||"✦";
+}
+
+// ---------------- PLAY TAB ----------------
+function renderPlayTab(body){
+  const hero = byId(DATA.heroes, state.selectedHero);
+  const panel = document.createElement("div");
+  panel.className = "panel flex-col";
+  panel.innerHTML = `
+    <h2>Prepare for the Run</h2>
+    <div class="row">
+      <div class="flex-col">
+        <div class="name" style="font-size:var(--font-lg);color:var(--c-brass-bright)">${hero.name}</div>
+        <div class="muted">${hero.desc}</div>
+      </div>
+      <div class="hero-portrait" style="width:64px;background-color:${hero.color}33;border-color:${hero.color}">⚔</div>
+    </div>
+    <div class="wrap-row muted" style="font-size:var(--font-sm)">
+      <span>HP ${hero.hp}</span><span>DMG ${hero.dmg}</span><span>SPD ${hero.spd}</span>
+      <span>Fire Rate ${hero.fireRate}/s</span><span>Passive: ${hero.passiveName}</span>
+    </div>
+    <button class="btn secondary" id="choose-hero-btn">Choose Different Hero</button>
+  `;
+  body.appendChild(panel);
+
+  const loadout = document.createElement("div");
+  loadout.className = "panel flex-col";
+  loadout.style.marginTop = "var(--gap)";
+  loadout.innerHTML = `<h2>Loadout (3 slots)</h2>`;
+  const slotsWrap = document.createElement("div");
+  slotsWrap.className = "wrap-row";
+  state.equipped.forEach((slotUid, idx)=>{
+    const inst = slotUid ? invFindInstance(slotUid) : null;
+    const def = inst ? DATA.items.find(i=>i.id===inst.itemId) : null;
+    const card = document.createElement("div");
+    card.className = "card";
+    card.style.width = "150px";
+    card.style.cursor = "pointer";
+    if(def){
+      card.innerHTML = `<span class="tier ${tierClass(def.tier)}">${def.tier}</span>
+        <div class="name">${def.name}${inst.enchant?` +${inst.enchant}`:""}</div>
+        <div class="stats">${statLine(def.stats)}</div>
+        <button class="btn danger small">Unequip</button>`;
+      card.querySelector("button").onclick = (e)=>{ e.stopPropagation(); state.equipped[idx]=null; saveState(); renderHub(); };
+    } else {
+      card.innerHTML = `<div class="name muted">Empty Slot</div><div class="desc">Tap to equip gear</div>`;
+      card.onclick = ()=> openEquipPicker(idx);
+    }
+    slotsWrap.appendChild(card);
+  });
+  loadout.appendChild(slotsWrap);
+  body.appendChild(loadout);
+
+  const petPanel = document.createElement("div");
+  petPanel.className = "panel flex-col";
+  petPanel.style.marginTop = "var(--gap)";
+  petPanel.innerHTML = `<h2>Active Pets (2 slots)</h2>`;
+  const petWrap = document.createElement("div");
+  petWrap.className = "wrap-row";
+  state.activePets.forEach((petId, idx)=>{
+    const inst = petId ? petOwned(petId) : null;
+    const def = inst ? byId(DATA.pets, inst.petId) : null;
+    const card = document.createElement("div");
+    card.className = "card";
+    card.style.width = "150px";
+    card.style.cursor = "pointer";
+    if(def){
+      card.innerHTML = `<span class="tier ${tierClass(def.tier)}">${def.tier}</span>
+        <div class="name">${def.name} Lv${inst.level}</div>
+        <div class="stats">+${(def.base+def.perLevel*(inst.level-1)).toFixed(1)} ${def.statKey}</div>
+        <button class="btn danger small">Remove</button>`;
+      card.querySelector("button").onclick=(e)=>{e.stopPropagation(); state.activePets[idx]=null; saveState(); renderHub();};
+    } else {
+      card.innerHTML = `<div class="name muted">Empty Slot</div><div class="desc">Tap to assign pet</div>`;
+      card.onclick = ()=> openPetPicker(idx);
+    }
+    petWrap.appendChild(card);
+  });
+  petPanel.appendChild(petWrap);
+  body.appendChild(petPanel);
+
+  const startBtn = document.createElement("button");
+  startBtn.className = "btn";
+  startBtn.style.width = "100%";
+  startBtn.style.marginTop = "var(--gap)";
+  startBtn.style.fontSize = "var(--font-lg)";
+  startBtn.textContent = "⚔ Begin Run ⚔";
+  startBtn.onclick = startRun;
+  body.appendChild(startBtn);
+
+  panel.querySelector("#choose-hero-btn").onclick = ()=>{ activeTab="heroes"; renderHub(); };
+}
+
+function statLine(stats){
+  const parts = [];
+  for(const k in stats){
+    const label = {hp:"HP",dmg:"DMG",spd:"SPD",fireRate:"Fire Rate",dust:"Dust",gold:"Gold"}[k]||k;
+    parts.push(`+${stats[k]} ${label}`);
+  }
+  return parts.join(", ");
+}
+
+function openEquipPicker(slotIdx){
+  const gearInst = state.inventory.filter(x=>!state.equipped.includes(x.uid));
+  showModal("Equip Gear", gearInst.length ? gearInst.map(inst=>{
+    const def = DATA.items.find(i=>i.id===inst.itemId);
+    return {
+      label: `${def.name}${inst.enchant?` +${inst.enchant}`:""} <span class="tier ${tierClass(def.tier)}" style="margin-left:6px">${def.tier}</span>`,
+      sub: statLine(def.stats),
+      onClick: ()=>{ state.equipped[slotIdx]=inst.uid; saveState(); closeModal(); renderHub(); }
+    };
+  }) : [{label:"No items in inventory", sub:"Craft or pull gear first.", onClick:closeModal}]);
+}
+function openPetPicker(slotIdx){
+  const opts = state.pets.filter(p=>!state.activePets.includes(p.petId));
+  showModal("Assign Pet", opts.length ? opts.map(inst=>{
+    const def = byId(DATA.pets, inst.petId);
+    return { label:`${def.name} Lv${inst.level} <span class="tier ${tierClass(def.tier)}" style="margin-left:6px">${def.tier}</span>`,
+      sub: def.desc,
+      onClick: ()=>{ state.activePets[slotIdx]=inst.petId; saveState(); closeModal(); renderHub(); } };
+  }) : [{label:"No pets owned", sub:"Pull the Menagerie Draw banner.", onClick:closeModal}]);
+}
+
+// ---------------- HEROES TAB ----------------
+function renderHeroesTab(body){
+  const title = document.createElement("div");
+  title.className="section-title"; title.textContent="Heroes";
+  body.appendChild(title);
+  const grid = document.createElement("div"); grid.className="card-grid";
+  for(const h of DATA.heroes){
+    const owned = state.ownedHeroes.includes(h.id);
+    const card = document.createElement("div");
+    card.className = "card" + (owned?"":" locked") + (state.selectedHero===h.id?" selected":"");
+    card.innerHTML = `
+      <div class="hero-portrait" style="background-color:${h.color}33;border-color:${h.color}">⚔</div>
+      <div class="name">${h.name}</div>
+      <div class="desc">${h.desc}</div>
+      <div class="stats">HP ${h.hp} / DMG ${h.dmg} / SPD ${h.spd}</div>
+      <div class="stats">${h.passiveName}: ${h.passiveDesc}</div>
+    `;
+    const btn = document.createElement("button");
+    btn.className = "btn small";
+    if(owned){
+      btn.textContent = state.selectedHero===h.id ? "Selected" : "Select";
+      btn.disabled = state.selectedHero===h.id;
+      btn.onclick = ()=>{ state.selectedHero = h.id; saveState(); renderHub(); };
+    } else {
+      btn.textContent = "Unlock ♦ 500";
+      btn.disabled = state.gems < 500;
+      btn.onclick = ()=>{
+        if(state.gems>=500){ state.gems-=500; state.ownedHeroes.push(h.id); saveState(); toast(`${h.name} unlocked!`); renderHub(); }
+      };
+    }
+    card.appendChild(btn);
+    grid.appendChild(card);
+  }
+  body.appendChild(grid);
+}
+
+// ---------------- PETS TAB ----------------
+function renderPetsTab(body){
+  const title = document.createElement("div"); title.className="section-title"; title.textContent="Pets"; body.appendChild(title);
+  const grid = document.createElement("div"); grid.className="card-grid";
+  for(const p of DATA.pets){
+    const inst = petOwned(p.id);
+    const card = document.createElement("div");
+    card.className = "card" + (inst?"":" locked");
+    card.innerHTML = `
+      <span class="tier ${tierClass(p.tier)}">${p.tier}</span>
+      <div class="name">${p.name}</div>
+      <div class="desc">${p.desc}</div>
+      ${inst?`<div class="stats">Level ${inst.level}/10 &mdash; +${(p.base+p.perLevel*(inst.level-1)).toFixed(1)} ${p.statKey}</div>`
+            : `<div class="stats muted">Not owned &mdash; pull the Menagerie Draw</div>`}
+    `;
+    if(inst){
+      const lvlBtn = document.createElement("button");
+      lvlBtn.className="btn small";
+      lvlBtn.textContent = inst.level>=10 ? "Max Level" : `Level Up (♦${petLevelCost(inst.level)})`;
+      lvlBtn.disabled = inst.level>=10 || state.gems < petLevelCost(inst.level);
+      lvlBtn.onclick = ()=>{ const cost=petLevelCost(inst.level); if(state.gems>=cost && inst.level<10){ state.gems-=cost; inst.level++; saveState(); renderHub(); } };
+      card.appendChild(lvlBtn);
+    }
+    grid.appendChild(card);
+  }
+  body.appendChild(grid);
+
+  const fusionPanel = document.createElement("div");
+  fusionPanel.className = "panel flex-col";
+  fusionPanel.style.marginTop = "var(--gap)";
+  fusionPanel.innerHTML = `<h2>Pet Fusion</h2><div class="muted">Fuse 2 Level-10 pets of the same tier for a 50% chance at a next-tier pet. On failure, one input pet is lost.</div>`;
+  const sel = document.createElement("div"); sel.className="wrap-row"; sel.style.marginTop="8px";
+  const fusionState = {a:null,b:null};
+  function fusionCard(which){
+    const inst = fusionState[which] ? petOwned(fusionState[which]) : null;
+    const def = inst ? byId(DATA.pets, inst.petId) : null;
+    const card = document.createElement("div");
+    card.className="card"; card.style.width="140px"; card.style.cursor="pointer";
+    card.innerHTML = def ? `<span class="tier ${tierClass(def.tier)}">${def.tier}</span><div class="name">${def.name}</div><div class="stats">Lv${inst.level}</div>`
+                         : `<div class="name muted">Pick pet ${which==='a'?'1':'2'}</div>`;
+    card.onclick = ()=>{
+      const other = which==='a' ? fusionState.b : fusionState.a;
+      const eligible = state.pets.filter(p=>p.level>=10 && p.petId!==other);
+      showModal("Choose Level-10 Pet", eligible.length? eligible.map(inst2=>{
+        const def2 = byId(DATA.pets, inst2.petId);
+        return {label:`${def2.name} <span class="tier ${tierClass(def2.tier)}" style="margin-left:6px">${def2.tier}</span>`, sub:`Lv${inst2.level}`,
+          onClick:()=>{ fusionState[which]=inst2.petId; closeModal(); renderFusionUI(); }};
+      }) : [{label:"No Level-10 pets yet", sub:"", onClick:closeModal}]);
+    };
+    return card;
+  }
+  function renderFusionUI(){
+    sel.innerHTML="";
+    sel.appendChild(fusionCard('a'));
+    sel.appendChild(fusionCard('b'));
+    fusionPanel.querySelector("#fuse-btn")?.remove();
+    const btn = document.createElement("button");
+    btn.id="fuse-btn"; btn.className="btn"; btn.style.marginTop="8px"; btn.textContent="Fuse Pets";
+    const instA = fusionState.a && petOwned(fusionState.a);
+    const instB = fusionState.b && petOwned(fusionState.b);
+    let valid = instA && instB && instA.petId!==instB.petId && instA.level>=10 && instB.level>=10;
+    if(valid){
+      const defA = byId(DATA.pets, instA.petId), defB = byId(DATA.pets, instB.petId);
+      valid = defA.tier===defB.tier && TIERS.indexOf(defA.tier) < TIERS.length-1;
+    }
+    btn.disabled = !valid;
+    btn.onclick = ()=>{ doFusion(fusionState.a, fusionState.b); fusionState.a=null; fusionState.b=null; renderHub(); };
+    fusionPanel.appendChild(btn);
+  }
+  renderFusionUI();
+  fusionPanel.appendChild(sel);
+  body.appendChild(fusionPanel);
+}
+function petLevelCost(lvl){ return Math.ceil(15*(1+lvl*0.5)); }
+
+function doFusion(petIdA, petIdB){
+  const instA = petOwned(petIdA), instB = petOwned(petIdB);
+  if(!instA || !instB) return;
+  const defA = byId(DATA.pets, instA.petId);
+  const nextTier = TIERS[TIERS.indexOf(defA.tier)+1];
+  if(Math.random() < 0.5){
+    // success: consume both, grant next tier pet
+    state.pets = state.pets.filter(p=>p!==instA && p!==instB);
+    const candidates = DATA.pets.filter(p=>p.tier===nextTier);
+    const won = pick(candidates);
+    const already = petOwned(won.id);
+    if(already){ already.level = Math.min(10, already.level+2); toast(`Fusion success! ${won.name} +2 levels.`); }
+    else { state.pets.push({petId:won.id, level:1}); toast(`Fusion success! Gained ${won.name}.`); }
+  } else {
+    const loser = Math.random()<0.5 ? instA : instB;
+    state.pets = state.pets.filter(p=>p!==loser);
+    if(state.activePets.includes(loser.petId)){
+      state.activePets = state.activePets.map(x=>x===loser.petId?null:x);
+    }
+    toast(`Fusion failed. ${byId(DATA.pets,loser.petId).name} was lost.`);
+  }
+  saveState();
+}
+
+// ---------------- GUILD TAB ----------------
+function renderGuildTab(body){
+  const title = document.createElement("div"); title.className="section-title"; title.textContent="Guild Hall"; body.appendChild(title);
+  const note = document.createElement("div"); note.className="muted"; note.style.marginBottom="var(--gap)";
+  note.textContent = "Guild bonuses are asynchronous — they apply automatically from your saved standing, no online play required.";
+  body.appendChild(note);
+  const grid = document.createElement("div"); grid.className="card-grid";
+  for(const g of DATA.guilds){
+    const card = document.createElement("div");
+    card.className = "card" + (state.guildId===g.id ? " selected":"");
+    card.innerHTML = `<div class="name">${g.name}</div><div class="desc">${g.desc}</div><div class="stats">+${g.value} ${g.statKey}</div>`;
+    const btn = document.createElement("button");
+    btn.className="btn small";
+    btn.textContent = state.guildId===g.id ? "Joined" : "Join Guild";
+    btn.disabled = state.guildId===g.id;
+    btn.onclick = ()=>{ state.guildId=g.id; saveState(); toast(`Joined ${g.name}`); renderHub(); };
+    card.appendChild(btn);
+    grid.appendChild(card);
+  }
+  body.appendChild(grid);
+}
+
+// ---------------- CRAFT TAB ----------------
+function renderCraftTab(body){
+  const title = document.createElement("div"); title.className="section-title"; title.textContent="Crafting Bench"; body.appendChild(title);
+
+  const invPanel = document.createElement("div");
+  invPanel.className="panel flex-col";
+  invPanel.innerHTML = `<h2>Inventory</h2>`;
+  const invWrap = document.createElement("div"); invWrap.className="wrap-row";
+  const grouped = {};
+  for(const inst of state.inventory){ grouped[inst.itemId]=(grouped[inst.itemId]||0)+1; }
+  const ids = Object.keys(grouped);
+  if(!ids.length){ invWrap.innerHTML = `<div class="muted">Empty. Pull the Vault of Relics banner or craft basic gear.</div>`; }
+  for(const id of ids){
+    const def = DATA.items.find(i=>i.id===id);
+    const chip = document.createElement("div");
+    chip.className="card"; chip.style.width="140px";
+    chip.innerHTML = `<span class="tier ${tierClass(def.tier)}">${def.tier}</span><div class="name">${def.name}</div><div class="stats">x${grouped[id]}</div><div class="desc">${statLine(def.stats)}</div>`;
+    if(def.stats.dust || def.stats.gold){
+      const convBtn = document.createElement("button");
+      convBtn.className="btn small";
+      const label = def.stats.dust ? `Convert → ${def.stats.dust} Dust` : `Convert → ${def.stats.gold} Gold`;
+      convBtn.textContent = label;
+      convBtn.onclick = ()=>{
+        invRemoveOneOf(id);
+        if(def.stats.dust) state.enchantDust += def.stats.dust;
+        if(def.stats.gold) state.gold += def.stats.gold;
+        saveState(); toast("Converted."); renderHub();
+      };
+      chip.appendChild(convBtn);
+    }
+    invWrap.appendChild(chip);
+  }
+  invPanel.appendChild(invWrap);
+  body.appendChild(invPanel);
+
+  const recTitle = document.createElement("div"); recTitle.className="section-title"; recTitle.style.marginTop="var(--gap)"; recTitle.textContent="Recipes ("+DATA.recipes.length+")";
+  body.appendChild(recTitle);
+  const grid = document.createElement("div"); grid.className="card-grid";
+  for(const r of DATA.recipes){
+    const outDef = DATA.items.find(i=>i.name===r.output);
+    const card = document.createElement("div"); card.className="card";
+    const inputsHtml = r.inputs.map(nm=>{
+      const have = invAllCountOf(itemByName(nm).id);
+      const ok = have>=1;
+      return `<div style="color:${ok?'var(--c-brass-bright)':'var(--c-blood)'}">${nm} (${have}/1)</div>`;
+    }).join("");
+    card.innerHTML = `<span class="tier ${tierClass(outDef.tier)}">${outDef.tier}</span>
+      <div class="name">${r.output}</div>
+      <div class="desc">${statLine(outDef.stats)}</div>
+      <div class="stats">Requires:</div>${inputsHtml}
+      <div class="stats">Cost: ${r.gold} Gold</div>`;
+    const canCraft = r.inputs.every(nm=>invAllCountOf(itemByName(nm).id)>=1) && state.gold>=r.gold;
+    const btn = document.createElement("button"); btn.className="btn small"; btn.textContent="Craft"; btn.disabled=!canCraft;
+    btn.onclick = ()=>{
+      for(const nm of r.inputs){ invRemoveOneOf(itemByName(nm).id); }
+      state.gold -= r.gold;
+      invAdd(outDef.id,1);
+      saveState(); toast(`Crafted ${r.output}!`); renderHub();
+    };
+    card.appendChild(btn);
+    grid.appendChild(card);
+  }
+  body.appendChild(grid);
+}
+
+// ---------------- ENCHANT TAB ----------------
+const ENCHANT_COST = 15;
+function renderEnchantTab(body){
+  const title = document.createElement("div"); title.className="section-title"; title.textContent="Enchant Forge"; body.appendChild(title);
+  const panel = document.createElement("div"); panel.className="panel flex-col";
+  panel.innerHTML = `<div class="muted">Spend ${ENCHANT_COST} Enchant Dust: 70% chance +1 gear score, 20% nothing, 10% a random inventory item is destroyed.</div>
+    <div class="row" style="margin-top:8px"><span>Enchant Dust</span><span class="gold-text">${state.enchantDust}</span></div>`;
+  body.appendChild(panel);
+
+  const grid = document.createElement("div"); grid.className="card-grid"; grid.style.marginTop="var(--gap)";
+  if(!state.inventory.length){
+    grid.innerHTML = `<div class="muted">No gear to enchant. Craft or pull some first.</div>`;
+  }
+  for(const inst of state.inventory){
+    const def = DATA.items.find(i=>i.id===inst.itemId);
+    const card = document.createElement("div"); card.className="card";
+    const equippedTag = state.equipped.includes(inst.uid) ? ' <span class="stats">(equipped)</span>' : "";
+    card.innerHTML = `<span class="tier ${tierClass(def.tier)}">${def.tier}</span>
+      <div class="name">${def.name} ${inst.enchant?`+${inst.enchant}`:""}${equippedTag}</div>
+      <div class="stats">${statLine(def.stats)}</div>`;
+    const btn = document.createElement("button"); btn.className="btn small"; btn.textContent="Enchant"; btn.disabled = state.enchantDust<ENCHANT_COST;
+    btn.onclick = ()=> doEnchant(inst.uid);
+    card.appendChild(btn);
+    grid.appendChild(card);
+  }
+  body.appendChild(grid);
+}
+function doEnchant(instUid){
+  if(state.enchantDust < ENCHANT_COST) return;
+  state.enchantDust -= ENCHANT_COST;
+  const roll = Math.random();
+  const inst = invFindInstance(instUid);
+  if(roll < 0.70){
+    if(inst){ inst.enchant = (inst.enchant||0)+1; toast("Enchant succeeded! +1 gear score."); }
+  } else if(roll < 0.90){
+    toast("The forge sputters. Nothing happens.");
+  } else {
+    const destroyable = state.inventory.filter(x=>!state.equipped.includes(x.uid));
+    if(destroyable.length){
+      const victim = pick(destroyable);
+      state.inventory = state.inventory.filter(x=>x!==victim);
+      const def = DATA.items.find(i=>i.id===victim.itemId);
+      toast(`Backfire! ${def.name} was destroyed.`);
+    } else {
+      toast("Backfire! But nothing unequipped was at hand.");
+    }
+  }
+  saveState(); renderHub();
+}
+
+// ---------------- GACHA TAB ----------------
+function renderGachaTab(body){
+  const title = document.createElement("div"); title.className="section-title"; title.textContent="Gacha Hall"; body.appendChild(title);
+  for(const key of ["hero","item","pet"]){
+    const b = DATA.banners[key];
+    const panel = document.createElement("div"); panel.className="panel flex-col"; panel.style.marginBottom="var(--gap)";
+    const pityCount = state.gachaPity[key];
+    const oddsHtml = b.odds.map(o=>`<div><span>${o.label}</span><span>${o.chance}%</span></div>`).join("");
+    panel.innerHTML = `<h2>${b.name}</h2>
+      <div class="muted">Cost: ♦${b.cost} per pull &mdash; Pity guarantees a top-tier result at ${b.pity} pulls without one (currently ${pityCount}/${b.pity}).</div>
+      <div class="gacha-odds">${oddsHtml}</div>
+      <div class="pip-bar"><div class="pip-fill" style="width:${clamp(pityCount/b.pity*100,0,100)}%"></div></div>
+      <div class="row" style="margin-top:6px">
+        <button class="btn" data-n="1">Pull x1</button>
+        <button class="btn" data-n="10">Pull x10</button>
+      </div>`;
+    panel.querySelectorAll("button").forEach(btn=>{
+      btn.disabled = state.gems < b.cost;
+      btn.onclick = ()=>{
+        const n = parseInt(btn.dataset.n,10);
+        if(state.gems < b.cost*n){ toast("Not enough Gems."); return; }
+        const results = [];
+        for(let i=0;i<n;i++){ if(state.gems<b.cost) break; state.gems-=b.cost; results.push(doGachaPull(key)); }
+        saveState();
+        toast(`Pulled: ${results.join(", ")}`);
+        renderHub();
+      };
+    });
+    body.appendChild(panel);
+  }
+}
+
+function doGachaPull(bannerKey){
+  const b = DATA.banners[bannerKey];
+  state.gachaPity[bannerKey]++;
+  if(bannerKey==="hero"){
+    const locked = DATA.heroes.filter(h=>!state.ownedHeroes.includes(h.id));
+    const forcedPity = state.gachaPity.hero >= b.pity;
+    if(!locked.length){
+      state.gold += 150; // all heroes owned, convert to gold
+      return "150 Gold (all heroes owned)";
+    }
+    const won = pick(locked);
+    state.ownedHeroes.push(won.id);
+    state.gachaPity.hero = 0;
+    return won.name+" (Hero!)";
+  }
+  if(bannerKey==="item"){
+    let tier;
+    const forcedPity = state.gachaPity.item >= b.pity;
+    if(forcedPity){ tier = Math.random()<0.5 ? "Legendary":"Mythic"; state.gachaPity.item=0; }
+    else { tier = weightedPick(b.odds, o=>o.chance).label; if(tier==="Legendary"||tier==="Mythic") state.gachaPity.item=0; }
+    const pool = DATA.items.filter(i=>i.tier===tier);
+    const won = pick(pool);
+    invAdd(won.id,1);
+    return won.name;
+  }
+  if(bannerKey==="pet"){
+    let tier;
+    const forcedPity = state.gachaPity.pet >= b.pity;
+    if(forcedPity){ tier = Math.random()<0.5 ? "Legendary":"Mythic"; state.gachaPity.pet=0; }
+    else { tier = weightedPick(b.odds, o=>o.chance).label; if(tier==="Legendary"||tier==="Mythic") state.gachaPity.pet=0; }
+    const pool = DATA.pets.filter(p=>p.tier===tier);
+    const won = pick(pool);
+    const already = petOwned(won.id);
+    if(already){ already.level = Math.min(10, already.level+1); return won.name+" (+1 lvl)"; }
+    state.pets.push({petId:won.id, level:1});
+    return won.name+" (New Pet!)";
+  }
+}
+
+// ---------------- META TAB ----------------
+function renderMetaTab(body){
+  const title = document.createElement("div"); title.className="section-title"; title.textContent="Meta Progression"; body.appendChild(title);
+  const grid = document.createElement("div"); grid.className="card-grid";
+  for(const m of DATA.metaUpgrades){
+    const lvl = metaLevel(m.id);
+    const cost = metaCost(m, lvl);
+    const card = document.createElement("div"); card.className="card meta-card";
+    const pips = document.createElement("div"); pips.className="level-track";
+    for(let i=0;i<m.maxLevel;i++){ const p=document.createElement("div"); p.className="pip"+(i<lvl?" filled":""); pips.appendChild(p); }
+    card.innerHTML = `<div class="name">${m.name}</div><div class="desc">${m.desc.replace("{v}", m.perLevel)}</div><div class="stats">Level ${lvl}/${m.maxLevel}</div>`;
+    card.appendChild(pips);
+    const btn = document.createElement("button"); btn.className="btn small";
+    const curr = m.currency==="gems" ? "♦":"⛀";
+    const maxed = lvl>=m.maxLevel;
+    btn.textContent = maxed ? "Max" : `Upgrade (${curr}${cost})`;
+    btn.disabled = maxed || (m.currency==="gems" ? state.gems<cost : state.gold<cost);
+    btn.onclick = ()=>{
+      if(maxed) return;
+      if(m.currency==="gems"){ if(state.gems<cost) return; state.gems-=cost; } else { if(state.gold<cost) return; state.gold-=cost; }
+      state.metaLevels[m.id]=lvl+1; saveState(); renderHub();
+    };
+    card.appendChild(btn);
+    grid.appendChild(card);
+  }
+  body.appendChild(grid);
+}
+
+// ---------------- BANK TAB ----------------
+const EXCHANGE_RATES = [{gold:100,gems:8},{gold:500,gems:45},{gold:2000,gems:200}];
+function renderBankTab(body){
+  const title = document.createElement("div"); title.className="section-title"; title.textContent="The Guild Bank"; body.appendChild(title);
+  const panel = document.createElement("div"); panel.className="panel flex-col";
+  panel.innerHTML = `<h2>Exchange Gold → Gems</h2><div class="muted">All currency in Void Break is earned in-game. There is no real-money purchase.</div>`;
+  const wrap = document.createElement("div"); wrap.className="wrap-row"; wrap.style.marginTop="8px";
+  for(const rate of EXCHANGE_RATES){
+    const card = document.createElement("div"); card.className="card"; card.style.width="150px";
+    card.innerHTML = `<div class="name">${rate.gold} Gold</div><div class="desc">→ ${rate.gems} Gems</div>`;
+    const btn = document.createElement("button"); btn.className="btn small"; btn.textContent="Exchange"; btn.disabled = state.gold<rate.gold;
+    btn.onclick = ()=>{ if(state.gold>=rate.gold){ state.gold-=rate.gold; state.gems+=rate.gems; saveState(); toast(`+${rate.gems} Gems`); renderHub(); } };
+    card.appendChild(btn);
+    wrap.appendChild(card);
+  }
+  panel.appendChild(wrap);
+  body.appendChild(panel);
+
+  const statsPanel = document.createElement("div"); statsPanel.className="panel flex-col"; statsPanel.style.marginTop="var(--gap)";
+  statsPanel.innerHTML = `<h2>Chronicle</h2>
+    <div class="summary-row"><span>Total Runs</span><span>${state.stats.totalRuns}</span></div>
+    <div class="summary-row"><span>Total Kills</span><span>${state.stats.totalKills}</span></div>
+    <div class="summary-row"><span>Best Wave Reached</span><span>${state.stats.bestWave}</span></div>
+    <div class="summary-row"><span>Best Survival Time</span><span>${fmtTime(state.stats.bestTime)}</span></div>`;
+  body.appendChild(statsPanel);
+}
+
+// ---------------- generic modal ----------------
+function showModal(title, options){
+  let modal = document.getElementById("modal-overlay");
+  if(!modal){
+    modal = document.createElement("div");
+    modal.id="modal-overlay";
+    modal.style.cssText="position:fixed;inset:0;background:rgba(10,6,2,0.85);display:flex;align-items:center;justify-content:center;z-index:200;padding:16px;";
+    document.body.appendChild(modal);
+  }
+  modal.innerHTML = "";
+  const panel = document.createElement("div");
+  panel.className="panel flex-col";
+  panel.style.cssText="max-width:420px;width:100%;max-height:80vh;overflow-y:auto;";
+  panel.innerHTML = `<h2>${title}</h2>`;
+  for(const opt of options){
+    const row = document.createElement("div");
+    row.className="card"; row.style.cursor="pointer"; row.style.marginBottom="6px";
+    row.innerHTML = `<div class="name">${opt.label}</div><div class="desc">${opt.sub||""}</div>`;
+    row.onclick = opt.onClick;
+    panel.appendChild(row);
+  }
+  const closeBtn = document.createElement("button");
+  closeBtn.className="btn secondary"; closeBtn.textContent="Close"; closeBtn.style.marginTop="8px";
+  closeBtn.onclick = closeModal;
+  panel.appendChild(closeBtn);
+  modal.appendChild(panel);
+  modal.style.display="flex";
+}
+function closeModal(){ const m=document.getElementById("modal-overlay"); if(m) m.style.display="none"; }
+
+/* =========================================================================
+   RUN / GAMEPLAY
+   ========================================================================= */
+let canvas, ctx;
+let runActive = false, runPaused = false;
+let run = null; // run-scoped state
+
+const WAVE_DURATION = 25; // seconds
+const MAX_SCALE_WAVE = 40;
+const WORLD_SPAWN_RADIUS = 620;
+
+function currentBiomeIndex(wave){ return Math.min(DATA.biomes.length-1, Math.floor((wave-1)/6)); }
+
+function startRun(){
+  const hero = byId(DATA.heroes, state.selectedHero);
+  const persist = persistentBonuses();
+  const gearFlat = {hp:0,dmg:0,spd:0,fireRate:0};
+  let gearEnchantBonus = 0;
+  for(const slotUid of state.equipped){
+    if(!slotUid) continue;
+    const inst = invFindInstance(slotUid);
+    if(!inst) continue;
+    const def = DATA.items.find(i=>i.id===inst.itemId);
+    for(const k in def.stats){ if(k in gearFlat) gearFlat[k]+=def.stats[k]; }
+    gearEnchantBonus += (inst.enchant||0)*0.02;
+  }
+
+  run = {
+    hero, persist, gearFlat, gearEnchantBonus,
+    passives: {}, // key -> stacked value
+    passiveList: [],
+    x:0, y:0, vx:0, vy:0,
+    hp:0, maxHp:0,
+    level:1, xp:0, xpNeed: xpForLevel(1),
+    wave:1, waveTimer:0, biomeIdx:0,
+    time:0, kills:0,
+    enemies:[], projectiles:[], orbs:[], particles:[], pickups:[],
+    fireTimer:0, spawnTimer:0, bossSpawnedThisWave:false,
+    reviveCharges: 0,
+    invuln:0,
+    loot: {gold:0, gems:0, dust:0, items:[]},
+    lastNow: performance.now(),
+    dead:false,
+  };
+  // meta revive roll
+  const reviveChancePct = persist.revive_chance||0;
+  if(reviveChancePct>0 && Math.random()*100 < reviveChancePct) run.reviveCharges += 1;
+
+  recalcStats();
+  run.hp = run.maxHp;
+
+  document.getElementById("hub").style.display="none";
+  document.getElementById("run").classList.add("active");
+  runActive = true; runPaused = false;
+  setupCanvas();
+  bindControls();
+  requestAnimationFrame(gameLoop);
+}
+
+function xpForLevel(lvl){ return Math.floor(6 + lvl*4 + lvl*lvl*0.5); }
+
+function statTotal(key){
+  let v = (run.persist[key]||0) + (run.passives[key]||0);
+  return v;
+}
+
+function recalcStats(){
+  const hero = run.hero;
+  const hpFlat = hero.hp + run.gearFlat.hp;
+  const dmgFlat = hero.dmg + run.gearFlat.dmg;
+  const spdFlat = hero.spd + run.gearFlat.spd;
+  const frFlat = hero.fireRate + run.gearFlat.fireRate;
+
+  const hpPct = 1 + statTotal("hp_pct")/100;
+  const dmgPct = 1 + statTotal("dmg_pct")/100 + run.gearEnchantBonus;
+  const spdPct = 1 + statTotal("spd_pct")/100;
+  const frPct = 1 + statTotal("fire_rate_pct")/100;
+  const psPct = 1 + statTotal("proj_speed_pct")/100;
+
+  const prevMax = run.maxHp||0;
+  run.maxHp = Math.round(hpFlat*hpPct);
+  if(prevMax>0 && run.hp!=null){ run.hp = Math.min(run.maxHp, run.hp + (run.maxHp-prevMax>0?0:0)); }
+  run.dmg = dmgFlat*dmgPct;
+  run.spd = spdFlat*spdPct;
+  run.fireRate = frFlat*frPct;
+  run.projSpeed = hero.projSpeed*psPct;
+
+  run.critChance = statTotal("crit_chance") + (hero.passive==="crit"?25:0);
+  run.critDmg = 100 + statTotal("crit_dmg");
+  run.pierce = statTotal("pierce") + (hero.passive==="pierce"?1:0);
+  run.multishot = statTotal("multishot") + (hero.passive==="multishot"?2:0);
+  run.lifesteal = statTotal("lifesteal") + (hero.passive==="lifesteal"?8:0);
+  run.thorns = statTotal("thorns") + (hero.passive==="thorns"?15:0);
+  run.armor = statTotal("armor") + (hero.passive==="tanky"?20:0);
+  run.dodge = clamp(statTotal("dodge"),0,60);
+  run.magnet = 120 + statTotal("magnet");
+  run.chain = statTotal("chain") + (hero.passive==="chain"?1:0);
+  run.explosivePct = statTotal("explosive");
+  run.freezeChance = statTotal("freeze_chance");
+  run.burnChance = statTotal("burn_chance");
+  run.knockbackPct = statTotal("knockback");
+  run.regen = statTotal("regen") + (hero.passive==="regen"?1:0);
+  run.slowAuraPct = statTotal("slow_aura");
+  run.aoeRadius = (hero.passive==="aoe"?60:0) + (hero.passive==="aoe_big"?110:0) + statTotal("aoe_pct");
+  run.xpPct = statTotal("xp_pct");
+  run.goldPct = statTotal("gold_pct");
+  run.gemChance = statTotal("gem_chance");
+}
+
+function setupCanvas(){
+  canvas = document.getElementById("gameCanvas");
+  ctx = canvas.getContext("2d");
+  resizeCanvas();
+}
+function resizeCanvas(){
+  if(!canvas) return;
+  const dpr = Math.min(window.devicePixelRatio||1, 2);
+  canvas.width = window.innerWidth*dpr;
+  canvas.height = window.innerHeight*dpr;
+  canvas.style.width = window.innerWidth+"px";
+  canvas.style.height = window.innerHeight+"px";
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+}
+window.addEventListener("resize", ()=>{ applyDensity(); if(runActive) resizeCanvas(); });
+
+// ---- controls: joystick + keyboard ----
+const keys = {};
+let joyActive=false, joyVec={x:0,y:0}, joyTouchId=null;
+function bindControls(){
+  const zone = document.getElementById("joystick-zone");
+  const stick = document.getElementById("joystick");
+  const knob = document.getElementById("joystick-knob");
+  const radius = ()=> stick.offsetWidth/2;
+
+  function start(id,cx,cy){
+    joyActive=true; joyTouchId=id;
+    stick.style.display="block";
+    stick.style.left=(cx-stick.offsetWidth/2)+"px";
+    stick.style.top=(cy-stick.offsetHeight/2)+"px";
+    stick.dataset.cx=cx; stick.dataset.cy=cy;
+    knob.style.left="50%"; knob.style.top="50%";
+  }
+  function move(cx,cy){
+    if(!joyActive) return;
+    const ccx = parseFloat(stick.dataset.cx), ccy = parseFloat(stick.dataset.cy);
+    let dx=cx-ccx, dy=cy-ccy;
+    const r = radius();
+    const dist = Math.min(Math.hypot(dx,dy), r);
+    const ang = Math.atan2(dy,dx);
+    const kx = Math.cos(ang)*dist, ky = Math.sin(ang)*dist;
+    knob.style.left = (stick.offsetWidth/2+kx)+"px";
+    knob.style.top = (stick.offsetHeight/2+ky)+"px";
+    joyVec.x = dist>8 ? Math.cos(ang)*(dist/r) : 0;
+    joyVec.y = dist>8 ? Math.sin(ang)*(dist/r) : 0;
+  }
+  function end(){ joyActive=false; joyTouchId=null; stick.style.display="none"; joyVec.x=0; joyVec.y=0; }
+
+  zone.ontouchstart = (e)=>{
+    if(!runActive||runPaused) return;
+    const t = e.changedTouches[0];
+    if(joyTouchId===null){ start(t.identifier, t.clientX, t.clientY); }
+    e.preventDefault();
+  };
+  zone.ontouchmove = (e)=>{
+    for(const t of e.changedTouches){ if(t.identifier===joyTouchId){ move(t.clientX,t.clientY); } }
+    e.preventDefault();
+  };
+  zone.ontouchend = (e)=>{
+    for(const t of e.changedTouches){ if(t.identifier===joyTouchId){ end(); } }
+  };
+  zone.ontouchcancel = end;
+
+  window.onkeydown = (e)=>{ keys[e.key.toLowerCase()]=true; };
+  window.onkeyup = (e)=>{ keys[e.key.toLowerCase()]=false; };
+}
+function keyboardVec(){
+  let x=0,y=0;
+  if(keys["a"]||keys["arrowleft"]) x-=1;
+  if(keys["d"]||keys["arrowright"]) x+=1;
+  if(keys["w"]||keys["arrowup"]) y-=1;
+  if(keys["s"]||keys["arrowdown"]) y+=1;
+  const len = Math.hypot(x,y);
+  if(len>0){ x/=len; y/=len; }
+  return {x,y};
+}
+
+// ---- enemy pool per biome ----
+function biomeRegulars(idx){
+  const name = DATA.biomes[idx];
+  return DATA.enemies.filter(e=>e.biome===name && !e.boss);
+}
+function biomeBoss(idx){
+  const name = DATA.biomes[idx];
+  return DATA.enemies.find(e=>e.biome===name && e.boss);
+}
+
+function waveScale(wave){ return Math.pow(1.10, Math.min(wave, MAX_SCALE_WAVE)-1); }
+
+function spawnEnemy(def, isBoss){
+  const ang = Math.random()*Math.PI*2;
+  const ex = run.x + Math.cos(ang)*WORLD_SPAWN_RADIUS;
+  const ey = run.y + Math.sin(ang)*WORLD_SPAWN_RADIUS;
+  const scale = waveScale(run.wave);
+  run.enemies.push({
+    def, x:ex, y:ey, hp:def.hp*scale*(isBoss?1:1), maxHp:def.hp*scale,
+    dmg:def.dmg*scale, spd:def.spd*(isBoss?0.72:1), r: isBoss?34:14,
+    isBoss, hitCd:0, slowUntil:0, freezeUntil:0, burnUntil:0, burnTick:0,
+  });
+}
+
+function updateSpawning(dt){
+  run.spawnTimer -= dt;
+  if(run.spawnTimer<=0){
+    const regs = biomeRegulars(run.biomeIdx);
+    const n = 1 + Math.floor(run.wave/8);
+    for(let i=0;i<n;i++) spawnEnemy(pick(regs), false);
+    run.spawnTimer = clamp(1.1 - run.wave*0.02, 0.35, 1.1);
+  }
+  if(run.wave % 6 === 0 && !run.bossSpawnedThisWave){
+    spawnEnemy(biomeBoss(run.biomeIdx), true);
+    run.bossSpawnedThisWave = true;
+    toast(biomeBoss(run.biomeIdx).name + " approaches!");
+  }
+}
+
+function nearestEnemy(){
+  let best=null, bestD=Infinity;
+  for(const e of run.enemies){
+    const d = Math.hypot(e.x-run.x, e.y-run.y);
+    if(d<bestD){ bestD=d; best=e; }
+  }
+  return best;
+}
+
+function fireProjectile(target){
+  const baseAng = Math.atan2(target.y-run.y, target.x-run.x);
+  const shots = 1 + run.multishot;
+  const spread = Math.min(0.9, shots*0.08);
+  for(let i=0;i<shots;i++){
+    const off = shots>1 ? (-spread/2 + spread*i/(shots-1)) : 0;
+    const ang = baseAng+off;
+    run.projectiles.push({
+      x:run.x, y:run.y, vx:Math.cos(ang)*run.projSpeed, vy:Math.sin(ang)*run.projSpeed,
+      dmg:run.dmg, pierce:run.pierce, hitEnemies:new Set(), life:1.6, r:6,
+      chain:run.chain,
+    });
+  }
+}
+
+function dealDamage(enemy, dmg){
+  let d = dmg;
+  const isCrit = Math.random()*100 < run.critChance;
+  if(isCrit) d *= run.critDmg/100;
+  if(run.hero.passive==="rampage"){ d *= 1 + (1-run.hp/run.maxHp)*0.4; }
+  enemy.hp -= d;
+  if(run.freezeChance>0 && Math.random()*100<run.freezeChance) enemy.freezeUntil = run.time+1.0;
+  if(run.burnChance>0 && Math.random()*100<run.burnChance) enemy.burnUntil = run.time+3.0;
+  if(run.hero.passive==="slow") enemy.slowUntil = run.time+1.5;
+  if(run.lifesteal>0){ run.hp = Math.min(run.maxHp, run.hp + d*run.lifesteal/100); }
+  if(enemy.hp<=0) killEnemy(enemy);
+  return d;
+}
+
+function killEnemy(enemy){
+  enemy.dead = true;
+  run.kills++;
+  const goldGain = Math.round((enemy.isBoss?40:3) * (1+run.goldPct/100));
+  run.loot.gold += goldGain;
+  spawnXpOrb(enemy.x, enemy.y, enemy.isBoss?30:4);
+  if(enemy.isBoss){
+    let gems = 3 + Math.floor(Math.random()*4);
+    if(Math.random()*100 < run.gemChance) gems += 2;
+    run.loot.gems += gems;
+    toast(`${enemy.def.name} defeated! +${gems} Gems`);
+    if(Math.random()<0.5){
+      const pool = weightedPick([{t:"Common",c:40},{t:"Rare",c:32},{t:"Legendary",c:22},{t:"Mythic",c:6}], o=>o.c).t;
+      const cand = DATA.items.filter(i=>i.tier===pool);
+      run.loot.items.push(pick(cand).name);
+    }
+  } else if(Math.random()<0.05){
+    const cand = DATA.items.filter(i=>i.tier==="Common");
+    run.loot.items.push(pick(cand).name);
+  }
+  if(run.aoeRadius>0){
+    for(const other of run.enemies){
+      if(other===enemy||other.dead) continue;
+      if(Math.hypot(other.x-enemy.x, other.y-enemy.y) <= run.aoeRadius){
+        other.hp -= run.dmg*0.35;
+        if(other.hp<=0) killEnemy(other);
+      }
+    }
+  }
+}
+
+function spawnXpOrb(x,y,val){ run.orbs.push({x,y,val}); }
+
+function gainXp(v){
+  run.xp += v*(1+run.xpPct/100);
+  while(run.xp >= run.xpNeed){
+    run.xp -= run.xpNeed;
+    run.level++;
+    run.xpNeed = xpForLevel(run.level);
+    triggerLevelUp();
+  }
+}
+
+function triggerLevelUp(){
+  runPaused = true;
+  const choices = [];
+  const pool = DATA.passives.slice();
+  while(choices.length<3 && pool.length){
+    const idx = Math.floor(Math.random()*pool.length);
+    choices.push(pool.splice(idx,1)[0]);
+  }
+  const overlay = document.getElementById("levelup-overlay");
+  overlay.classList.add("active");
+  const wrap = document.getElementById("levelup-cards");
+  wrap.innerHTML = "";
+  document.getElementById("levelup-title").textContent = `Level ${run.level}! Choose an Upgrade`;
+  for(const p of choices){
+    const card = document.createElement("div");
+    card.className="card upgrade-card panel";
+    card.innerHTML = `<div class="name">${p.name}</div><div class="desc">${p.descTemplate.replace("{v}", p.value)}</div>`;
+    card.onclick = ()=>{
+      run.passives[p.key] = (run.passives[p.key]||0) + p.value;
+      run.passiveList.push(p.name);
+      recalcStats();
+      overlay.classList.remove("active");
+      runPaused = false;
+      run.lastNow = performance.now();
+      requestAnimationFrame(gameLoop);
+    };
+    wrap.appendChild(card);
+  }
+}
+
+function updateProjectiles(dt){
+  for(const p of run.projectiles){
+    p.x += p.vx*dt; p.y += p.vy*dt; p.life -= dt;
+    for(const e of run.enemies){
+      if(e.dead || p.hitEnemies.has(e)) continue;
+      if(Math.hypot(e.x-p.x, e.y-p.y) < e.r+p.r){
+        p.hitEnemies.add(e);
+        dealDamage(e, p.dmg);
+        if(run.explosivePct>0){
+          for(const other of run.enemies){
+            if(other===e||other.dead) continue;
+            if(Math.hypot(other.x-e.x, other.y-e.y)<70){ other.hp -= p.dmg*run.explosivePct/100; if(other.hp<=0) killEnemy(other); }
+          }
+        }
+        if(p.chain>0 && p.hitEnemies.size <= p.chain){
+          let best=null,bestD=140;
+          for(const cand of run.enemies){
+            if(cand.dead||p.hitEnemies.has(cand)) continue;
+            const d=Math.hypot(cand.x-e.x,cand.y-e.y);
+            if(d<bestD){bestD=d;best=cand;}
+          }
+          if(best){ const ang=Math.atan2(best.y-e.y,best.x-e.x); p.x=e.x; p.y=e.y; p.vx=Math.cos(ang)*run.projSpeed; p.vy=Math.sin(ang)*run.projSpeed; }
+        }
+        if(p.pierce<=0){ p.life=0; break; }
+        p.pierce--;
+      }
+    }
+  }
+  run.projectiles = run.projectiles.filter(p=>p.life>0);
+  run.enemies = run.enemies.filter(e=>!e.dead);
+}
+
+function updateEnemies(dt){
+  for(const e of run.enemies){
+    let spd = e.spd;
+    if(e.slowUntil>run.time) spd *= 0.7;
+    if(e.freezeUntil>run.time) spd *= 0.15;
+    if(run.slowAuraPct>0 && Math.hypot(e.x-run.x,e.y-run.y)<130) spd *= (1-run.slowAuraPct/100);
+    if(e.burnUntil>run.time){
+      e.burnTick -= dt;
+      if(e.burnTick<=0){ e.hp -= e.maxHp*0.03; e.burnTick=0.5; if(e.hp<=0){ killEnemy(e); continue; } }
+    }
+    const ang = Math.atan2(run.y-e.y, run.x-e.x);
+    e.x += Math.cos(ang)*spd*dt; e.y += Math.sin(ang)*spd*dt;
+    e.hitCd -= dt;
+    const distToPlayer = Math.hypot(e.x-run.x, e.y-run.y);
+    if(distToPlayer < e.r+16 && e.hitCd<=0){
+      e.hitCd = 0.85;
+      applyDamageToPlayer(e.dmg);
+      if(run.thorns>0){ e.hp -= e.dmg*run.thorns/100; if(e.hp<=0) killEnemy(e); }
+      if(run.knockbackPct>0){
+        const kang = Math.atan2(e.y-run.y, e.x-run.x);
+        e.x += Math.cos(kang)*(20+run.knockbackPct); e.y += Math.sin(kang)*(20+run.knockbackPct);
+      }
+    }
+  }
+  run.enemies = run.enemies.filter(e=>!e.dead);
+}
+
+function applyDamageToPlayer(dmg){
+  if(run.invuln>run.time) return;
+  if(Math.random()*100 < run.dodge) return;
+  const mitigated = dmg*(1-clamp(run.armor,0,80)/100);
+  run.hp -= mitigated;
+  if(run.hp<=0){
+    if(run.reviveCharges>0){
+      run.reviveCharges--;
+      run.hp = run.maxHp*0.3;
+      run.invuln = run.time+2.0;
+      toast("Saved by fate! Revived.");
+    } else {
+      run.hp = 0;
+      endRun();
+    }
+  }
+}
+
+function updatePickups(dt){
+  for(const o of run.orbs){
+    const d = Math.hypot(o.x-run.x, o.y-run.y);
+    if(d < run.magnet){
+      const ang = Math.atan2(run.y-o.y, run.x-o.x);
+      const pull = clamp((run.magnet-d)*4, 40, 500);
+      o.x += Math.cos(ang)*pull*dt; o.y += Math.sin(ang)*pull*dt;
+    } else {
+      // gentle passive drift so orbs from ranged kills are never permanently stranded
+      const ang = Math.atan2(run.y-o.y, run.x-o.x);
+      o.x += Math.cos(ang)*70*dt; o.y += Math.sin(ang)*70*dt;
+    }
+    if(d < 20){ gainXp(o.val); o.dead=true; }
+  }
+  run.orbs = run.orbs.filter(o=>!o.dead);
+}
+
+function updateRegen(dt){
+  if(run.regen>0) run.hp = Math.min(run.maxHp, run.hp + run.maxHp*(run.regen/100)*dt);
+}
+
+function updateWave(dt){
+  run.waveTimer += dt;
+  if(run.waveTimer >= WAVE_DURATION){
+    run.waveTimer = 0;
+    run.wave++;
+    run.bossSpawnedThisWave = false;
+    const newBiome = currentBiomeIndex(Math.min(run.wave,30));
+    if(newBiome !== run.biomeIdx){ run.biomeIdx = newBiome; toast("Entering "+DATA.biomes[run.biomeIdx]+"..."); }
+  }
+}
+
+function gameLoop(now){
+  if(!runActive || runPaused) return;
+  const dt = Math.min(0.05, (now-run.lastNow)/1000);
+  run.lastNow = now;
+  run.time += dt;
+
+  const vec = joyActive ? joyVec : keyboardVec();
+  run.x += vec.x*run.spd*dt;
+  run.y += vec.y*run.spd*dt;
+
+  updateWave(dt);
+  updateSpawning(dt);
+  updateEnemies(dt);
+
+  run.fireTimer -= dt;
+  if(run.fireTimer<=0){
+    const target = nearestEnemy();
+    if(target && Math.hypot(target.x-run.x,target.y-run.y) < 560){
+      fireProjectile(target);
+      run.fireTimer = 1/Math.max(0.2,run.fireRate);
+    } else {
+      run.fireTimer = 0.1;
+    }
+  }
+  updateProjectiles(dt);
+  updatePickups(dt);
+  updateRegen(dt);
+
+  render();
+  updateHud();
+
+  if(runActive && !runPaused) requestAnimationFrame(gameLoop);
+}
+
+function render(){
+  const w = window.innerWidth, h = window.innerHeight;
+  ctx.clearRect(0,0,w,h);
+  const biome = DATA.biomes[run.biomeIdx];
+  const bgColors = {
+    "Forest":"#20260f","Desert":"#2e2612","Ice Cavern":"#15242b","Volcano":"#2b1410","The Void":"#0e0a16"
+  };
+  ctx.fillStyle = bgColors[biome]||"#1a1006";
+  ctx.fillRect(0,0,w,h);
+
+  // grid parallax
+  ctx.strokeStyle = "rgba(201,162,74,0.08)";
+  ctx.lineWidth=1;
+  const grid=60;
+  const offx = ((-run.x)%grid+grid)%grid, offy = ((-run.y)%grid+grid)%grid;
+  for(let gx=offx; gx<w; gx+=grid){ ctx.beginPath(); ctx.moveTo(gx,0); ctx.lineTo(gx,h); ctx.stroke(); }
+  for(let gy=offy; gy<h; gy+=grid){ ctx.beginPath(); ctx.moveTo(0,gy); ctx.lineTo(w,gy); ctx.stroke(); }
+
+  const cx = w/2, cy = h/2;
+  const toScreen = (x,y)=>[x-run.x+cx, y-run.y+cy];
+
+  // orbs
+  for(const o of run.orbs){
+    const [sx,sy]=toScreen(o.x,o.y);
+    ctx.fillStyle="#e6c25c"; ctx.beginPath(); ctx.arc(sx,sy,5,0,7); ctx.fill();
+  }
+  // enemies
+  for(const e of run.enemies){
+    const [sx,sy]=toScreen(e.x,e.y);
+    ctx.fillStyle = e.isBoss ? "#c9432e" : "#8a3a20";
+    ctx.beginPath(); ctx.arc(sx,sy,e.r,0,7); ctx.fill();
+    ctx.strokeStyle="#1a1006"; ctx.lineWidth=2; ctx.stroke();
+    // hp bar
+    const bw = e.r*2;
+    ctx.fillStyle="rgba(0,0,0,0.6)"; ctx.fillRect(sx-bw/2, sy-e.r-10, bw, 5);
+    ctx.fillStyle= e.isBoss ? "#e6c25c" : "#c9432e";
+    ctx.fillRect(sx-bw/2, sy-e.r-10, bw*clamp(e.hp/e.maxHp,0,1), 5);
+  }
+  // projectiles
+  for(const p of run.projectiles){
+    const [sx,sy]=toScreen(p.x,p.y);
+    ctx.fillStyle="#f0dca8"; ctx.beginPath(); ctx.arc(sx,sy,p.r,0,7); ctx.fill();
+  }
+  // player
+  ctx.fillStyle = run.hero.color;
+  ctx.beginPath(); ctx.arc(cx,cy,18,0,7); ctx.fill();
+  ctx.strokeStyle="#1a1006"; ctx.lineWidth=3; ctx.stroke();
+  if(run.invuln>run.time){ ctx.strokeStyle="#e6c25c"; ctx.lineWidth=2; ctx.beginPath(); ctx.arc(cx,cy,24,0,7); ctx.stroke(); }
+}
+
+function updateHud(){
+  document.getElementById("hp-fill").style.width = clamp(run.hp/run.maxHp*100,0,100)+"%";
+  document.getElementById("hp-label").textContent = Math.ceil(run.hp)+"/"+run.maxHp;
+  document.getElementById("xp-fill").style.width = clamp(run.xp/run.xpNeed*100,0,100)+"%";
+  document.getElementById("xp-label").textContent = "Lv "+run.level;
+  document.getElementById("hud-wave").textContent = "Wave "+run.wave;
+  document.getElementById("hud-biome").textContent = DATA.biomes[run.biomeIdx];
+  document.getElementById("hud-timer").textContent = fmtTime(run.time);
+  document.getElementById("hud-kills").textContent = run.kills+" kills";
+}
+
+function endRun(){
+  runActive = false;
+  window.onkeydown = null; window.onkeyup = null;
+  state.stats.totalRuns++;
+  state.stats.totalKills += run.kills;
+  state.stats.bestWave = Math.max(state.stats.bestWave, run.wave);
+  state.stats.bestTime = Math.max(state.stats.bestTime, run.time);
+  state.gold += run.loot.gold;
+  state.gems += run.loot.gems;
+  state.enchantDust += run.loot.dust + Math.floor(run.kills/10);
+  for(const nm of run.loot.items){ const def=itemByName(nm); if(def) invAdd(def.id,1); }
+  state.firstRunDone = true;
+  saveState();
+
+  const overlay = document.getElementById("death-overlay");
+  overlay.classList.add("active");
+  document.getElementById("death-summary").innerHTML = `
+    <div class="summary-row"><span>Wave Reached</span><span>${run.wave}</span></div>
+    <div class="summary-row"><span>Time Survived</span><span>${fmtTime(run.time)}</span></div>
+    <div class="summary-row"><span>Kills</span><span>${run.kills}</span></div>
+    <div class="summary-row"><span>Gold Earned</span><span class="gold-text">${run.loot.gold}</span></div>
+    <div class="summary-row"><span>Gems Earned</span><span class="gold-text">${run.loot.gems}</span></div>
+    <div class="summary-row"><span>Items Looted</span><span>${run.loot.items.length ? run.loot.items.join(", ") : "None"}</span></div>
+  `;
+}
+
+function returnToHub(){
+  document.getElementById("death-overlay").classList.remove("active");
+  document.getElementById("pause-overlay").classList.remove("active");
+  document.getElementById("levelup-overlay").classList.remove("active");
+  document.getElementById("run").classList.remove("active");
+  document.getElementById("hub").style.display="flex";
+  activeTab="play";
+  renderHub();
+}
+
+/* =========================================================================
+   BOOTSTRAP
+   ========================================================================= */
+function init(){
+  state = loadState();
+  applyDensity();
+
+  document.getElementById("density-toggle").onclick = ()=>{
+    const order = ["auto","phone","tablet"];
+    const idx = order.indexOf(state.density);
+    state.density = order[(idx+1)%order.length];
+    document.getElementById("density-toggle").textContent = "Density: "+state.density;
+    applyDensity(); saveState();
+  };
+  document.getElementById("density-toggle").textContent = "Density: "+state.density;
+
+  document.getElementById("pause-btn").onclick = ()=>{
+    if(!runActive) return;
+    runPaused = true;
+    document.getElementById("pause-overlay").classList.add("active");
+  };
+  document.getElementById("resume-btn").onclick = ()=>{
+    document.getElementById("pause-overlay").classList.remove("active");
+    runPaused = false;
+    run.lastNow = performance.now();
+    requestAnimationFrame(gameLoop);
+  };
+  document.getElementById("abandon-btn").onclick = ()=>{
+    document.getElementById("pause-overlay").classList.remove("active");
+    endRun();
+  };
+  document.getElementById("return-hub-btn").onclick = returnToHub;
+
+  document.getElementById("app").addEventListener("click", (e)=>{
+    if(e.target.id==="modal-overlay") closeModal();
+  });
+
+  renderHub();
+}
+
+if(document.readyState==="loading") document.addEventListener("DOMContentLoaded", init);
+else init();
+
+})();
+
+</script>
+</body>
+</html>
