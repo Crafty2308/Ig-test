@@ -436,6 +436,16 @@ function invFindInstance(uidv){ return state.inventory.find(x=>x.uid===uidv); }
 const SELL_VALUE_BY_TIER = {Common:12, Rare:30, Legendary:75, Mythic:180, Utility:8};
 function sellValue(def, enchant){ return (SELL_VALUE_BY_TIER[def.tier]||10) + (enchant||0)*5; }
 
+const ENCHANT_STAT_PCT = 8; // % boost to the item's own hp/dmg/spd/fireRate per enchant level
+const ENCHANTABLE_KEYS = ["hp","dmg","spd","fireRate"];
+function scaledStats(stats, enchant){
+  if(!enchant) return stats;
+  const mult = 1 + enchant*ENCHANT_STAT_PCT/100;
+  const out = {};
+  for(const k in stats){ out[k] = ENCHANTABLE_KEYS.includes(k) ? Math.round(stats[k]*mult*100)/100 : stats[k]; }
+  return out;
+}
+
 function petOwned(petId){ return state.pets.find(p=>p.petId===petId); }
 
 function metaLevel(id){ return state.metaLevels[id]||0; }
@@ -578,7 +588,7 @@ function renderPlayTab(body){
     if(def){
       card.innerHTML = `<span class="tier ${tierClass(def.tier)}">${def.tier}</span>
         <div class="name">${def.name}${inst.enchant?` +${inst.enchant}`:""}</div>
-        <div class="stats">${statLine(def.stats)}${inst.enchant?` &mdash; +${inst.enchant*2}% DMG`:""}</div>
+        <div class="stats">${statLine(scaledStats(def.stats, inst.enchant))}</div>
         <button class="btn danger small">Unequip</button>`;
       card.querySelector("button").onclick = (e)=>{ e.stopPropagation(); state.equipped[idx]=null; saveState(); renderHub(); };
     } else {
@@ -645,7 +655,7 @@ function openEquipPicker(slotIdx){
     const def = DATA.items.find(i=>i.id===inst.itemId);
     return {
       label: `${def.name}${inst.enchant?` +${inst.enchant}`:""} <span class="tier ${tierClass(def.tier)}" style="margin-left:6px">${def.tier}</span>`,
-      sub: statLine(def.stats) + (inst.enchant ? ` &mdash; +${inst.enchant*2}% DMG` : ""),
+      sub: statLine(scaledStats(def.stats, inst.enchant)),
       onClick: ()=>{ state.equipped[slotIdx]=inst.uid; saveState(); closeModal(); renderHub(); }
     };
   }) : [{label:"No items in inventory", sub:"Craft or pull gear first.", onClick:closeModal}]);
@@ -926,7 +936,7 @@ const ENCHANT_COST = 15;
 function renderEnchantTab(body){
   const title = document.createElement("div"); title.className="section-title"; title.textContent="Enchant Forge"; body.appendChild(title);
   const panel = document.createElement("div"); panel.className="panel flex-col";
-  panel.innerHTML = `<div class="muted">Spend ${ENCHANT_COST} Enchant Dust on a piece of gear: 70% chance to raise its enchant level by 1 (each level grants +2% Damage while equipped, and +5 Gold sell value), 20% chance nothing happens, 10% chance a random <em>unequipped</em> item elsewhere in your inventory is destroyed. Equipped items are always safe from the backfire.</div>
+  panel.innerHTML = `<div class="muted">Spend ${ENCHANT_COST} Enchant Dust on a piece of gear: 70% chance to raise its enchant level by 1 (each level boosts this item's own HP/Damage/Speed/Fire Rate by +${ENCHANT_STAT_PCT}%, and adds +5 Gold sell value), 20% chance nothing happens, 10% chance a random <em>unequipped</em> item elsewhere in your inventory is destroyed. Equipped items are always safe from the backfire.</div>
     <div class="row" style="margin-top:8px"><span>Enchant Dust</span><span class="gold-text">${state.enchantDust}</span></div>`;
   body.appendChild(panel);
 
@@ -938,10 +948,10 @@ function renderEnchantTab(body){
     const def = DATA.items.find(i=>i.id===inst.itemId);
     const card = document.createElement("div"); card.className="card";
     const equippedTag = state.equipped.includes(inst.uid) ? ' <span class="stats">(equipped)</span>' : "";
-    const enchantTag = inst.enchant ? ` <span class="stats gold-text">+${inst.enchant} (+${inst.enchant*2}% DMG when equipped)</span>` : "";
+    const enchantTag = inst.enchant ? ` <span class="stats gold-text">Enchant +${inst.enchant} (stats boosted +${inst.enchant*ENCHANT_STAT_PCT}%)</span>` : "";
     card.innerHTML = `<span class="tier ${tierClass(def.tier)}">${def.tier}</span>
       <div class="name">${def.name}${equippedTag}</div>
-      <div class="stats">${statLine(def.stats)}</div>
+      <div class="stats">${statLine(scaledStats(def.stats, inst.enchant))}</div>
       ${enchantTag}`;
     const btn = document.createElement("button"); btn.className="btn small"; btn.textContent="Enchant"; btn.disabled = state.enchantDust<ENCHANT_COST;
     btn.onclick = ()=> doEnchant(inst.uid);
@@ -956,7 +966,7 @@ function doEnchant(instUid){
   const roll = Math.random();
   const inst = invFindInstance(instUid);
   if(roll < 0.70){
-    if(inst){ inst.enchant = (inst.enchant||0)+1; toast(`Enchant succeeded! Now +${inst.enchant} (+${inst.enchant*2}% Damage when equipped).`); }
+    if(inst){ inst.enchant = (inst.enchant||0)+1; toast(`Enchant succeeded! +${inst.enchant} (stats now boosted +${inst.enchant*ENCHANT_STAT_PCT}%).`); }
   } else if(roll < 0.90){
     toast("The forge sputters. Nothing happens.");
   } else {
@@ -1154,18 +1164,17 @@ function startRun(){
   const hero = byId(DATA.heroes, state.selectedHero);
   const persist = persistentBonuses();
   const gearFlat = {hp:0,dmg:0,spd:0,fireRate:0};
-  let gearEnchantBonus = 0;
   for(const slotUid of state.equipped){
     if(!slotUid) continue;
     const inst = invFindInstance(slotUid);
     if(!inst) continue;
     const def = DATA.items.find(i=>i.id===inst.itemId);
-    for(const k in def.stats){ if(k in gearFlat) gearFlat[k]+=def.stats[k]; }
-    gearEnchantBonus += (inst.enchant||0)*0.02;
+    const scaled = scaledStats(def.stats, inst.enchant);
+    for(const k in scaled){ if(k in gearFlat) gearFlat[k]+=scaled[k]; }
   }
 
   run = {
-    hero, persist, gearFlat, gearEnchantBonus,
+    hero, persist, gearFlat,
     passives: {}, // key -> stacked value
     passiveList: [],
     x:0, y:0, vx:0, vy:0,
@@ -1211,7 +1220,7 @@ function recalcStats(){
   const frFlat = hero.fireRate + run.gearFlat.fireRate;
 
   const hpPct = 1 + statTotal("hp_pct")/100;
-  const dmgPct = 1 + statTotal("dmg_pct")/100 + run.gearEnchantBonus;
+  const dmgPct = 1 + statTotal("dmg_pct")/100;
   const spdPct = 1 + statTotal("spd_pct")/100;
   const frPct = 1 + statTotal("fire_rate_pct")/100;
   const psPct = 1 + statTotal("proj_speed_pct")/100;
