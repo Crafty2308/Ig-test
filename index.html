@@ -433,6 +433,8 @@ function invRemoveOneOf(itemId){
   if(idx>=0) state.inventory.splice(idx,1);
 }
 function invFindInstance(uidv){ return state.inventory.find(x=>x.uid===uidv); }
+const SELL_VALUE_BY_TIER = {Common:12, Rare:30, Legendary:75, Mythic:180, Utility:8};
+function sellValue(def, enchant){ return (SELL_VALUE_BY_TIER[def.tier]||10) + (enchant||0)*5; }
 
 function petOwned(petId){ return state.pets.find(p=>p.petId===petId); }
 
@@ -663,6 +665,10 @@ function renderHeroesTab(body){
   const title = document.createElement("div");
   title.className="section-title"; title.textContent="Heroes";
   body.appendChild(title);
+  const hint = document.createElement("div");
+  hint.className="muted"; hint.style.marginBottom="var(--gap)";
+  hint.textContent = "Unlock a hero outright for 500 Gems, or try the Champion's Call banner in Gacha for a cheaper chance at one. Earn Gems from boss kills, or exchange Gold for Gems in the Bank.";
+  body.appendChild(hint);
   const grid = document.createElement("div"); grid.className="card-grid";
   for(const h of DATA.heroes){
     const owned = state.ownedHeroes.includes(h.id);
@@ -697,6 +703,10 @@ function renderHeroesTab(body){
 // ---------------- PETS TAB ----------------
 function renderPetsTab(body){
   const title = document.createElement("div"); title.className="section-title"; title.textContent="Pets"; body.appendChild(title);
+  const hint = document.createElement("div");
+  hint.className="muted"; hint.style.marginBottom="var(--gap)";
+  hint.textContent = "Pets are only obtained from the Menagerie Draw banner in Gacha (or by fusing two Level-10 pets of the same tier below).";
+  body.appendChild(hint);
   const grid = document.createElement("div"); grid.className="card-grid";
   for(const p of DATA.pets){
     const inst = petOwned(p.id);
@@ -844,6 +854,37 @@ function renderCraftTab(body){
         saveState(); toast("Converted."); renderHub();
       };
       chip.appendChild(convBtn);
+    }
+    const sellable = state.inventory.filter(x=>x.itemId===id && !state.equipped.includes(x.uid));
+    if(sellable.length){
+      const sellBtn = document.createElement("button");
+      sellBtn.className="btn small secondary";
+      const unitValue = sellValue(def, sellable[0].enchant);
+      sellBtn.textContent = `Sell (⛀${unitValue})`;
+      sellBtn.onclick = ()=>{
+        const inst = sellable[0];
+        state.inventory = state.inventory.filter(x=>x!==inst);
+        state.gold += sellValue(def, inst.enchant);
+        saveState(); toast(`Sold ${def.name} for ${sellValue(def, inst.enchant)} Gold.`); renderHub();
+      };
+      chip.appendChild(sellBtn);
+      if(sellable.length>1){
+        const sellAllBtn = document.createElement("button");
+        sellAllBtn.className="btn small danger";
+        sellAllBtn.textContent = `Sell All x${sellable.length}`;
+        sellAllBtn.onclick = ()=>{
+          let total=0;
+          for(const inst of sellable){ total += sellValue(def, inst.enchant); }
+          const sellSet = new Set(sellable);
+          state.inventory = state.inventory.filter(x=>!sellSet.has(x));
+          state.gold += total;
+          saveState(); toast(`Sold ${sellable.length}x ${def.name} for ${total} Gold.`); renderHub();
+        };
+        chip.appendChild(sellAllBtn);
+      }
+    } else {
+      const note = document.createElement("div"); note.className="muted"; note.style.fontSize="var(--font-sm)"; note.textContent="Equipped — unequip to sell";
+      chip.appendChild(note);
     }
     invWrap.appendChild(chip);
   }
@@ -1360,11 +1401,11 @@ function dealDamage(enemy, dmg){
 function killEnemy(enemy){
   enemy.dead = true;
   run.kills++;
-  const goldGain = Math.round((enemy.isBoss?40:3) * (1+run.goldPct/100));
+  const goldGain = Math.round((enemy.isBoss?55:4) * (1+run.goldPct/100));
   run.loot.gold += goldGain;
   spawnXpOrb(enemy.x, enemy.y, enemy.isBoss?30:4);
   if(enemy.isBoss){
-    let gems = 3 + Math.floor(Math.random()*4);
+    let gems = 5 + Math.floor(Math.random()*5);
     if(Math.random()*100 < run.gemChance) gems += 2;
     run.loot.gems += gems;
     toast(`${enemy.def.name} defeated! +${gems} Gems`);
@@ -1373,9 +1414,12 @@ function killEnemy(enemy){
       const cand = DATA.items.filter(i=>i.tier===pool);
       run.loot.items.push(pick(cand).name);
     }
-  } else if(Math.random()<0.05){
-    const cand = DATA.items.filter(i=>i.tier==="Common");
-    run.loot.items.push(pick(cand).name);
+  } else {
+    if(Math.random()<0.05){
+      const cand = DATA.items.filter(i=>i.tier==="Common");
+      run.loot.items.push(pick(cand).name);
+    }
+    if(Math.random()*100 < 2 + run.gemChance*0.2){ run.loot.gems += 1; }
   }
   if(run.aoeRadius>0){
     for(const other of run.enemies){
