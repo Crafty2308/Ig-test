@@ -235,8 +235,18 @@ h1,h2,h3{font-family:Georgia,'Palatino Linotype',Palatino,serif; margin:0 0 6px 
 .upgrade-card .name{font-size:var(--font-base); font-weight:bold; color:var(--c-brass-bright);}
 .upgrade-card .desc{font-size:var(--font-sm); color:var(--c-parchment);}
 
-#death-overlay .summary-panel{max-width:420px; width:90%;}
+#death-overlay .summary-panel{max-width:420px; width:90%; max-height:85vh; overflow-y:auto;}
 .summary-row{display:flex; justify-content:space-between; padding:4px 0; border-bottom:1px dashed rgba(201,162,74,0.3); font-size:var(--font-base);}
+.summary-row.items-row{flex-direction:column; align-items:stretch; gap:4px;}
+.summary-items-list{
+  max-height:110px; overflow-y:auto;
+  background:rgba(0,0,0,0.25); border:1px solid var(--c-wood-dark); border-radius:6px;
+  padding:6px; display:flex; flex-wrap:wrap; gap:4px; align-content:flex-start;
+}
+.summary-items-list .item-chip{
+  font-size:var(--font-sm); background:var(--c-wood-light); border:1px solid var(--c-ink);
+  border-radius:10px; padding:2px 8px; color:var(--c-parchment);
+}
 
 /* Toast */
 #toast{
@@ -1640,13 +1650,21 @@ function endRun(){
 
   const overlay = document.getElementById("death-overlay");
   overlay.classList.add("active");
+
+  const itemCounts = {};
+  for(const nm of run.loot.items){ itemCounts[nm]=(itemCounts[nm]||0)+1; }
+  const itemNames = Object.keys(itemCounts);
+  const itemsHtml = itemNames.length
+    ? `<div class="summary-items-list">${itemNames.map(nm=>`<span class="item-chip">${nm}${itemCounts[nm]>1?` x${itemCounts[nm]}`:""}</span>`).join("")}</div>`
+    : `<span class="muted">None</span>`;
+
   document.getElementById("death-summary").innerHTML = `
     <div class="summary-row"><span>Wave Reached</span><span>${run.wave}</span></div>
     <div class="summary-row"><span>Time Survived</span><span>${fmtTime(run.time)}</span></div>
     <div class="summary-row"><span>Kills</span><span>${run.kills}</span></div>
     <div class="summary-row"><span>Gold Earned</span><span class="gold-text">${run.loot.gold}</span></div>
     <div class="summary-row"><span>Gems Earned</span><span class="gold-text">${run.loot.gems}</span></div>
-    <div class="summary-row"><span>Items Looted</span><span>${run.loot.items.length ? run.loot.items.join(", ") : "None"}</span></div>
+    <div class="summary-row items-row"><span>Items Looted (${run.loot.items.length})</span>${itemsHtml}</div>
   `;
 }
 
