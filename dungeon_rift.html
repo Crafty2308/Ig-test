@@ -32,7 +32,7 @@ input,textarea{font-family:'Crimson Pro',Georgia,serif}
 #app{position:fixed;inset:0;overflow:hidden}
 .screen{position:absolute;inset:0;display:none;opacity:0;transition:opacity .5s ease}
 .screen.active{display:block;opacity:1}
-.scrollable{overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;
+.scrollable{position:absolute;inset:0;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;
   padding:calc(28px + env(safe-area-inset-top)) calc(20px + env(safe-area-inset-right))
           calc(40px + env(safe-area-inset-bottom)) calc(20px + env(safe-area-inset-left))}
 .wrap{max-width:760px;margin:0 auto}
@@ -156,7 +156,6 @@ body.touch #touchui{display:block}
 .overlay{position:absolute;inset:0;display:none;background:rgba(4,4,6,.9);z-index:20;
   backdrop-filter:blur(2px);-webkit-backdrop-filter:blur(2px)}
 .overlay.on{display:block}
-.overlay .scrollable{position:absolute;inset:0}
 .ov-title{font-size:clamp(22px,4.6vw,34px);color:var(--gold);text-align:center;letter-spacing:.2em;text-transform:uppercase}
 .ov-note{text-align:center;color:var(--text-dim);font-style:italic;margin-top:12px;font-size:16px;line-height:1.6}
 .pick{display:block;width:100%;text-align:left;background:rgba(255,255,255,.022);border:1px solid rgba(255,255,255,.05);
