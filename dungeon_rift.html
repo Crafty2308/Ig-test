@@ -68,7 +68,8 @@ input{font-family:'Crimson Pro',Georgia,serif}
 .cls:hover,.cls.on{background:rgba(200,169,110,.1);border-color:rgba(200,169,110,.4)}
 .cls .nm{font-family:'Cinzel',serif;color:#e3d6b8;font-size:19px}
 .cls .at{font-family:'Cinzel',serif;font-size:10.5px;letter-spacing:.2em;color:var(--gold);margin-top:5px}
-.cls .ds{color:var(--dim);font-style:italic;font-size:14.5px;margin-top:8px;line-height:1.55}
+.cls .mh{color:#9db4d4;font-size:14.5px;margin-top:8px;line-height:1.5}
+.cls .ds{color:var(--dim);font-style:italic;font-size:14px;margin-top:6px;line-height:1.5}
 .cls .sk{color:var(--faint);font-size:13px;margin-top:8px}
 .nameinput{width:100%;background:rgba(255,255,255,.03);border:0;border-bottom:1px solid rgba(200,169,110,.22);
   color:var(--text);font-size:17px;padding:10px 12px;outline:none;border-radius:3px 3px 0 0}
@@ -99,9 +100,16 @@ input{font-family:'Crimson Pro',Georgia,serif}
 #flask-life .flask i{background:linear-gradient(180deg,#c0463a,#7d2420)}
 #flask-mana .flask i{background:linear-gradient(180deg,#4a76ad,#26405f)}
 .flask span{position:relative;z-index:2;display:block;margin-top:calc(13px * var(--hud))}
+#pail{position:absolute;bottom:calc(102px * var(--hud) + 26px);left:calc(12px + env(safe-area-inset-left));
+  width:calc(112px * var(--hud));display:flex;flex-direction:column;gap:2px}
+#pail .m{height:calc(4px * var(--hud));background:rgba(255,255,255,.07);border-radius:2px;overflow:hidden;
+  position:relative}
+#pail .m i{display:block;height:100%;width:0}
+#pail .m b{position:absolute;left:3px;top:calc(-1px * var(--hud));font-size:calc(6px * var(--hud));
+  font-family:'Cinzel',serif;color:rgba(255,255,255,.55);font-weight:400;letter-spacing:.1em}
 #spiritbar{position:absolute;bottom:calc(102px * var(--hud) + 26px);right:calc(12px + env(safe-area-inset-right));
   width:calc(112px * var(--hud));font-size:calc(8.5px * var(--hud));color:var(--dim);letter-spacing:.14em;text-align:right}
-body.touch #spiritbar{right:auto;left:calc(12px + env(safe-area-inset-left));text-align:left}
+
 #spiritbar .bar{height:calc(5px * var(--hud));background:rgba(255,255,255,.07);border-radius:2px;margin-top:3px;overflow:hidden}
 #spiritbar .bar i{display:block;height:100%;background:linear-gradient(90deg,#5b4d86,#9a86d4)}
 #slots{position:absolute;bottom:calc(16px + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);
@@ -138,6 +146,15 @@ body.touch #spiritbar{right:auto;left:calc(12px + env(safe-area-inset-left));tex
   position:relative;overflow:hidden}
 #bossbar .bar i{display:block;height:100%;background:linear-gradient(90deg,#7d2420,#c8483a);width:100%}
 #bossbar .ph{position:absolute;top:0;bottom:0;width:1px;background:rgba(0,0,0,.65)}
+#pointhint{position:absolute;top:calc(46px + env(safe-area-inset-top));left:50%;
+  transform:translateX(-50%);font-family:'Cinzel',serif;font-size:calc(10px * var(--hud));
+  letter-spacing:.16em;color:var(--gold);background:rgba(200,169,110,.1);
+  border:1px solid rgba(200,169,110,.3);border-radius:3px;padding:3px 9px;display:none}
+#pointhint.on{display:block}
+#tmenu button{position:relative}
+#tmenu button .badge{position:absolute;top:-5px;right:-5px;min-width:15px;height:15px;
+  border-radius:8px;background:#c8a96e;color:#0b0b0f;font-size:9px;line-height:15px;
+  font-family:'Cinzel',serif;text-align:center;padding:0 3px}
 #toast{position:absolute;top:calc(96px + env(safe-area-inset-top));left:50%;transform:translateX(-50%);
   font-family:'Crimson Pro',serif;font-size:15px;color:var(--gold);text-align:center;pointer-events:none;
   opacity:0;transition:opacity .3s;text-shadow:0 2px 8px #000;max-width:70vw}
@@ -192,7 +209,9 @@ body.touch #tmenu{display:flex}
 .card{background:rgba(255,255,255,.022);border-left:2px solid rgba(200,169,110,.24);padding:12px 14px;
   margin-bottom:9px;border-radius:0 4px 4px 0}
 .card .nm{font-family:'Cinzel',serif;color:#e3d6b8;font-size:16px}
-.card .ds{color:var(--dim);font-style:italic;font-size:14.5px;margin-top:5px;line-height:1.5}
+.card .ds{color:var(--dim);font-style:italic;font-size:14px;margin-top:5px;line-height:1.5}
+.card .mh,.gemcard .mh,.pick .mh{color:#9db4d4;font-size:14px;margin-top:5px;line-height:1.5;
+  font-family:'Crimson Pro',serif}
 .card .mc{color:var(--faint);font-size:13px;margin-top:6px}
 .kv{display:flex;justify-content:space-between;gap:12px;padding:6px 2px;border-bottom:1px solid rgba(255,255,255,.04)}
 .kv span:first-child{font-family:'Cinzel',serif;font-size:10px;letter-spacing:.16em;text-transform:uppercase;
@@ -207,15 +226,47 @@ body.touch #tmenu{display:flex}
 /* inventory */
 .invwrap{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:18px;align-items:start}
 @media (max-width:860px){.invwrap{grid-template-columns:1fr}}
-.eqgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
-.eqslot{aspect-ratio:1;background:rgba(255,255,255,.022);border:1px solid rgba(255,255,255,.055);
+.paperdoll{display:grid;gap:6px;
+  grid-template-columns:1fr 1fr 1fr;
+  grid-template-areas:
+    "sets   helmet amulet"
+    "weapon body   offhand"
+    "gloves body   rings1"
+    "belt   boots  rings2";}
+.paperdoll .setrow{grid-area:sets;display:flex;flex-direction:column;gap:4px;justify-content:center}
+.paperdoll .setrow .tab{padding:5px 4px;font-size:9.5px;letter-spacing:.1em}
+.slot-weapon{grid-area:weapon;min-height:104px}
+.slot-offhand{grid-area:offhand;min-height:78px}
+.slot-helmet{grid-area:helmet}
+.slot-amulet{grid-area:amulet;min-height:44px}
+.slot-body{grid-area:body;min-height:112px}
+.slot-gloves{grid-area:gloves}
+.slot-ring1{grid-area:rings1;min-height:44px}
+.slot-ring2{grid-area:rings2;min-height:44px}
+.slot-belt{grid-area:belt;min-height:44px}
+.slot-boots{grid-area:boots}
+.eqslot{background:rgba(255,255,255,.022);border:1px solid rgba(255,255,255,.055);
   border-radius:4px;position:relative;display:flex;align-items:center;justify-content:center;
-  font-size:8.5px;letter-spacing:.1em;color:var(--faint);text-align:center;font-family:'Cinzel',serif;
-  text-transform:uppercase;cursor:pointer;overflow:hidden;padding:2px}
-.eqslot.filled{border-color:rgba(200,169,110,.3)}
-.eqslot .it{position:absolute;inset:2px;display:flex;align-items:center;justify-content:center;
-  font-family:'Crimson Pro',serif;font-size:10.5px;line-height:1.1;text-align:center;padding:2px;
+  min-height:66px;font-size:8.5px;letter-spacing:.1em;color:var(--faint);text-align:center;
+  font-family:'Cinzel',serif;text-transform:uppercase;cursor:pointer;overflow:hidden;padding:3px;
+  transition:border-color .18s,background .18s}
+.eqslot .lbl{opacity:.75}
+.eqslot.filled{border-color:rgba(200,169,110,.3);background:rgba(255,255,255,.035)}
+.eqslot.filled.r1{border-color:rgba(106,143,200,.5)}
+.eqslot.filled.r2{border-color:rgba(212,192,96,.5)}
+.eqslot.filled.r3{border-color:rgba(200,120,56,.6)}
+.eqslot.target{border-color:var(--gold);background:rgba(200,169,110,.14)}
+.eqslot.dim{opacity:.35}
+.eqslot.blocked{opacity:.5;background:repeating-linear-gradient(45deg,rgba(255,255,255,.02) 0 6px,rgba(0,0,0,.18) 6px 12px)}
+.eqslot .x{position:absolute;bottom:3px;left:0;right:0;font-size:7.5px;color:#8a6a5a;letter-spacing:.08em}
+.eqslot .it{position:absolute;inset:3px;display:flex;align-items:center;justify-content:center;
+  font-family:'Crimson Pro',serif;font-size:10.5px;line-height:1.15;text-align:center;padding:2px;
   text-transform:none;letter-spacing:0}
+@media (max-width:520px){
+  .paperdoll{grid-template-columns:1fr 1fr;
+    grid-template-areas:"sets sets" "helmet amulet" "weapon offhand" "body body" "gloves belt" "rings1 rings2" "boots boots";}
+  .paperdoll .setrow{flex-direction:row}
+}
 .grid{position:relative;background:rgba(255,255,255,.016);border:1px solid rgba(255,255,255,.05);
   border-radius:4px;touch-action:none}
 .cell{position:absolute;border:1px solid rgba(255,255,255,.035)}
@@ -228,6 +279,13 @@ body.touch #tmenu{display:flex}
 .item.r2{border-color:rgba(212,192,96,.5);color:var(--r2)}
 .item.r3{border-color:rgba(200,120,56,.6);color:var(--r3)}
 .item.unid{border-style:dashed}
+.item.stack{border-color:rgba(160,140,200,.55);background:rgba(24,20,34,.92);color:#cdbde8;
+  flex-direction:column;gap:0;font-size:8.5px;letter-spacing:.02em}
+.item.stack .ab{line-height:1.05}
+.item.stack .ct{font-family:'Cinzel',serif;font-size:9px;color:#efe4c4}
+.item.armed{border-color:var(--gold);box-shadow:inset 0 0 0 1px rgba(200,169,110,.5)}
+.item.dim{opacity:.3}
+.item.dropping{border-color:#b4685f;opacity:.75}
 #tooltip{position:fixed;z-index:60;max-width:290px;background:rgba(6,6,9,.97);
   border:1px solid rgba(200,169,110,.28);border-radius:4px;padding:11px 13px;display:none;
   pointer-events:none;font-size:13.5px;line-height:1.45}
@@ -280,6 +338,7 @@ body.touch #tmenu{display:flex}
   margin-bottom:8px;border-radius:0 4px 4px 0}
 .pick:hover:not(:disabled){background:rgba(200,169,110,.09);border-left-color:var(--gold)}
 .pick:disabled{opacity:.4;cursor:default}
+.pick.bad{border-left-color:rgba(180,104,95,.4)}
 .pick .nm{font-family:'Cinzel',serif;color:#e3d6b8;font-size:15px}
 .pick .ds{color:var(--dim);font-style:italic;font-size:13.5px;margin-top:4px;font-family:'Crimson Pro',serif}
 .pick .mc{color:var(--faint);font-size:12.5px;margin-top:4px;font-family:'Crimson Pro',serif}
@@ -288,6 +347,20 @@ body.touch #tmenu{display:flex}
 #mapcv{position:absolute;inset:0;width:100%;height:100%}
 
 @media (max-width:920px),(pointer:coarse){ :root{--hud:1.26} }
+/* Touch layout, driven by the body class rather than a viewport guess:
+   the menu row owns the top-left, so anything centred at the top moves
+   below it, and the spirit bar moves to the middle where the desktop
+   skill slots would be. */
+body.touch #tmenu{flex-wrap:wrap;max-width:172px}
+/* the menu wraps to two rows (82px tall), so the whole top strip is
+   stacked underneath it rather than guessing at a single row */
+body.touch #xpbar{top:calc(96px + env(safe-area-inset-top));left:16px;right:16px;
+  width:auto;max-width:none;transform:none}
+body.touch #pointhint{top:calc(126px + env(safe-area-inset-top))}
+body.touch #bossbar{top:calc(152px + env(safe-area-inset-top))}
+body.touch #minimap-wrap{top:calc(152px + env(safe-area-inset-top))}
+body.touch #spiritbar{left:50%;right:auto;transform:translateX(-50%);text-align:center;
+  bottom:calc(126px + env(safe-area-inset-bottom))}
 @media (max-width:560px){
   :root{--hud:1.1}
   #minimap-wrap,#minimap{width:92px;height:92px}
@@ -296,8 +369,14 @@ body.touch #tmenu{display:flex}
   .flasks{flex-direction:column;bottom:calc(24px + env(safe-area-inset-bottom))}
   #flask-life{left:calc(102px * var(--hud) + 14px)}
   #flask-mana{right:calc(102px * var(--hud) + 14px)}
-  /* the stacked flasks are taller, so the button cluster moves up to clear them */
+  /* the stacked flasks are taller, so the button cluster moves up to clear
+     them, and the ailment meters sit above the flask column */
   #tbtns{bottom:calc(196px + env(safe-area-inset-bottom))}
+  #pail{bottom:calc(186px + env(safe-area-inset-bottom));width:120px}
+  /* no room in the middle once the button cluster rises: stack the spirit
+     bar above the ailment meters on the left instead */
+  body.touch #spiritbar{left:calc(12px + env(safe-area-inset-left));right:auto;transform:none;
+    text-align:left;bottom:calc(232px + env(safe-area-inset-bottom))}
 }
 @media (max-height:430px){ .scroll{padding-top:calc(12px + env(safe-area-inset-top))} .sect{margin:14px 0 8px} }
 </style>
@@ -347,9 +426,11 @@ body.touch #tmenu{display:flex}
     <div class="orb" id="orb-mana"><div class="fill" id="mana-fill"></div><div class="txt" id="mana-txt"></div></div>
     <div class="flasks" id="flask-life"></div>
     <div class="flasks" id="flask-mana"></div>
+    <div id="pail"></div>
     <div id="spiritbar"><span id="spirit-lb">SPIRIT</span><div class="bar"><i id="spirit-fill"></i></div></div>
     <div id="slots"></div>
     <div id="setind">SET <b id="set-nm">I</b></div>
+    <div id="pointhint"></div>
     <div id="toast"></div>
     <div id="prompt"></div>
   </div>
@@ -359,7 +440,8 @@ body.touch #tmenu{display:flex}
     <div id="tmenu">
       <button data-panel="inv">I</button><button data-panel="tree">P</button>
       <button data-panel="skills">S</button><button data-panel="sheet">C</button>
-      <button data-panel="map">M</button><button data-panel="menu">&#9776;</button>
+      <button data-panel="map">M</button><button id="tb-hide">H</button>
+      <button data-panel="menu">&#9776;</button>
     </div>
     <div id="tbtns">
       <div class="tb" id="tb0" data-sk="0"><div class="sweep"></div><span>1</span><span class="lb"></span></div>
@@ -379,6 +461,7 @@ body.touch #tmenu{display:flex}
       <span class="pts" id="tree-pts">0 POINTS</span>
       <button class="tab" id="tree-set">SET I</button>
       <input id="treesearch" placeholder="search nodes">
+      <button class="tab" id="tree-filter">ACTIVE SET ONLY</button>
       <button class="tab" id="tree-respec">RESPEC</button>
     </div>
     <div id="treeinfo"></div>
@@ -393,7 +476,6 @@ body.touch #tmenu{display:flex}
   <div class="panel" id="panel-npc"><button class="pclose" data-close="npc">&#10005;</button>
     <div class="scroll"><div class="wrap" id="npc-body"></div></div></div>
   <div class="panel" id="panel-death"><div class="scroll"><div class="wrap" id="death-body"></div></div></div>
-  <div class="panel" id="panel-level"><div class="scroll"><div class="wrap" id="level-body"></div></div></div>
 </section>
 
 <div id="tooltip"></div>
@@ -408,6 +490,7 @@ body.touch #tmenu{display:flex}
    ========================================================================== */
 
 const SAVE_KEY = 'dungeonrift_save_v1';
+const SAVE_VERSION = 2;
 const TILE = 48;
 const GRID = 160;
 const MAX_SLOTS = 6;
@@ -418,21 +501,27 @@ const SKILL_KEYS = ['LMB','Q','E','R','SPACE'];
 const CLASSES = {
   marauder:{ name:'Marauder', attrs:{str:23,dex:14,int:14}, life:38, mana:30, spirit:0,
     start:'str', startSkill:'ground_slam', color:'#a8452f',
+    mech:'Highest base life and the strongest melee scaling. Starts beside strength passives: life, armour and stun buildup.',
     desc:'Slow, heavy and hard to put down. Everything he owns is blunt.' },
   ranger:{ name:'Ranger', attrs:{str:14,dex:23,int:14}, life:30, mana:34, spirit:0,
     start:'dex', startSkill:'split_arrow', color:'#4f8f5a',
+    mech:'Highest evasion and attack speed. Starts beside dexterity passives: projectile damage, evasion and movement.',
     desc:'Fast, distant and difficult to touch. She fights the room, not the enemy.' },
   witch:{ name:'Witch', attrs:{str:14,dex:14,int:23}, life:24, mana:46, spirit:0,
     start:'int', startSkill:'fireball', color:'#6a5fa8',
+    mech:'Highest mana and spell damage, lowest life. Starts beside intelligence passives: elemental damage and energy shield.',
     desc:'Thin-boned and appalling to stand near. The damage is not hers to carry.' },
   duelist:{ name:'Duelist', attrs:{str:20,dex:20,int:11}, life:34, mana:32, spirit:0,
     start:'strdex', startSkill:'whirling_blades', color:'#b07a3a',
+    mech:'Fast melee with the best crit access. Starts between strength and dexterity: attack speed, crit and leech.',
     desc:'Quick hands, quicker exits. He wins on the openings nobody else sees.' },
   templar:{ name:'Templar', attrs:{str:20,dex:11,int:20}, life:35, mana:38, spirit:0,
     start:'strint', startSkill:'holy_flame', color:'#c0a45a',
+    mech:'Melee and spell hybrid with resistances and spirit. Starts between strength and intelligence.',
     desc:'Faith swung like a hammer. Half his damage arrives a moment late.' },
   shadow:{ name:'Shadow', attrs:{str:11,dex:20,int:20}, life:27, mana:40, spirit:0,
     start:'dexint', startSkill:'viper_strike', color:'#5f7f9f',
+    mech:'Damage over time and burst, thin on life. Starts between dexterity and intelligence: poison, crit and energy shield.',
     desc:'Poison, distance and patience. Nothing he does looks fatal at the time.' }
 };
 const CLASS_KEYS = Object.keys(CLASSES);
@@ -468,97 +557,134 @@ const GEMS = {
   ground_slam:{name:'Ground Slam',type:'melee_arc',tags:['attack','melee','area'],dtype:'physical',
     attr:'str',req:16,lvlReq:1,mana:7,cd:0.75,dmgMult:1.4,arc:1.5,range:165,stunMult:2.2,
     wep:['mace','axe','staff'],combo:'finisher',
+    mech:'Slams a 165-unit fan in front of you for 140% of weapon damage, with heavy stun buildup. As a combo finisher it deals 45% more damage to a stunned target, 60% more to a frozen one.',
     desc:'A shockwave hammered out of the floor in a wide fan. Staggered things come apart under it.'},
   heavy_strike:{name:'Heavy Strike',type:'melee_arc',tags:['attack','melee'],dtype:'physical',
     attr:'str',req:16,lvlReq:1,mana:6,cd:0.7,dmgMult:1.85,arc:0.75,range:120,stunMult:3.4,
     wep:['mace','axe','sword'],combo:'enabler',ailment:'stun',
+    mech:'One narrow swing for 185% of weapon damage with the highest stun buildup of any skill. Primes targets for finishers.',
     desc:'One committed swing at one target. It is mostly used to make things stop moving.'},
   cleave:{name:'Cleave',type:'melee_arc',tags:['attack','melee','area'],dtype:'physical',
     attr:'str',req:20,lvlReq:4,mana:8,cd:0.62,dmgMult:1.15,arc:2.5,range:140,stunMult:1.4,
     wep:['axe','sword','mace'],
+    mech:'A wide 2.5-radian sweep for 115% of weapon damage. Built for crowds, not single targets.',
     desc:'A flat sweep at hip height, meant for crowds rather than for anything important.'},
   leap_slam:{name:'Leap Slam',type:'dash',tags:['attack','melee','area','movement'],dtype:'physical',
     attr:'str',req:22,lvlReq:6,mana:14,cd:3.4,dmgMult:1.5,radius:120,range:330,stunMult:2.6,
     wep:['mace','axe','sword','staff'],
+    mech:'Leaps up to 330 units and lands for 150% of weapon damage in a 120-unit burst. Travels over nothing: walls still stop you.',
     desc:'You leave the ground entirely and arrive badly, on purpose, on someone.'},
   sunder:{name:'Sunder',type:'nova',tags:['attack','melee','area'],dtype:'physical',
     attr:'str',req:30,lvlReq:12,mana:16,cd:2.1,dmgMult:1.25,count:9,radius:110,speed:420,range:420,stunMult:1.8,
     wep:['mace','axe','staff'],
+    mech:'Sends 9 shockwaves outward in every direction, each dealing 125% of weapon damage.',
     desc:'The ground splits away from you in every direction at once and does not close again.'},
   split_arrow:{name:'Split Arrow',type:'projectile',tags:['attack','projectile'],dtype:'physical',
     attr:'dex',req:16,lvlReq:1,mana:7,cd:0.5,dmgMult:0.78,count:3,speed:620,range:480,spread:0.34,
     wep:['bow'],
+    mech:'Fires 3 arrows in a spread, each for 78% of weapon damage. Bow only.',
     desc:'Three arrows leave together and arrive apart. None of them is aimed at you.'},
   puncture:{name:'Puncture',type:'projectile',tags:['attack','projectile'],dtype:'physical',
     attr:'dex',req:18,lvlReq:3,mana:8,cd:0.75,dmgMult:1.2,count:1,speed:660,range:500,
     wep:['bow','dagger','claw'],combo:'enabler',ailment:'bleed',bleedMult:2.4,
+    mech:'A single arrow for 120% of weapon damage that applies bleed buildup at 2.4x rate. Bleeding targets take double damage while moving.',
     desc:'A wound shaped so that walking reopens it. Runners bleed out faster than the patient.'},
   rain_of_arrows:{name:'Rain of Arrows',type:'aoe',tags:['attack','projectile','area'],dtype:'physical',
     attr:'dex',req:26,lvlReq:9,mana:17,cd:2.4,dmgMult:1.35,radius:155,range:430,delay:0.55,
     wep:['bow'],
+    mech:'After a 0.55s delay, arrows land in a 155-unit circle at the aimed point for 135% of weapon damage.',
     desc:'Everything you have, straight up, and a short quiet while it comes back down.'},
   whirling_blades:{name:'Whirling Blades',type:'dash',tags:['attack','melee','movement'],dtype:'physical',
     attr:'dex',req:16,lvlReq:1,mana:11,cd:2.2,dmgMult:1.05,radius:52,range:310,
     wep:['sword','dagger','claw'],
+    mech:'Travels 310 units through everything in the way, dealing 105% of weapon damage along the path.',
     desc:'You travel through a line of people rather than around them.'},
   lightning_strike:{name:'Lightning Strike',type:'projectile',tags:['attack','melee','projectile'],dtype:'lightning',
     attr:'dex',req:24,lvlReq:7,mana:9,cd:0.55,dmgMult:0.9,count:3,speed:560,range:330,spread:0.5,
     wep:['sword','dagger','claw','axe'],combo:'enabler',ailment:'shock',
+    mech:'Strikes for 90% of weapon damage as lightning, then throws 3 shards onward. Builds shock.',
     desc:'The strike lands and then leaves the weapon in pieces of light, looking for a second target.'},
   fireball:{name:'Fireball',type:'projectile',tags:['spell','projectile','area','fire'],dtype:'fire',
     attr:'int',req:16,lvlReq:1,mana:9,cd:0.65,base:16,perLvl:5.4,count:1,speed:470,range:520,radius:70,
     combo:'enabler',ailment:'ignite',
+    mech:'A slow projectile dealing its own fire damage in a 70-unit burst. Builds ignite.',
     desc:'It is not fast. It does not need to be, and it leaves the floor burning behind it.'},
   frost_bolt:{name:'Frost Bolt',type:'projectile',tags:['spell','projectile','cold'],dtype:'cold',
     attr:'int',req:16,lvlReq:1,mana:7,cd:0.5,base:12,perLvl:4.1,count:1,speed:380,range:560,pierce:1,
     combo:'enabler',ailment:'freeze',
+    mech:'A slow shard that pierces one enemy and builds freeze heavily.',
     desc:'A slow shard that takes the heat out of everything it passes through.'},
   ice_nova:{name:'Ice Nova',type:'nova',tags:['spell','area','cold'],dtype:'cold',
     attr:'int',req:24,lvlReq:8,mana:19,cd:1.9,base:30,perLvl:9.5,count:12,speed:430,range:340,radius:130,
     combo:'finisher',
+    mech:'A ring of 12 cold projectiles. As a combo finisher it deals 60% more damage to frozen enemies and shatters them.',
     desc:'A ring of cold thrown outward at ankle height. Frozen things do not survive the pressure change.'},
   spark:{name:'Spark',type:'projectile',tags:['spell','projectile','lightning'],dtype:'lightning',
     attr:'int',req:18,lvlReq:2,mana:8,cd:0.45,base:9,perLvl:3.4,count:4,speed:520,range:400,spread:1.5,erratic:1,
     combo:'enabler',ailment:'shock',
+    mech:'Fires 4 erratic bolts that wander the room. Builds shock on every hit.',
     desc:'Loose current that wanders the room until it finds something conductive.'},
   arc:{name:'Arc',type:'chain',tags:['spell','lightning','chain'],dtype:'lightning',
     attr:'int',req:22,lvlReq:5,mana:13,cd:0.9,base:22,perLvl:7.2,chains:3,range:330,
     combo:'enabler',ailment:'shock',
+    mech:'Jumps to the 3 nearest enemies in turn, losing 15% damage per jump. Builds shock.',
     desc:'It picks the shortest path between bodies, and keeps picking until it runs out.'},
   flame_wall:{name:'Flame Wall',type:'dot_cloud',tags:['spell','area','fire','duration'],dtype:'fire',
     attr:'int',req:20,lvlReq:4,mana:16,cd:4.5,base:11,perLvl:3.6,radius:82,duration:4.5,range:300,
     combo:'enabler',ailment:'ignite',
+    mech:'Leaves a burning patch for 4.5s that ticks fire damage and builds ignite on anything standing in it.',
     desc:'A standing sheet of fire. Things walk into it more often than you would expect.'},
   detonate:{name:'Detonate',type:'aoe',tags:['spell','area','fire'],dtype:'fire',
     attr:'int',req:28,lvlReq:10,mana:22,cd:3.2,base:26,perLvl:8.6,radius:150,range:360,
     combo:'finisher',
+    mech:'Bursts a 150-unit area. As a combo finisher against an ignited target it consumes the ignite and deals its remaining damage to everything nearby.',
     desc:'Whatever is already burning is asked to give all of it back at once.'},
   holy_flame:{name:'Holy Flame',type:'melee_arc',tags:['attack','melee','area','fire'],dtype:'fire',
     attr:'strint',req:18,lvlReq:1,mana:8,cd:0.7,dmgMult:1.1,arc:1.3,range:145,addBase:9,addPerLvl:3.1,
     wep:['sceptre','staff','mace','sword'],combo:'enabler',ailment:'ignite',
+    mech:'A 145-unit arc for 110% of weapon damage plus its own fire damage. Builds ignite.',
     desc:'The swing is ordinary. What follows the swing is not, and it clings.'},
   viper_strike:{name:'Viper Strike',type:'melee_arc',tags:['attack','melee','chaos'],dtype:'chaos',
     attr:'dexint',req:17,lvlReq:1,mana:7,cd:0.6,dmgMult:1.15,arc:0.9,range:125,
     wep:['dagger','claw','sword'],combo:'enabler',ailment:'poison',poisonMult:2.6,
+    mech:'A short arc for 115% of weapon damage as chaos, applying poison buildup at 2.6x rate. Poison stacks.',
     desc:'A shallow cut, twice, and then a long wait while it does the rest.'},
   lightning_totem:{name:'Lightning Totem',type:'totem',tags:['spell','totem','lightning','duration'],dtype:'lightning',
     attr:'int',req:26,lvlReq:9,mana:24,cd:6,base:14,perLvl:4.6,duration:9,range:340,interval:0.7,
     spirit:15,
+    mech:'Plants a totem for 9s that fires at the nearest enemy every 0.7s. Reserves 15 spirit while it stands.',
     desc:'It stands where you put it and does the tedious part of the fight for you.'},
+  vitality:{name:'Vitality',type:'aura',tags:['spell','aura','persistent'],dtype:'physical',
+    attr:'str',req:20,lvlReq:4,mana:0,spirit:20,grants:{lifeRegen:6},
+    mech:'Persistent. Reserves 20 spirit for +6 life regenerated per second.',
+    desc:'A steady warmth you stop noticing until it stops.'},
+  wrath:{name:'Wrath',type:'aura',tags:['spell','aura','lightning','persistent'],dtype:'lightning',
+    attr:'int',req:22,lvlReq:6,mana:0,spirit:30,grants:{addLight:14,lightPct:12},
+    mech:'Persistent. Reserves 30 spirit for +14 lightning damage and 12% increased lightning damage.',
+    desc:'The air near you never quite settles.'},
+  defiance:{name:'Defiance',type:'aura',tags:['spell','aura','persistent'],dtype:'physical',
+    attr:'str',req:24,lvlReq:7,mana:0,spirit:25,grants:{armourPct:28,stunBuild:-25},
+    mech:'Persistent. Reserves 25 spirit for 28% increased armour and 25% reduced stun buildup taken.',
+    desc:'You set your feet and stop negotiating.'},
   herald_of_ash:{name:'Herald of Ash',type:'aura',tags:['spell','aura','fire','persistent'],dtype:'fire',
-    attr:'strint',req:22,lvlReq:5,mana:0,spirit:30,firePct:22,
+    attr:'strint',req:22,lvlReq:5,mana:0,spirit:30,grants:{firePct:22},
+    mech:'Persistent. Reserves 30 spirit for 22% increased fire damage.',
     desc:'Your overkill carries. What dies loudly sets its neighbours alight.'},
   grace:{name:'Grace',type:'aura',tags:['spell','aura','persistent'],dtype:'physical',
-    attr:'dex',req:22,lvlReq:5,mana:0,spirit:35,evasionPct:30,
+    attr:'dex',req:22,lvlReq:5,mana:0,spirit:35,grants:{evasionPct:30},
+    mech:'Persistent. Reserves 35 spirit for 30% increased evasion rating.',
     desc:'You stop being quite where you appear to be.'},
   discipline:{name:'Discipline',type:'aura',tags:['spell','aura','persistent'],dtype:'physical',
-    attr:'int',req:22,lvlReq:5,mana:0,spirit:35,esPct:35,
+    attr:'int',req:22,lvlReq:5,mana:0,spirit:35,grants:{esPct:35},
+    mech:'Persistent. Reserves 35 spirit for 35% increased energy shield.',
     desc:'A held breath, kept in the shape of a shell.'},
   cast_on_crit:{name:'Cast on Critical',type:'meta',tags:['meta','persistent'],dtype:'physical',
     attr:'dexint',req:24,lvlReq:8,mana:0,spirit:25,trigger:'crit',energyMax:100,energyPer:34,
+    mech:'Persistent. Reserves 25 spirit. Builds 34 energy per critical strike and casts its linked skill for free at 100.',
     desc:'A held spell that spends itself the moment your weapon finds a seam.'},
   cast_on_freeze:{name:'Cast on Freeze',type:'meta',tags:['meta','persistent'],dtype:'physical',
     attr:'int',req:24,lvlReq:8,mana:0,spirit:25,trigger:'freeze',energyMax:100,energyPer:50,
+    mech:'Persistent. Reserves 25 spirit. Builds 50 energy each time you freeze something and casts its linked skill for free at 100.',
     desc:'It waits for something to go still, and answers on your behalf.'}
 };
 const GEM_KEYS = Object.keys(GEMS);
@@ -628,8 +754,17 @@ const STAT_FMT = {
 function statLine(k,v){
   const f=STAT_FMT[k];
   if(!f) return k+' '+v;
-  const val = (v>0 && f.indexOf('+#')===0) ? v : v;
-  return f.replace('#',val);
+  if(v<0){
+    /* a negative increase is a reduction, and should say so */
+    const flipped=f.replace('increased','reduced').replace('+#','#');
+    return flipped.replace('#',Math.abs(v));
+  }
+  return f.replace('#',v);
+}
+/* support multipliers: below 1.0 is "less", above is "more" */
+function pctText(mult,noun){
+  const pct=Math.round(Math.abs(1-mult)*100);
+  return pct+'% '+(mult<1?'less':'more')+(noun?' '+noun:'');
 }
 const KEYSTONES = {
   resolute:{name:'Resolute Technique',
@@ -645,7 +780,7 @@ const KEYSTONES = {
   hollow_bones:{name:'Hollow Bones',
     text:'40% more spell damage. 30% less maximum life.'},
   unwavering:{name:'Unwavering Stance',
-    text:'You cannot be stunned. Your evasion rating is always zero.'},
+    text:'You cannot be stunned, and cold builds on you half as fast. Your evasion rating is always zero.'},
   crimson_dance:{name:'Crimson Dance',
     text:'Your bleeds stack up to four times, but each stack deals 45% less damage.'}
 };
@@ -906,22 +1041,37 @@ const TREE = {nodes:{}, list:[]};
   /* Relaxation: the authored branches are polar walks, so inward spokes
      crowd near the middle. Push overlapping nodes apart and keep everything
      off the very centre. Class starts stay pinned to the rim. */
-  const MIN=46;
+  /* Overlap resolution through a spatial grid rather than every pair, and it
+     stops the moment nothing moves. Boot must not stall on this. */
+  const MIN=46, CELL=46;
+  const buckets=new Map();
+  const bkey=(x,y)=>((y/CELL)|0)*100000+((x/CELL)|0);
   for(let pass=0;pass<90;pass++){
+    buckets.clear();
+    for(const n of TREE.list){
+      const k=bkey(n.x,n.y);
+      let arr=buckets.get(k);
+      if(!arr){ arr=[]; buckets.set(k,arr); }
+      arr.push(n);
+    }
     let moved=0;
-    for(let i=0;i<TREE.list.length;i++){
-      const a=TREE.list[i];
-      for(let j=i+1;j<TREE.list.length;j++){
-        const b=TREE.list[j];
-        let dx=b.x-a.x, dy=b.y-a.y;
-        let d=Math.hypot(dx,dy);
-        if(d>=MIN) continue;
-        if(d<0.01){ dx=Math.cos(i*2.4); dy=Math.sin(i*2.4); d=1; }
-        const push=(MIN-d)/2;
-        const ux=dx/d, uy=dy/d;
-        if(a.type!=='start'){ a.x-=ux*push; a.y-=uy*push; }
-        if(b.type!=='start'){ b.x+=ux*push; b.y+=uy*push; }
-        moved++;
+    for(const a of TREE.list){
+      const cx=(a.x/CELL)|0, cy=(a.y/CELL)|0;
+      for(let oy=-1;oy<=1;oy++) for(let ox=-1;ox<=1;ox++){
+        const near=buckets.get((cy+oy)*100000+(cx+ox));
+        if(!near) continue;
+        for(const b of near){
+          if(b===a) continue;
+          let dx=b.x-a.x, dy=b.y-a.y;
+          let d=Math.hypot(dx,dy);
+          if(d>=MIN) continue;
+          if(d<0.01){ dx=Math.cos(a.x*2.4); dy=Math.sin(a.y*2.4); d=1; }
+          const push=(MIN-d)/2;
+          const ux=dx/d, uy=dy/d;
+          if(a.type!=='start'){ a.x-=ux*push; a.y-=uy*push; }
+          if(b.type!=='start'){ b.x+=ux*push; b.y+=uy*push; }
+          moved++;
+        }
       }
     }
     for(const n of TREE.list){
@@ -931,6 +1081,15 @@ const TREE = {nodes:{}, list:[]};
       if(r>R_START+40){ const k=(R_START+40)/r; n.x*=k; n.y*=k; }
     }
     if(!moved) break;
+  }
+  /* the link list never changes: build it once instead of every frame */
+  TREE.links=[];
+  const seenL={};
+  for(const n of TREE.list) for(const id of n.adj){
+    const k=n.id<id?n.id+'|'+id:id+'|'+n.id;
+    if(seenL[k]) continue;
+    seenL[k]=1;
+    TREE.links.push([n,TREE.nodes[id]]);
   }
 })();
 
@@ -1084,7 +1243,8 @@ const CURRENCY = {
   chaos:{name:'Chaos Orb',desc:'Removes a random mod from a rare item and adds a new one.'},
   divine:{name:'Divine Orb',desc:'Rerolls the numeric values of an item’s existing mods.'},
   vaal:{name:'Vaal Orb',desc:'Corrupts an item unpredictably. It can never be modified again.'},
-  shard:{name:'Salvage Shard',desc:'Crafting material recovered from broken items.'},
+  shard:{name:'Salvage Shard',desc:'Common currency. Vendors take it; the mirror takes it for respecs.'},
+  essence:{name:'Rift Essence',desc:'Salvage-only material. The crafting bench spends it to add a modifier you choose.'},
   uncut_skill:{name:'Uncut Skill Gem',desc:'Carve it into any skill gem you have unlocked.'},
   uncut_support:{name:'Uncut Support Gem',desc:'Carve it into any support gem you have unlocked.'}
 };
@@ -1248,6 +1408,23 @@ const BOSSES = {
 
 /* --------------------------------------------------------------------- zones */
 const ZONES = {
+  hideout:{name:'Your Hideout',level:0,town:1,hideout:1,
+    theme:{bg:'#06070a',floor:'#262b30',rim:'#8fa8c8',mote:'dust',moteColor:'#b8c8dc'},
+    blobs:5,pool:[],boss:null,next:null,
+    fixtures:[
+      {id:'stash',name:'Stash',kind:'stash',
+       mech:'Store and retrieve gear across all your characters. Four tabs.',
+       line:'Four drawers, shared by everyone who still comes back.'},
+      {id:'bench',name:'Crafting Bench',kind:'bench',
+       mech:'Put an item on the bench to see every orb you hold that can change it, and what each would do, before you commit. Essence buys a modifier you pick.',
+       line:'Someone else\u2019s tools, left where they fell.'},
+      {id:'mirror',name:'Mirror of Second Thoughts',kind:'mirror',
+       mech:'Refund one leaf passive, or all of them, for salvage shards.',
+       line:'It shows you the version of yourself that chose differently.'},
+      {id:'gate',name:'Standing Gate',kind:'waypoint',
+       mech:'Travel to any zone you have already reached.',
+       line:'It remembers every place you have already survived.'}
+    ]},
   town:{name:'The Last Landing',level:0,town:1,
     theme:{bg:'#07070a',floor:'#2e2a22',rim:'#c8a96e',mote:'dust',moteColor:'#c8a96e'},
     blobs:7,pool:[],boss:null,next:'drowned_shore'},
@@ -1284,26 +1461,27 @@ const ZONES = {
     pool:[['sanctum_warden',2],['sanctum_acolyte',3],['sanctum_lance',3],['slag_brute',1]],
     boss:'the_warden',next:null}
 };
-const ZONE_ORDER = ['town','drowned_shore','tidewrack_caves','sunken_road','ashfall_woods',
+const ZONE_ORDER = ['hideout','town','drowned_shore','tidewrack_caves','sunken_road','ashfall_woods',
   'cathedral_ruins','the_ossuary','emberdeep','wardens_sanctum'];
 
 /* -------------------------------------------------------------------- vendors */
 const NPCS = [
   {id:'vendor',name:'Serrec, Quartermaster',kind:'vendor',
+    mech:'Buy currency with shards, exchange orbs at better rates than buying, and sell gear.',
     line:'Everything here belonged to somebody who stopped needing it.'},
-  {id:'stash',name:'The Common Chest',kind:'stash',
-    line:'Four drawers, shared by everyone who still comes back.'},
   {id:'waypoint',name:'The Standing Gate',kind:'waypoint',
+    mech:'Travel to any zone you have already reached.',
     line:'It remembers every place you have already survived.'}
 ];
 /* what the quartermaster sells, and the currency exchange rates */
 const SHOP_STOCK = [
   {cur:'wisdom',price:1},{cur:'transmute',price:2},{cur:'augment',price:4},
   {cur:'regal',price:12},{cur:'exalted',price:25},{cur:'chaos',price:18},
-  {cur:'divine',price:40},{cur:'vaal',price:30},
+  {cur:'divine',price:40},{cur:'vaal',price:34},
   {cur:'uncut_skill',price:35},{cur:'uncut_support',price:30}
 ];
-const RESPEC_COST = 5;   /* salvage shards per refunded point */
+const RESPEC_COST = 5;    /* salvage shards per refunded point */
+const IMPRINT_COST = 4;   /* essence to imprint a chosen modifier at the bench */
 
 /* ==========================================================================
    UTILITIES
@@ -1348,6 +1526,9 @@ let uidCounter = 1;
 function newUid(){ return 'i'+(uidCounter++)+'_'+Math.floor(Math.random()*1e6); }
 
 const DTYPES = ['physical','fire','cold','lightning','chaos'];
+/* damage type -> the key it uses in st.m. 'physical' is stored as 'phys',
+   which is exactly the mismatch that silently ate every physical increase. */
+const DTYPE_MULT = {physical:'phys',fire:'fire',cold:'cold',lightning:'lightning',chaos:'chaos'};
 const DCOLOR = {physical:'#ded6c4',fire:'#e07a3c',cold:'#7fc0e0',lightning:'#e8d860',chaos:'#b070c8'};
 const AILMENTS = ['stun','freeze','ignite','shock','poison','bleed'];
 const AIL_COLOR = {stun:'#e8d8a0',freeze:'#8fd0e8',ignite:'#e07a3c',shock:'#e8d860',
@@ -1388,7 +1569,7 @@ window.G=G;
    SAVE / LOAD  (localStorage, single key, debounced writes)
    ========================================================================== */
 let saveTimer=null, saveDirty=false;
-function blankSave(){ return {v:1, chars:new Array(MAX_SLOTS).fill(null), stash:[[],[],[],[]]}; }
+function blankSave(){ return {v:SAVE_VERSION, chars:new Array(MAX_SLOTS).fill(null), stash:[[],[],[],[]], sound:true}; }
 function loadSave(){
   let raw=null;
   try{ raw=localStorage.getItem(SAVE_KEY); }catch(e){ raw=null; }
@@ -1425,7 +1606,24 @@ document.addEventListener('visibilitychange',()=>{ if(document.hidden) flushSave
 /* ==========================================================================
    CHARACTER RECORD
    ========================================================================== */
-const INV_W=12, INV_H=6, STASH_W=12, STASH_H=8;
+const INV_W=12, INV_H=8, STASH_W=12, STASH_H=8;
+const MAX_STACK=20;
+/* Currency is an inventory item, not a counter: {uid,cur,n,pos}. Everything
+   that walks a grid has to ask these two for a footprint rather than
+   reaching into BASES directly. */
+function isStack(it){ return !!(it&&it.cur); }
+function itemW(it){ return isStack(it)?1:BASES[it.b].w; }
+function itemH(it){ return isStack(it)?1:BASES[it.b].h; }
+function stackName(it){ return CURRENCY[it.cur]?CURRENCY[it.cur].name:it.cur; }
+const CUR_ABBR={wisdom:'Wis',transmute:'Trans',augment:'Aug',regal:'Regal',exalted:'Exalt',
+  chaos:'Chaos',divine:'Divine',vaal:'Vaal',shard:'Shard',essence:'Ess',
+  uncut_skill:'Skill',uncut_support:'Supp',
+  iron_rune:'Iron',desert_rune:'Desert',glacial_rune:'Glacial',storm_rune:'Storm',
+  body_rune:'Body',ward_rune:'Ward',vital_rune:'Vital',soul_rune:'Soul'};
+function curAbbr(k){ return CUR_ABBR[k]||k.slice(0,5); }
+function isRuneKey(k){ return !!RUNES[k]; }
+function curDesc(k){ return RUNES[k]?('Rune. '+RUNES[k].desc) : (CURRENCY[k]?CURRENCY[k].desc:''); }
+function curLabel(k){ return RUNES[k]?RUNES[k].name:(CURRENCY[k]?CURRENCY[k].name:k); }
 function newCharacter(name,clsKey){
   const cls=CLASSES[clsKey];
   const ch={
@@ -1434,8 +1632,9 @@ function newCharacter(name,clsKey){
     loadout:[[null,null,null,null,null],[null,null,null,null,null]],
     sets:[{weapon:null,offhand:null},{weapon:null,offhand:null}],
     equip:{helmet:null,body:null,gloves:null,boots:null,belt:null,ring1:null,ring2:null,amulet:null},
-    inv:[], currency:{wisdom:4,transmute:2,shard:0}, auras:{}, activeSet:0,
-    zone:'drowned_shore', waypoints:['town','drowned_shore'], reached:'drowned_shore',
+    inv:[], auras:{}, activeSet:0,
+    zone:'drowned_shore', waypoints:['hideout','town','drowned_shore'], reached:'drowned_shore',
+    zonesCleared:{}, seenGems:[], returnZone:'drowned_shore',
     flasks:{life:3,mana:3}, created:Date.now()
   };
   /* starting gear: the class's weapon and its first skill, already carved */
@@ -1445,12 +1644,20 @@ function newCharacter(name,clsKey){
   }[clsKey];
   ch.sets[0].weapon = makeItem(startWeapon,1,0);
   ch.equip.body = makeItem('ragged_vest',1,0);
-  ch.gems.push({gem:cls.startSkill, level:1, sockets:[null,null,null,null,null]});
+  ch.gems.push({gem:cls.startSkill, level:1, sockets:[null,null,null,null,null], link:null});
   ch.loadout[0][0]=0;
   ch.loadout[1][0]=0;
+  /* starting currency, as real stacks in the bag */
+  const prev=G.ch; G.ch=ch;
+  giveCurrency('wisdom',4); giveCurrency('transmute',2); giveCurrency('shard',6);
+  G.ch=prev;
   return ch;
 }
-function charPoints(ch){ return ch.level-1; }
+const BOSS_POINTS = 3;
+function clearedCount(ch){ return ch.zonesCleared?Object.keys(ch.zonesCleared).length:0; }
+/* one point per level plus three for the first kill of each zone's master:
+   39 from levels and 24 from the eight masters */
+function charPoints(ch){ return (ch.level-1) + clearedCount(ch)*BOSS_POINTS; }
 function pointsSpent(ch){ return Object.keys(ch.passives).length; }
 
 /* Which passive allocations are active for a given weapon set:
@@ -1503,10 +1710,17 @@ function makeItem(base,ilvl,rarity,uniqueKey){
     return it;
   }
   if(it.r>=1){
-    const nPre = it.r===1 ? (Math.random()<0.5?1:0) : rndi(1,3);
-    const nSuf = it.r===1 ? (it.pre.length?1:1) : rndi(1,3);
+    let nPre,nSuf;
+    if(it.r===1){
+      /* magic: one or two mods in total, in any combination */
+      const total=Math.random()<0.45?1:2;
+      if(total===1){ nPre=Math.random()<0.5?1:0; nSuf=1-nPre; }
+      else { nPre=1; nSuf=1; }
+    } else {
+      nPre=rndi(1,3); nSuf=rndi(1,3);
+    }
     const ex=[];
-    for(let i=0;i<Math.max(1,nPre);i++){
+    for(let i=0;i<nPre;i++){
       const m=rollMod(PREFIXES,base,it.il,ex);
       if(m){ it.pre.push(m); ex.push(m.id); }
     }
@@ -1514,7 +1728,11 @@ function makeItem(base,ilvl,rarity,uniqueKey){
       const m=rollMod(SUFFIXES,base,it.il,ex);
       if(m){ it.suf.push(m); ex.push(m.id); }
     }
-    if(it.r===1){ it.pre.length=Math.min(it.pre.length,1); it.suf.length=Math.min(it.suf.length,1); }
+    /* a magic item with no mod at all would be indistinguishable from normal */
+    if(!it.pre.length&&!it.suf.length){
+      const m=rollMod(PREFIXES,base,it.il,[])||rollMod(SUFFIXES,base,it.il,[]);
+      if(m) (PREFIXES.some(d=>d.id===m.id)?it.pre:it.suf).push(m);
+    }
   }
   if(it.r>=2){ it.nm=rareName(base); it.idf=false; }
   if(Math.random()<0.35) it.q=rndi(1,12);
@@ -1522,6 +1740,7 @@ function makeItem(base,ilvl,rarity,uniqueKey){
 }
 function itemName(it){
   if(!it) return '';
+  if(isStack(it)) return stackName(it)+' x'+it.n;
   const b=BASES[it.b];
   if(it.uq) return it.idf? UNIQUES[it.uq].name : 'Unknown '+b.name;
   if(it.r===2) return it.idf? (it.nm+' '+b.name) : 'Unknown '+b.name;
@@ -1640,6 +1859,10 @@ const CRAFT = {
 function salvageValue(it){
   return 1 + it.r + Math.floor(it.il/6) + (it.q?1:0);
 }
+/* selling pays more raw shards; salvaging pays less but returns runes and
+   the essence the vendor will not sell you at any price */
+function salvageEssence(it){ return Math.max(1, it.r + (it.q?1:0)); }
+function sellValue(it){ return salvageValue(it)*3; }
 
 /* ==========================================================================
    DERIVED STATS
@@ -1694,16 +1917,22 @@ function recalc(){
   /* persistent skills (auras and meta gems) reserve spirit */
   let spiritUsed=0;
   const auraMods={};
+  const spiritBreak=[];
   ch.gems.forEach((g,i)=>{
     const def=GEMS[g.gem];
     if(!def||!def.spirit) return;
     if(!ch.auras[i]) return;
     spiritUsed+=def.spirit;
-    if(def.firePct) auraMods.firePct=(auraMods.firePct||0)+def.firePct;
-    if(def.evasionPct) auraMods.evasionPct=(auraMods.evasionPct||0)+def.evasionPct;
-    if(def.esPct) auraMods.esPct=(auraMods.esPct||0)+def.esPct;
+    spiritBreak.push({name:def.name,cost:def.spirit});
+    if(def.grants) for(const k in def.grants) auraMods[k]=(auraMods[k]||0)+def.grants[k];
   });
   for(const k in auraMods) add(k,auraMods[k]);
+  /* a standing totem holds its reservation for as long as it lives */
+  for(const t of G.totems){
+    if(!t.spirit) continue;
+    spiritUsed+=t.spirit;
+    spiritBreak.push({name:(t.sk&&t.sk.name)||'Totem',cost:t.spirit});
+  }
 
   str+=(S.str||0)+(S.allAttr||0);
   dex+=(S.dex||0)+(S.allAttr||0);
@@ -1763,11 +1992,12 @@ function recalc(){
   st.aspd=w.aspd*(1+(S.aspd||0)/100+dex*0.0015);
   st.cspd=1*(1+(S.cspd||0)/100);
   st.moveSpeed=200*(1+(S.moveSpeed||0)/100);
-  st.leech=(S.leech||0)+(flags.leechFlat||0);
+  st.leech=(S.leech||0);
   st.lifeRegen=flags.noRegen?0:(1+ch.level*0.12+(S.lifeRegen||0));
   st.manaRegen=(1.4+ch.level*0.16+(S.manaRegen||0));
   st.spiritMax=cls.spirit+30+(S.spirit||0);
   st.spiritUsed=spiritUsed;
+  st.spiritBreak=spiritBreak;
 
   /* damage multipliers by category */
   /* strength scales melee, intelligence scales spells, dexterity scales
@@ -1810,9 +2040,12 @@ function socketsUnlocked(level){
   for(const l of SOCK_LADDER) if(level>=l) n++;
   return n;
 }
-function gemLevelFor(charLevel,def){
-  /* gems keep pace with the character, capped by their own requirement */
-  return Math.max(1, Math.min(20, charLevel - (def.lvlReq-1)));
+/* A gem's level is its own, raised with uncut gems, and capped by how far
+   the character has come. */
+function gemLevelFor(g,def){
+  const cap=Math.max(1,Math.min(20,G.ch.level-(def.lvlReq-1)));
+  const own=(g&&g.level)?g.level:1;
+  return Math.max(1,Math.min(cap,own));
 }
 /* is a support already used anywhere in the build? (uniqueness constraint) */
 function supportUsedBy(ch,supId){
@@ -1822,7 +2055,7 @@ function supportUsedBy(ch,supId){
 }
 function skillStats(g,idx){
   const def=GEMS[g.gem], st=G.st, ch=G.ch;
-  const lvl=gemLevelFor(ch.level,def);
+  const lvl=gemLevelFor(g,def);
   const mods={}; let manaMult=1;
   const sups=[];
   const nSock=socketsUnlocked(lvl);
@@ -1863,7 +2096,7 @@ function skillStats(g,idx){
   if(isProj) mult*=st.m.proj;
   if(isSpell) mult*=st.m.spell;
   if(isArea) mult*=st.m.area;
-  mult*=st.m[dtype==='lightning'?'lightning':dtype]||1;
+  mult*=st.m[DTYPE_MULT[dtype]]||1;
   if(dtype==='fire'||dtype==='cold'||dtype==='lightning'){
     mult*=st.m.ele;
     if(mods.elePct) mult*=1+mods.elePct/100;
@@ -1955,8 +2188,16 @@ function rebuildBuckets(){
     a.push(e);
   }
 }
+/* These two are called several times a frame and they nest (a hit can kill,
+   which looks up neighbours again), so hand out buffers from a small pool
+   instead of allocating, and never share one buffer across a nested call. */
+const _nearPool=[[],[],[],[],[],[]];
+let _nearIdx=0;
+const _allPool=[[],[],[],[]];
+let _allIdx=0;
 function nearbyEnemies(x,y,r){
-  const out=[];
+  const out=_nearPool[_nearIdx=(_nearIdx+1)%_nearPool.length];
+  out.length=0;
   const b=G.bucket;
   const x0=((x-r)/BUCKET)|0, x1=((x+r)/BUCKET)|0;
   const y0=((y-r)/BUCKET)|0, y1=((y+r)/BUCKET)|0;
@@ -1971,7 +2212,8 @@ function nearbyEnemies(x,y,r){
   return out;
 }
 function allTargets(){
-  const out=[];
+  const out=_allPool[_allIdx=(_allIdx+1)%_allPool.length];
+  out.length=0;
   for(const e of G.enemies) if(!e.dead&&!e.dying) out.push(e);
   if(G.boss&&!G.boss.dead&&!G.boss.dying) out.push(G.boss);
   return out;
@@ -2124,6 +2366,18 @@ function nearestWalkableTile(tx,ty){
   return {x:GRID>>1,y:GRID>>1};
 }
 function tileCenter(tx,ty){ return {x:tx*TILE+TILE/2,y:ty*TILE+TILE/2}; }
+/* Every world placement goes through this: keep the point if it is
+   standable, otherwise walk out to the nearest tile that is. */
+function snapToWalkable(x,y,r){
+  if(canStand(x,y,r||14)) return {x:x,y:y};
+  for(let att=0;att<12;att++){
+    const a=rnd(0,TAU), d=rnd(20,90);
+    const nx=x+Math.cos(a)*d, ny=y+Math.sin(a)*d;
+    if(canStand(nx,ny,r||14)) return {x:nx,y:ny};
+  }
+  const t=nearestWalkableTile((x/TILE)|0,(y/TILE)|0);
+  return tileCenter(t.x,t.y);
+}
 
 function generateZone(zoneKey){
   const z=ZONES[zoneKey];
@@ -2347,18 +2601,21 @@ function burst(x,y,n,color,spd,size,life,glow){
     spawnPart(x,y,Math.cos(a)*s,Math.sin(a)*s,rnd(life*.6,life),rnd(size*.6,size),color,.9,glow);
   }
 }
-function dmgNumber(x,y,amount,crit,dtype){
+function dmgNumber(x,y,amount,crit,dtype,text){
   const color = crit? '#f2d79a' : (DCOLOR[dtype]||'#e8e2d4');
   for(let i=0;i<DNUM_MAX;i++){
     const n=G.dmgNums[i];
     if(n.on) continue;
     n.on=true; n.x=x+rnd(-6,6); n.y=y-8; n.vy=crit?-54:-42;
     n.life=crit?1.05:.8; n.max=n.life;
-    n.txt=String(Math.max(1,Math.round(amount)));
-    n.color=color; n.size=crit?25:14; n.crit=!!crit;
+    n.txt= text!=null ? text : String(Math.max(1,Math.round(amount)));
+    n.color= text!=null ? '#9fb8cf' : color;
+    n.size= text!=null ? 12 : (crit?25:14);
+    n.crit=!!crit;
     return;
   }
 }
+function resetPlayerAilHud(){ pailBuilt=false; }
 function initMotes(){
   G.motes=[];
   const t=G.theme;
@@ -2370,6 +2627,92 @@ function initMotes(){
       a:rnd(.14,.5),ph:rnd(0,TAU),sway:rnd(4,17)});
   }
 }
+/* ==========================================================================
+   SOUND — synthesized on the fly, no asset files.
+   The context is created on the first real input, because browsers refuse
+   to start audio before a gesture.
+   ========================================================================== */
+const SND={ctx:null,master:null,on:true,vol:0.5};
+function sndInit(){
+  if(SND.ctx) return;
+  const AC=window.AudioContext||window.webkitAudioContext;
+  if(!AC) return;
+  try{
+    SND.ctx=new AC();
+    SND.master=SND.ctx.createGain();
+    SND.master.gain.value=SND.on?SND.vol:0;
+    SND.master.connect(SND.ctx.destination);
+  }catch(e){ SND.ctx=null; }
+}
+function sndResume(){
+  sndInit();
+  if(SND.ctx&&SND.ctx.state==='suspended') SND.ctx.resume().catch(()=>{});
+}
+function tone(o){
+  if(!SND.ctx||!SND.on) return;
+  const c=SND.ctx, t=c.currentTime;
+  const osc=c.createOscillator(), g=c.createGain();
+  osc.type=o.type||'sine';
+  osc.frequency.setValueAtTime(o.f0,t);
+  if(o.f1&&o.f1!==o.f0) osc.frequency.exponentialRampToValueAtTime(Math.max(20,o.f1),t+o.dur);
+  g.gain.setValueAtTime(0,t);
+  g.gain.linearRampToValueAtTime(o.vol==null?0.3:o.vol,t+Math.min(0.02,o.dur*0.3));
+  g.gain.exponentialRampToValueAtTime(0.0008,t+o.dur);
+  osc.connect(g); g.connect(SND.master);
+  osc.start(t); osc.stop(t+o.dur+0.02);
+}
+function noise(o){
+  if(!SND.ctx||!SND.on) return;
+  const c=SND.ctx, t=c.currentTime;
+  const len=Math.max(1,Math.floor(c.sampleRate*o.dur));
+  const buf=c.createBuffer(1,len,c.sampleRate);
+  const d=buf.getChannelData(0);
+  for(let i=0;i<len;i++) d[i]=(Math.random()*2-1)*(1-i/len);
+  const src=c.createBufferSource(); src.buffer=buf;
+  const f=c.createBiquadFilter();
+  f.type=o.filter||'bandpass';
+  f.frequency.value=o.freq||900;
+  f.Q.value=o.q==null?1:o.q;
+  const g=c.createGain();
+  g.gain.setValueAtTime(o.vol==null?0.25:o.vol,t);
+  g.gain.exponentialRampToValueAtTime(0.0008,t+o.dur);
+  src.connect(f); f.connect(g); g.connect(SND.master);
+  src.start(t);
+}
+function sfx(name,arg){
+  if(!SND.ctx||!SND.on) return;
+  switch(name){
+    case 'hit':    noise({dur:0.07,freq:560,vol:0.11,q:0.8}); break;
+    case 'crit':   noise({dur:0.11,freq:1150,vol:0.2,q:1.4}); tone({type:'triangle',f0:880,f1:420,dur:0.12,vol:0.14}); break;
+    case 'cast':   tone({type:'triangle',f0:330,f1:620,dur:0.1,vol:0.09}); break;
+    case 'melee':  noise({dur:0.09,freq:330,vol:0.13,filter:'lowpass',q:0.6}); break;
+    case 'hurt':   tone({type:'sawtooth',f0:240,f1:90,dur:0.2,vol:0.16}); break;
+    case 'kill':   noise({dur:0.14,freq:420,vol:0.1,filter:'lowpass'}); break;
+    case 'stun':   tone({type:'square',f0:150,f1:70,dur:0.22,vol:0.13}); break;
+    case 'freeze': tone({type:'sine',f0:1400,f1:600,dur:0.26,vol:0.11}); break;
+    case 'level':  [523,659,784,1046].forEach((f,i)=>setTimeout(()=>tone({type:'sine',f0:f,dur:0.3,vol:0.13}),i*90)); break;
+    case 'phase':  tone({type:'sawtooth',f0:110,f1:55,dur:0.5,vol:0.18}); noise({dur:0.4,freq:200,vol:0.14,filter:'lowpass'}); break;
+    case 'death':  [330,247,196,131].forEach((f,i)=>setTimeout(()=>tone({type:'triangle',f0:f,dur:0.5,vol:0.16}),i*150)); break;
+    case 'drop': {
+      /* pitched by rarity, so you can hear what fell */
+      const r=arg|0;
+      const base=[520,700,880,1100][r]||520;
+      tone({type:'sine',f0:base,f1:base*1.5,dur:0.12,vol:0.09+r*0.02});
+      if(r>=2) setTimeout(()=>tone({type:'sine',f0:base*1.5,dur:0.16,vol:0.1}),90);
+      break;
+    }
+    case 'pickup': tone({type:'sine',f0:760,f1:1020,dur:0.08,vol:0.07}); break;
+    case 'craft':  noise({dur:0.16,freq:1500,vol:0.1,q:2}); break;
+    case 'portal': tone({type:'sine',f0:180,f1:520,dur:0.4,vol:0.11}); break;
+    case 'ui':     tone({type:'sine',f0:440,dur:0.05,vol:0.05}); break;
+  }
+}
+function setSound(on){
+  SND.on=!!on;
+  if(G.save){ G.save.sound=SND.on; markDirty(); }
+  if(SND.master) SND.master.gain.value=SND.on?SND.vol:0;
+}
+
 function setHitStop(s){ if(s>G.hitStop) G.hitStop=s; }
 function shakeCam(v){ G.cam.shake=Math.min(26,G.cam.shake+v); }
 function toast(msg){
@@ -2387,7 +2730,10 @@ function makePlayer(){
   G.player={x:c.x,y:c.y,r:14,face:0,walkT:0,
     life:1,mana:1,es:0,esDelay:0,iframe:0,
     cds:[0,0,0,0,0],energy:{},flask:{life:0,mana:0},
-    flaskCharge:{life:0,mana:0},trailT:0};
+    flaskCharge:{life:0,mana:0},trailT:0,
+    ail:{stun:0,freeze:0,ignite:0,shock:0,poison:0,bleed:0},
+    ailT:{stun:0,freeze:0,ignite:0,shock:0,poison:0,bleed:0},
+    dots:[],shockMag:0,moving:false};
   recalc();
   const p=G.player,st=G.st;
   p.life=st.maxLife; p.mana=st.maxMana; p.es=st.maxES;
@@ -2417,7 +2763,6 @@ function makeEnemy(defKey,x,y,forceRarity){
     dots:[],threshold:0
   };
   e.hp=e.maxHp;
-  e.threshold=Math.max(18,e.maxHp*0.55);   /* ailment meters scale with the monster */
   /* rarity: magic gets 1-2 mods, rare gets 3-4 and a name */
   let rar=forceRarity;
   if(rar==null){
@@ -2437,11 +2782,13 @@ function makeEnemy(defKey,x,y,forceRarity){
     e.dmg*=rar===1?1.25:1.55;
     e.r=Math.round(e.r*(rar===1?1.14:1.3));
     e.xp=Math.round(e.xp*(rar===1?1.8:3.2));
-    e.threshold=Math.max(18,e.maxHp*0.55);
     for(const k of e.mods) MONSTER_MODS[k].apply(e);
     if(rar===2) e.name=pick(RARE_NAMES_A)+' '+pick(RARE_NAMES_B)+', '+def.name;
     else e.name=MONSTER_MODS[e.mods[0]].name+' '+def.name;
   }
+  /* ailment meters scale with the monster's FINAL life, after rarity and
+     modifiers, or Extra Life monsters would freeze faster than normal ones */
+  e.threshold=Math.max(18,e.maxHp*0.55);
   return e;
 }
 function spawnEnemies(){
@@ -2477,6 +2824,10 @@ function spawnEnemies(){
 function makeBoss(){
   const z=G.zdef;
   if(!z.boss){ G.boss=null; return null; }
+  if(G.ch.zonesCleared&&G.ch.zonesCleared[G.zoneKey]){
+    /* already killed here: the zone stays clear until deliberately reawakened */
+    G.boss=null; return null;
+  }
   const def=BOSSES[z.boss];
   const c=tileCenter(G.bossTile.x,G.bossTile.y);
   const sc=monsterScale(z.level);
@@ -2508,22 +2859,29 @@ function placeNpcsAndPortals(){
       const t=navAt(b.x,b.y)?b:nearestWalkableTile(b.x,b.y);
       spots.push(t);
     }
-    NPCS.forEach((n,i)=>{
+    const fixtures=z.fixtures||NPCS;
+    fixtures.forEach((n,i)=>{
       const t=spots[Math.min(spots.length-1,i+1)]||spots[0];
       const c=tileCenter(t.x,t.y);
-      G.npcs.push({id:n.id,name:n.name,kind:n.kind,line:n.line,x:c.x,y:c.y,r:20});
+      const q=snapToWalkable(c.x,c.y,20);
+      G.npcs.push({id:n.id,name:n.name,kind:n.kind,line:n.line,mech:n.mech,x:q.x,y:q.y,r:20});
     });
     const t=spots[spots.length-1];
     const c=tileCenter(t.x,t.y);
-    G.portals.push({kind:'zone',to:G.ch.reached||'drowned_shore',x:c.x,y:c.y+80,r:26,
-      label:'Descend to '+ZONES[G.ch.reached||'drowned_shore'].name});
+    const dest=(G.zoneKey==='hideout')?(G.ch.returnZone||'town'):(G.ch.reached||'drowned_shore');
+    const q=snapToWalkable(c.x,c.y+80,26);
+    G.portals.push({kind:'zone',to:dest,x:q.x,y:q.y,r:26,
+      label:(G.zoneKey==='hideout'?'Return to ':'Descend to ')+ZONES[dest].name});
   } else {
     /* every zone has a way back to town at its entrance, and an exit at the far end */
     const s=tileCenter(G.spawnTile.x,G.spawnTile.y);
-    G.portals.push({kind:'zone',to:'town',x:s.x,y:s.y-60,r:26,label:'Return to '+ZONES.town.name});
+    const q=snapToWalkable(s.x,s.y-60,26);
+    G.portals.push({kind:'zone',to:'town',x:q.x,y:q.y,r:26,label:'Return to '+ZONES.town.name});
     if(z.next){
       const e=tileCenter(G.exitTile.x,G.exitTile.y);
-      G.portals.push({kind:'zone',to:z.next,x:e.x,y:e.y+70,r:26,locked:!!z.boss,
+      const sealed = !!z.boss && !(G.ch.zonesCleared&&G.ch.zonesCleared[G.zoneKey]);
+      const q=snapToWalkable(e.x,e.y+70,26);
+      G.portals.push({kind:'zone',to:z.next,x:q.x,y:q.y,r:26,locked:sealed,
         label:'Continue to '+ZONES[z.next].name});
     }
   }
@@ -2538,6 +2896,10 @@ function enterZone(zoneKey,keepProgress){
   if(order>reachedOrder) ch.reached=zoneKey;
   G.shots=[]; G.fx=[]; G.clouds=[]; G.totems=[]; G.pickups=[]; G.enemies=[]; G.boss=null;
   G.hitStop=0; G.flash=0; G.dead=false;
+  if(G.player){
+    G.player.dots.length=0;
+    for(const k of AILMENTS){ G.player.ail[k]=0; G.player.ailT[k]=0; }
+  }
   initPools();
   if(!G.player) makePlayer();
   else {
@@ -2554,8 +2916,10 @@ function enterZone(zoneKey,keepProgress){
   G.player.energy={};
   $('bossbar').classList.remove('on');
   buildSlotUI();
+  updatePointBadge();
   markDirty();
   toast(ZONES[zoneKey].name+(ZONES[zoneKey].town?'':' · level '+ZONES[zoneKey].level));
+  if(G.st&&G.st.zoneRes) setTimeout(()=>toast('This depth saps resistances by '+G.st.zoneRes+'%'),2200);
 }
 
 /* ==========================================================================
@@ -2572,11 +2936,22 @@ function addBuildup(e,type,amount,hitDmg){
   e.ail[type]=0;
   switch(type){
     case 'stun':
-      if(e.boss){ e.ailT.stun=Math.max(e.ailT.stun,0.55); }
+      if(e.boss){
+        if(e.ailImmune&&e.ailImmune.stun>0) return;
+        if(!e.ailImmune) e.ailImmune={};
+        e.ailImmune.stun=2.6;
+        e.ailT.stun=Math.max(e.ailT.stun,0.55);
+      }
       else e.ailT.stun=Math.max(e.ailT.stun,1.3);
       burst(e.x,e.y,10,'#e8d8a0',150,3,.4,true);
       break;
     case 'freeze':
+      if(e.boss){
+        /* without this, enough cold buildup perma-freezes any boss */
+        if(e.ailImmune&&e.ailImmune.freeze>0) return;
+        if(!e.ailImmune) e.ailImmune={};
+        e.ailImmune.freeze=3.2;
+      }
       e.ailT.freeze=Math.max(e.ailT.freeze,e.boss?0.8:1.7);
       burst(e.x,e.y,14,'#8fd0e8',170,3.2,.5,true);
       onFreeze(e);
@@ -2635,6 +3010,84 @@ function addEnergy(gemIdx,def){
   }
 }
 
+/* --------------------------------------------------- player-side ailments
+   Monsters build these on the player exactly the way the player builds them
+   on monsters: a meter that fills, then fires. The meters are drawn on the
+   HUD beside the life orb. */
+function playerThreshold(){ return Math.max(30,G.st.maxLife*0.5); }
+function addPlayerBuildup(type,amount,hitDmg){
+  const p=G.player,st=G.st;
+  if(!p||!amount||amount<=0) return;
+  if(type==='stun'){
+    if(st.keys.unwavering) return;          /* Unwavering Stance: never stunned */
+    amount*=st.stunTaken;                   /* Quarryman's Belt and friends */
+  }
+  if(type==='freeze'&&st.keys.unwavering) amount*=0.5;
+  p.ail[type]=(p.ail[type]||0)+amount;
+  if(p.ail[type]<playerThreshold()) return;
+  p.ail[type]=0;
+  switch(type){
+    case 'stun':
+      p.ailT.stun=0.55;
+      burst(p.x,p.y,12,'#e8d8a0',170,3,.45,true);
+      shakeCam(11); sfx('stun');
+      break;
+    case 'freeze':
+      p.ailT.freeze=0.9;
+      burst(p.x,p.y,14,'#8fd0e8',170,3.2,.5,true);
+      sfx('freeze');
+      break;
+    case 'ignite':
+      addPlayerDot('ignite',hitDmg*0.28,4,'fire');
+      break;
+    case 'shock':
+      p.ailT.shock=4;
+      p.shockMag=clamp(0.12+hitDmg/Math.max(1,st.maxLife)*0.8,0.1,0.4);
+      break;
+    case 'poison':
+      addPlayerDot('poison',hitDmg*0.2,6,'chaos',true);
+      break;
+    case 'bleed':
+      addPlayerDot('bleed',hitDmg*0.26,5,'physical',false,true);
+      break;
+  }
+}
+function addPlayerDot(kind,dps,dur,dtype,stacking,moveScaled){
+  const p=G.player;
+  if(!(dps>0)) return;
+  if(!stacking){
+    const ex=p.dots.find(d=>d.kind===kind);
+    if(ex){ if(dps>ex.dps){ ex.dps=dps; ex.t=dur; } return; }
+  }
+  p.ailT[kind]=Math.max(p.ailT[kind],dur);
+  p.dots.push({kind:kind,dps:dps,t:dur,dtype:dtype,moveScaled:!!moveScaled});
+}
+function tickPlayerAilments(dt){
+  const p=G.player,st=G.st;
+  if(!p) return;
+  for(const k of AILMENTS){
+    if(p.ailT[k]>0) p.ailT[k]-=dt;
+    if(p.ail[k]>0) p.ail[k]=Math.max(0,p.ail[k]-playerThreshold()*0.16*dt);
+  }
+  for(let i=p.dots.length-1;i>=0;i--){
+    const d=p.dots[i];
+    d.t-=dt;
+    let dps=d.dps;
+    if(d.moveScaled&&p.moving) dps*=2.0;
+    /* over-time damage respects resistances but not armour or evasion */
+    let amt=dps*dt;
+    if(d.dtype!=='physical') amt*=1-(st.res[d.dtype]||0)/100;
+    p.life-=amt;
+    if(Math.random()<dt*3) spawnPart(p.x+rnd(-10,10),p.y+rnd(-10,10),0,rnd(-22,-6),.4,2,DCOLOR[d.dtype],.9,true);
+    if(d.t<=0) p.dots.splice(i,1);
+  }
+  if(p.life<=0&&!G.dead){ p.life=0; onDeath(); }
+}
+function playerStunned(){
+  const p=G.player;
+  return p&&(p.ailT.stun>0||p.ailT.freeze>0);
+}
+
 /* ==========================================================================
    DAMAGE
    ========================================================================== */
@@ -2662,6 +3115,7 @@ function monsterTakeDamage(e,base,dtype,crit,sk,kx,ky){
   burst(e.x,e.y,crit?15:6,crit?'#f2d79a':(DCOLOR[dtype]||e.color),crit?290:170,crit?4:2.8,crit?.5:.32,true);
   setHitStop(e.boss?0.08:(crit?0.08:0.05));
   shakeCam(crit?5:1.6);
+  sfx(crit?'crit':'hit');
   if(comboed==='shatter'){
     burst(e.x,e.y,26,'#a8e0f0',300,4,.6,true);
     e.ailT.freeze=0;
@@ -2708,6 +3162,7 @@ function monsterTakeDamage(e,base,dtype,crit,sk,kx,ky){
 function killEnemy(e){
   if(e.dead||e.dying) return;
   e.dying=0.2; e.hp=0;
+  sfx('kill');
   burst(e.x,e.y,e.boss?70:(e.rarity===2?26:14),e.color,e.boss?420:240,e.boss?6:3.4,.7,true);
   if(e.boss){ shakeCam(24); setHitStop(0.12); return; }
   G.kills++; G.ch.kills++;
@@ -2755,8 +3210,7 @@ function damagePlayer(amount,dtype,src){
   const p=G.player,st=G.st;
   if(!p||p.iframe>0||G.dead||G.paused) return;
   if(evadeRoll()){
-    dmgNumber(p.x,p.y-p.r-6,0,false,'physical');
-    G.dmgNums.find(n=>n.on&&n.txt==='0')&&(G.dmgNums.find(n=>n.on&&n.txt==='0').txt='evaded');
+    dmgNumber(p.x,p.y-p.r-6,0,false,'physical','evaded');
     return;
   }
   let dmg=amount;
@@ -2769,6 +3223,15 @@ function damagePlayer(amount,dtype,src){
     dmg*=1-r/100;
   }
   dmg=Math.max(1,dmg);
+  if(p.ailT.shock>0) dmg*=1+(p.shockMag||0.15);
+  /* whatever the attacker is enchanted with builds on the player */
+  if(src){
+    if(src.ailment) addPlayerBuildup(src.ailment,dmg*1.1,dmg);
+    else if(dtype==='physical') addPlayerBuildup('stun',dmg*0.6,dmg);
+    else if(dtype==='fire') addPlayerBuildup('ignite',dmg*0.35,dmg);
+    else if(dtype==='cold') addPlayerBuildup('freeze',dmg*0.4,dmg);
+    else if(dtype==='lightning') addPlayerBuildup('shock',dmg*0.35,dmg);
+  } else if(dtype==='physical') addPlayerBuildup('stun',dmg*0.4,dmg);
   /* energy shield takes the hit first, then delays its recharge */
   if(p.es>0){
     const absorb=Math.min(p.es,dmg);
@@ -2783,6 +3246,7 @@ function damagePlayer(amount,dtype,src){
   burst(p.x,p.y,11,'#c0402f',210,3.2,.42,true);
   setHitStop(0.08);
   shakeCam(9+Math.min(14,amount*0.4));
+  sfx('hurt');
   if(src&&src.mods&&src.mods.indexOf('vampiric')>=0){
     src.hp=Math.min(src.maxHp,src.hp+amount*1.4);
     burst(src.x,src.y,9,'#e06a8a',150,3,.4,true);
@@ -2845,9 +3309,12 @@ function gainXp(v){
     p.life=G.st.maxLife; p.mana=G.st.maxMana; p.es=G.st.maxES;
     burst(p.x,p.y,40,'#e0c070',300,4,.9,true);
     spawnFx({type:'shock',x:p.x,y:p.y,r:0,max:200,life:.7,maxLife:.7,color:'#e0c070'});
-    G.pendingLevel+=leveled;
-    openPanel('level');
+    /* no popup: a toast plus a standing badge on the tree button say it all */
+    const left=charPoints(ch)-pointsSpent(ch);
+    toast('Level '+ch.level+' — '+left+' passive point'+(left===1?'':'s'));
+    sfx('level');
     buildSlotUI();
+    updatePointBadge();
   }
   markDirty();
 }
@@ -2862,6 +3329,7 @@ function onDeath(){
   G.deathXpLost=actual;
   burst(G.player.x,G.player.y,60,'#c04a3c',340,5,1.1,true);
   shakeCam(20);
+  sfx('death');
   markDirty();
   setTimeout(()=>{ if(G.dead) openPanel('death'); },700);
 }
@@ -2899,7 +3367,7 @@ function spawnShot(o){
   const s={x:o.x,y:o.y,vx:o.vx,vy:o.vy,r:o.r||6,dmg:o.dmg,dtype:o.dtype||'physical',
     color:o.color||'#fff',from:o.from,life:o.life||2.2,pierce:o.pierce||0,chains:o.chains||0,
     hitList:[],trail:[],size:o.size||1,crit:!!o.crit,sk:o.sk||null,homing:o.homing||0,
-    wallSplit:o.wallSplit||0,erratic:o.erratic||0};
+    wallSplit:o.wallSplit||0,erratic:o.erratic||0,ailment:o.ailment||null};
   G.shots.push(s);
   return s;
 }
@@ -3095,7 +3563,9 @@ function executeSkill(sk,ang,fromTouch){
     const md=Math.min(sk.range||200,dist(p.x,p.y,G.mouse.wx,G.mouse.wy));
     let tx=p.x+Math.cos(ang)*Math.max(40,md*0.6), ty=p.y+Math.sin(ang)*Math.max(40,md*0.6);
     if(!canStand(tx,ty,14)){ tx=p.x; ty=p.y; }
-    G.totems.push({x:tx,y:ty,r:14,t:sk.duration||8,max:sk.duration||8,cd:0,sk:sk,color:col,rot:0});
+    G.totems.push({x:tx,y:ty,r:14,t:sk.duration||8,max:sk.duration||8,cd:0,sk:sk,
+      color:col,rot:0,spirit:sk.spirit||0});
+    recalc();
     burst(tx,ty,14,col,150,3,.5,true);
   } else if(type==='aura'||type==='meta'){
     toggleAura(sk.idx);
@@ -3136,6 +3606,7 @@ function fireMetaGem(gemIdx){
 function useSkill(slot,fromTouch){
   const p=G.player,ch=G.ch,st=G.st;
   if(!p||G.paused||G.dead||G.panel) return;
+  if(playerStunned()) return;
   const sk=activeSkills()[slot];
   if(!sk) return;
   if(sk.type==='aura'||sk.type==='meta'){
@@ -3150,9 +3621,14 @@ function useSkill(slot,fromTouch){
   if(costLife){
     if(p.life<=sk.mana+1){ toast('Not enough life.'); return; }
   } else if(p.mana<sk.mana){ toast('Not enough mana.'); return; }
+  if(sk.type==='totem'&&sk.spirit&&st.spiritUsed+sk.spirit>st.spiritMax){
+    toast(sk.name+' needs '+sk.spirit+' spirit, '+(st.spiritMax-st.spiritUsed)+' free.');
+    return;
+  }
   const ang=aimFor(sk,fromTouch);
   if(costLife) p.life-=sk.mana; else p.mana-=sk.mana;
   p.cds[slot]=Math.max(0.12,sk.cd);
+  sfx(sk.isAttack&&sk.type==='melee_arc'?'melee':'cast');
   executeSkill(sk,ang,fromTouch);
 }
 
@@ -3161,12 +3637,11 @@ function useSkill(slot,fromTouch){
    Items occupy a footprint of cells; a drop only enters the bag if it fits.
    ========================================================================== */
 function gridFits(list,item,x,y,w,h,ignore){
-  const b=BASES[item.b];
-  if(x<0||y<0||x+b.w>w||y+b.h>h) return false;
+  const iw=itemW(item), ih=itemH(item);
+  if(x<0||y<0||x+iw>w||y+ih>h) return false;
   for(const o of list){
     if(o===ignore) continue;
-    const ob=BASES[o.b];
-    if(x < o.pos.x+ob.w && x+b.w > o.pos.x && y < o.pos.y+ob.h && y+b.h > o.pos.y) return false;
+    if(x < o.pos.x+itemW(o) && x+iw > o.pos.x && y < o.pos.y+itemH(o) && y+ih > o.pos.y) return false;
   }
   return true;
 }
@@ -3184,15 +3659,52 @@ function addToInv(item){
   return true;
 }
 function invCount(){ return G.ch.inv.length; }
+function countCurrency(key){
+  let n=0;
+  for(const it of G.ch.inv) if(it.cur===key) n+=it.n;
+  return n;
+}
+/* fills partial stacks first, then opens new ones; anything that will not
+   fit in the bag goes to the first stash tab with room, and only then to
+   the floor */
 function giveCurrency(key,n){
-  const c=G.ch.currency;
-  c[key]=(c[key]||0)+(n||1);
+  let left=n||1;
+  const ch=G.ch;
+  for(const it of ch.inv){
+    if(it.cur!==key||it.n>=MAX_STACK) continue;
+    const room=MAX_STACK-it.n;
+    const put=Math.min(room,left);
+    it.n+=put; left-=put;
+    if(left<=0) break;
+  }
+  while(left>0){
+    const put=Math.min(MAX_STACK,left);
+    const st={uid:newUid(),cur:key,n:put,pos:{x:0,y:0}};
+    const spot=findSpot(ch.inv,st,INV_W,INV_H);
+    if(spot){ st.pos={x:spot.x,y:spot.y}; ch.inv.push(st); left-=put; continue; }
+    let stashed=false;
+    for(let t=0;t<4&&!stashed;t++){
+      const sp=findSpot(G.save.stash[t],st,STASH_W,STASH_H);
+      if(sp){ st.pos={x:sp.x,y:sp.y}; G.save.stash[t].push(st); stashed=true; }
+    }
+    if(stashed){ left-=put; toast(curLabel(key)+' went to the stash.'); continue; }
+    if(G.player) spawnGroundCurrency(key,G.player.x,G.player.y,left);
+    left=0;
+  }
   markDirty();
 }
 function takeCurrency(key,n){
-  const c=G.ch.currency;
-  if((c[key]||0)<(n||1)) return false;
-  c[key]-=(n||1);
+  const need=n||1;
+  if(countCurrency(key)<need) return false;
+  let left=need;
+  const ch=G.ch;
+  for(let i=ch.inv.length-1;i>=0&&left>0;i--){
+    const it=ch.inv[i];
+    if(it.cur!==key) continue;
+    const take=Math.min(it.n,left);
+    it.n-=take; left-=take;
+    if(it.n<=0) ch.inv.splice(i,1);
+  }
   markDirty();
   return true;
 }
@@ -3229,10 +3741,20 @@ function makeDropItem(ilvl,rarityBonus,forceRarity){
   return makeItem(baseForDrop(il),il,rar);
 }
 function spawnGroundItem(item,x,y){
-  G.pickups.push({kind:'item',item:item,x:x,y:y,vx:rnd(-40,40),vy:rnd(-40,40),r:11,t:rnd(0,TAU)});
+  sfx('drop',item.r);
+  const q=snapToWalkable(x,y,10);
+  G.pickups.push({kind:'item',item:item,x:q.x,y:q.y,vx:rnd(-40,40),vy:rnd(-40,40),r:11,t:rnd(0,TAU)});
 }
 function spawnGroundCurrency(key,x,y,n){
-  G.pickups.push({kind:'cur',cur:key,n:n||1,x:x,y:y,vx:rnd(-40,40),vy:rnd(-40,40),r:8,t:rnd(0,TAU)});
+  const q=snapToWalkable(x,y,8);
+  /* merge into a stack already lying nearby rather than littering */
+  for(const k of G.pickups){
+    if(k.kind==='cur'&&k.cur===key&&k.n<MAX_STACK&&d2(k.x,k.y,q.x,q.y)<40*40){
+      k.n=Math.min(MAX_STACK,k.n+(n||1));
+      return;
+    }
+  }
+  G.pickups.push({kind:'cur',cur:key,n:n||1,x:q.x,y:q.y,vx:rnd(-40,40),vy:rnd(-40,40),r:8,t:rnd(0,TAU)});
 }
 function dropLoot(e){
   const il=rollItemLevel();
@@ -3271,7 +3793,8 @@ function dropBossLoot(b){
 function collectPickup(k){
   if(k.kind==='cur'){
     giveCurrency(k.cur,k.n);
-    toast(CURRENCY[k.cur].name+(k.n>1?' x'+k.n:''));
+    sfx('pickup');
+    toast(curLabel(k.cur)+(k.n>1?' x'+k.n:''));
     burst(k.x,k.y,8,'#d8c69c',120,2.2,.35,true);
     return true;
   }
@@ -3299,7 +3822,7 @@ function enemyShoot(e,ang){
     spawnShot({x:e.x+Math.cos(a2)*e.r,y:e.y+Math.sin(a2)*e.r,
       vx:Math.cos(a2)*(a.pspeed||240),vy:Math.sin(a2)*(a.pspeed||240),
       dmg:e.dmg,dtype:e.dtype,color:e.color,from:'enemy',r:6,life:3.2,
-      homing:e.arch==='caster'?0.4:0});
+      homing:e.arch==='caster'?0.4:0,ailment:e.ailment||null});
   }
   burst(e.x+Math.cos(ang)*e.r,e.y+Math.sin(ang)*e.r,4,e.color,90,2,.25,true);
 }
@@ -3317,6 +3840,7 @@ function tickDots(e,dt){
   if(e.hp<=0) killEnemy(e);
 }
 function tickAilments(e,dt){
+  if(e.ailImmune) for(const k in e.ailImmune) if(e.ailImmune[k]>0) e.ailImmune[k]-=dt;
   for(const k of AILMENTS) if(e.ailT[k]>0) e.ailT[k]-=dt;
   /* meters decay if nothing keeps feeding them */
   for(const k of AILMENTS) if(e.ail[k]>0) e.ail[k]=Math.max(0,e.ail[k]-e.threshold*0.14*dt);
@@ -3457,8 +3981,11 @@ function bossFire(b,kind){
         color:b.rim,from:'enemy',r:8,life:3});
     }
   } else if(kind==='slam'){
-    spawnFx({type:'shock',x:p.x,y:p.y,r:0,max:170,life:.45,maxLife:.45,color:b.rim});
-    if(d2(p.x,p.y,p.x,p.y)<170*170) damagePlayer(b.dmg*1.2,'physical',b);
+    /* lands where the telegraph was drawn, not wherever the player ended up */
+    const ox=(b.windupAt&&b.windupAt.x!=null)?b.windupAt.x:p.x;
+    const oy=(b.windupAt&&b.windupAt.y!=null)?b.windupAt.y:p.y;
+    spawnFx({type:'shock',x:ox,y:oy,r:0,max:170,life:.45,maxLife:.45,color:b.rim});
+    if(d2(p.x,p.y,ox,oy)<170*170) damagePlayer(b.dmg*1.2,'physical',b);
     shakeCam(14);
   } else if(kind==='beam'){
     const len=760;
@@ -3467,11 +3994,13 @@ function bossFire(b,kind){
     if(distToSeg(p.x,p.y,b.x,b.y,ex,ey)<p.r+24) damagePlayer(b.dmg*1.1,'lightning',b);
     shakeCam(10);
   } else if(kind==='ring'){
-    /* a ring of standing fire that boxes the player in */
+    /* a ring of standing fire, centred where the telegraph was */
+    const cx=(b.windupAt&&b.windupAt.x!=null)?b.windupAt.x:p.x;
+    const cy=(b.windupAt&&b.windupAt.y!=null)?b.windupAt.y:p.y;
     const n=10;
     for(let i=0;i<n;i++){
       const a=i*(TAU/n);
-      const x=p.x+Math.cos(a)*190, y=p.y+Math.sin(a)*190;
+      const x=cx+Math.cos(a)*190, y=cy+Math.sin(a)*190;
       if(!walkable(x,y)) continue;
       G.clouds.push({x:x,y:y,r:64,t:4,max:4,dps:b.dmg*0.5,dtype:'fire',
         color:'#e07a3c',tick:0,hostile:true});
@@ -3503,7 +4032,7 @@ function updateBoss(dt){
     b.phase=ph;
     spawnFx({type:'shock',x:b.x,y:b.y,r:0,max:260,life:.6,maxLife:.6,color:b.rim});
     burst(b.x,b.y,40,b.rim,340,5,.7,true);
-    shakeCam(16); setHitStop(.09);
+    shakeCam(16); setHitStop(.09); sfx('phase');
     for(const k in b.cds) b.cds[k]=rnd(.6,1.8);
     toast(b.name+' · phase '+ph);
   }
@@ -3540,6 +4069,8 @@ function updateBoss(dt){
         : kind==='ring'?rnd(10,13)
         : rnd(4.5,6.5);
       b.windup={kind:kind,t:kind==='dash'?.7:.65,total:kind==='dash'?.7:.65};
+      /* fix the aim point now so the telegraph is honest */
+      b.windupAt={x:p.x,y:p.y};
     }
   }
   if(b.touchCd>0) b.touchCd-=dt;
@@ -3547,7 +4078,12 @@ function updateBoss(dt){
 }
 function onBossDead(){
   const b=G.boss;
-  G.kills++; G.ch.kills++;
+  const ch=G.ch;
+  const firstKill=!(ch.zonesCleared&&ch.zonesCleared[G.zoneKey]);
+  if(!ch.zonesCleared) ch.zonesCleared={};
+  ch.zonesCleared[G.zoneKey]=true;
+  G.kills++; ch.kills++;
+  if(firstKill) toast(b.name+' has fallen — '+BOSS_POINTS+' passive points');
   gainXp(b.xp);
   dropBossLoot(b);
   $('bossbar').classList.remove('on');
@@ -3555,6 +4091,7 @@ function onBossDead(){
   /* the way onward unlocks */
   for(const pt of G.portals) if(pt.locked) pt.locked=false;
   markDirty();
+  updatePointBadge();
 }
 
 /* ==========================================================================
@@ -3579,7 +4116,9 @@ function moveInput(){
 }
 function updatePlayer(dt){
   const p=G.player,st=G.st,ch=G.ch;
-  const mv=moveInput();
+  tickPlayerAilments(dt);
+  const frozen=playerStunned();
+  const mv=frozen?{x:0,y:0,len:0}:moveInput();
   p.moving=false;
   if(mv.len>0.05){
     const sp=st.moveSpeed;
@@ -3604,6 +4143,7 @@ function updatePlayer(dt){
   else if(p.es<st.maxES) p.es=Math.min(st.maxES,p.es+st.maxES*0.28*dt);
   if(p.life<st.maxLife&&st.lifeRegen>0) p.life=Math.min(st.maxLife,p.life+st.lifeRegen*dt);
   if(p.mana<st.maxMana) p.mana=Math.min(st.maxMana,p.mana+st.manaRegen*dt);
+  if(frozen){ updatePrompt(); return; }
   /* held inputs keep firing at the skill's own rate */
   if(G.mouse.left) useSkill(0,false);
   for(let i=0;i<5;i++) if(G.touch.btn[i]) useSkill(i,true);
@@ -3631,11 +4171,28 @@ function updatePrompt(){
     if(d<bd){bd=d;best={kind:'portal',ref:pt,label:pt.label+(pt.locked?' (sealed — the zone’s master still stands)':'')};}
   }
   G.prompt=best;
+  /* this runs every frame, so it must not rewrite the DOM every frame */
   const el=$('prompt');
+  setElClass(el,'on',!!best);
   if(best){
-    el.classList.add('on');
-    el.textContent=(IS_TOUCH?'Tap: ':'F: ')+best.label;
-  } else el.classList.remove('on');
+    const txt=(IS_TOUCH?'Tap: ':'F: ')+best.label;
+    if(el.__txt!==txt){ el.__txt=txt; el.textContent=txt; }
+  }
+}
+/* H from anywhere that is not a live boss fight; the portal inside goes
+   back to wherever you left */
+function goHideout(){
+  if(!G.running||G.dead) return;
+  if(G.zoneKey==='hideout'){
+    const back=G.ch.returnZone&&ZONES[G.ch.returnZone]?G.ch.returnZone:'town';
+    enterZone(back);
+    return;
+  }
+  if(G.boss&&G.boss.awake&&!G.boss.dead){ toast('Not while the zone\u2019s master is awake.'); return; }
+  G.ch.returnZone=G.zoneKey;
+  markDirty();
+  sfx('portal');
+  enterZone('hideout');
 }
 function interact(){
   const t=G.prompt;
@@ -3719,7 +4276,7 @@ function updateShots(dt){
       if(done) continue;
     } else {
       if(d2(s.x,s.y,p.x,p.y)<(p.r+s.r)*(p.r+s.r)){
-        damagePlayer(s.dmg,s.dtype,null);
+        damagePlayer(s.dmg,s.dtype,s.ailment?{ailment:s.ailment}:null);
         burst(s.x,s.y,8,s.color,150,2.6,.3,true);
         G.shots.splice(i,1);
         continue;
@@ -3770,7 +4327,11 @@ function updateTotems(dt){
           from:'player',r:6,life:1.6,crit:crit,sk:t.sk});
       } else t.cd=0.3;
     }
-    if(t.t<=0){ burst(t.x,t.y,12,t.color,140,3,.5,true); G.totems.splice(i,1); }
+    if(t.t<=0){
+      burst(t.x,t.y,12,t.color,140,3,.5,true);
+      G.totems.splice(i,1);
+      if(t.spirit) recalc();      /* its reservation is released */
+    }
   }
 }
 function updatePickups(dt){
@@ -4044,9 +4605,13 @@ function drawBoss(){
                  b.y+Math.sin(a)*(b.windup.kind==='beam'?700:420)*t);
       ctx.stroke(); ctx.setLineDash([]);
     } else if(b.windup.kind==='slam'){
-      ctx.beginPath(); ctx.arc(p.x,p.y,170*t,0,TAU); ctx.stroke();
+      const w=b.windupAt||p;
+      ctx.beginPath(); ctx.arc(w.x,w.y,170,0,TAU); ctx.stroke();
+      ctx.globalAlpha=.2+.5*t;
+      ctx.beginPath(); ctx.arc(w.x,w.y,170*t,0,TAU); ctx.stroke();
     } else if(b.windup.kind==='ring'){
-      ctx.beginPath(); ctx.arc(p.x,p.y,190,0,TAU*t); ctx.stroke();
+      const w=b.windupAt||p;
+      ctx.beginPath(); ctx.arc(w.x,w.y,190,0,TAU*t); ctx.stroke();
     } else {
       ctx.beginPath(); ctx.arc(b.x,b.y,b.r*1.3+t*90,0,TAU); ctx.stroke();
     }
@@ -4222,6 +4787,21 @@ function drawPickups(){
       ctx.strokeRect(-5,-8,10,16);
     }
     ctx.restore();
+    /* names on the floor: hold Alt on desktop, always shown on touch */
+    if(IS_TOUCH||G.keys['alt']){
+      const label=k.kind==='cur'? curAbbr(k.cur)+' x'+k.n
+        : (k.item.idf?itemName(k.item):'? '+BASES[k.item.b].name);
+      const lcol=k.kind==='cur'?'#d8c69c':RARITY_COLOR[k.item.r];
+      ctx.save();
+      ctx.font='10px Cinzel, serif';
+      ctx.textAlign='center';
+      const lw=ctx.measureText(label).width+10;
+      ctx.fillStyle='rgba(6,6,9,.78)';
+      ctx.fillRect(k.x-lw/2,k.y-31,lw,14);
+      ctx.fillStyle=lcol;
+      ctx.fillText(label,k.x,k.y-21);
+      ctx.restore();
+    }
   }
 }
 function drawNpcsPortals(){
@@ -4409,6 +4989,18 @@ function buildSlotUI(){
       d.className='flask';
       d.innerHTML='<i></i><span>'+(kind==='life'?'L':'M')+'</span>';
       d.addEventListener('click',ev=>{ev.stopPropagation();useFlask(kind);});
+      d.addEventListener('pointerenter',ev=>{
+        const p=G.player,c=G.ch;
+        const need=90+c.level*14;
+        showTipHtml('<div class="tnm" style="color:'+(kind==='life'?'#c0463a':'#4a76ad')+'">'+
+          (kind==='life'?'Life Flask':'Mana Flask')+'</div>'+
+          '<div class="tb2">'+(kind==='life'?'1':'2')+' to drink</div>'+
+          '<div class="mod">Restores '+(kind==='life'?'38% of maximum life':'45% of maximum mana')+'.</div>'+
+          '<div class="imp">'+p.flask[kind]+' of '+c.flasks[kind]+' charges held</div>'+
+          '<div class="mod">Next charge: '+Math.round(clamp(p.flaskCharge[kind]/need,0,1)*100)+
+          '% (charges fill by dealing damage and killing)</div>',ev.clientX,ev.clientY);
+      });
+      d.addEventListener('pointerleave',hideTip);
       d.addEventListener('touchstart',ev=>{ev.stopPropagation();ev.preventDefault();useFlask(kind);},{passive:false});
       f.appendChild(d);
     }
@@ -4421,34 +5013,115 @@ function buildSlotUI(){
   }
   $('set-nm').textContent=roman(ch.activeSet);
 }
+/* one standing badge wherever the tree is reachable, while points are unspent */
+/* the player's own ailment buildup, mirroring the monster meters */
+let pailBuilt=false;
+function updatePlayerAilHud(){
+  const host=$('pail'), p=G.player;
+  if(!host||!p) return;
+  if(!pailBuilt){
+    host.innerHTML=AILMENTS.map(k=>'<div class="m" data-a="'+k+'"><i></i><b>'+k.toUpperCase()+'</b></div>').join('');
+    pailBuilt=true;
+  }
+  const th=playerThreshold();
+  for(const el of host.children){
+    const k=el.dataset.a;
+    const act=p.ailT[k]>0;
+    const v=act?1:clamp((p.ail[k]||0)/th,0,1);
+    /* same caching discipline as the rest of the HUD: no blind writes */
+    const disp=(v>0.02||act)?'block':'none';
+    setElStyle(el,'display',disp);
+    if(disp==='none') continue;
+    const bar=el.firstElementChild;
+    setElStyle(bar,'width',(Math.round(v*1000)/10)+'%');
+    setElStyle(bar,'background',AIL_COLOR[k]);
+  }
+}
+function updatePointBadge(){
+  const ch=G.ch;
+  if(!ch) return;
+  const left=charPoints(ch)-pointsSpent(ch);
+  const hint=$('pointhint');
+  if(hint){
+    hint.textContent='P  +'+left+' PASSIVE POINT'+(left===1?'':'S');
+    hint.classList.toggle('on',left>0&&!IS_TOUCH);
+  }
+  const btn=document.querySelector('#tmenu [data-panel="tree"]');
+  if(btn){
+    let b=btn.querySelector('.badge');
+    if(left>0){
+      if(!b){ b=document.createElement('span'); b.className='badge'; btn.appendChild(b); }
+      b.textContent='+'+left;
+    } else if(b) b.remove();
+  }
+}
+/* Every HUD write goes through these, so an unchanged value costs nothing.
+   updateHUD runs every frame and used to rewrite ~20 properties blind. */
+const HUDC={};
+function setStyle(id,prop,val){
+  const k=id+'.'+prop;
+  if(HUDC[k]===val) return;
+  HUDC[k]=val;
+  const el=$(id);
+  if(el) el.style[prop]=val;
+}
+function setText(id,val){
+  const k=id+'#';
+  if(HUDC[k]===val) return;
+  HUDC[k]=val;
+  const el=$(id);
+  if(el) el.textContent=val;
+}
+function resetHudCache(){ for(const k in HUDC) delete HUDC[k]; ELC=new WeakMap(); }
+let ELC=new WeakMap();
+function elCache(el){
+  let c=ELC.get(el);
+  if(!c){ c={}; ELC.set(el,c); }
+  return c;
+}
+function setElStyle(el,prop,val){
+  if(!el) return;
+  const c=elCache(el);
+  if(c[prop]===val) return;
+  c[prop]=val;
+  el.style[prop]=val;
+}
+function setElClass(el,cls,on){
+  if(!el) return;
+  const c=elCache(el);
+  const k='.'+cls;
+  if(c[k]===!!on) return;
+  c[k]=!!on;
+  el.classList.toggle(cls,!!on);
+}
 function updateHUD(){
   const ch=G.ch,p=G.player,st=G.st;
   if(!ch||!p||!st) return;
-  const lf=clamp(p.life/st.maxLife,0,1);
-  $('life-fill').style.height=(lf*100)+'%';
-  $('es-fill').style.height=(st.maxES?clamp(p.es/st.maxES,0,1)*22:0)+'%';
-  $('life-txt').textContent=Math.ceil(p.life)+(st.maxES?' +'+Math.ceil(p.es):'');
-  $('mana-fill').style.height=(st.maxMana?clamp(p.mana/st.maxMana,0,1)*100:0)+'%';
-  $('mana-txt').textContent=st.maxMana?Math.ceil(p.mana):'—';
+  const pc=v=>(Math.round(v*1000)/10)+'%';
+  setStyle('life-fill','height',pc(clamp(p.life/st.maxLife,0,1)));
+  setStyle('es-fill','height',pc(st.maxES?clamp(p.es/st.maxES,0,1)*0.22:0));
+  setText('life-txt',Math.ceil(p.life)+(st.maxES?' +'+Math.ceil(p.es):''));
+  setStyle('mana-fill','height',pc(st.maxMana?clamp(p.mana/st.maxMana,0,1):0));
+  setText('mana-txt',st.maxMana?String(Math.ceil(p.mana)):'—');
   const need=xpForLevel(ch.level);
-  $('xp-fill').style.width=(clamp(ch.xp/need,0,1)*100)+'%';
-  $('xp-lb').textContent='Level '+ch.level+'  ·  '+Math.floor(ch.xp)+' / '+need;
-  $('zone-nm').textContent=G.zdef.name;
-  $('zone-lv').textContent=G.zdef.town?'sanctuary':('level '+G.zdef.level+'  ·  '+ch.kills+' slain');
-  $('spirit-lb').textContent='SPIRIT '+st.spiritUsed+' / '+st.spiritMax;
-  $('spirit-fill').style.width=(st.spiritMax?clamp(st.spiritUsed/st.spiritMax,0,1)*100:0)+'%';
+  setStyle('xp-fill','width',pc(clamp(ch.xp/need,0,1)));
+  setText('xp-lb','Level '+ch.level+'  ·  '+Math.floor(ch.xp)+' / '+need);
+  setText('zone-nm',G.zdef.name);
+  setText('zone-lv',G.zdef.town?'sanctuary':('level '+G.zdef.level+'  ·  '+ch.kills+' slain'));
+  setText('spirit-lb','SPIRIT '+st.spiritUsed+' / '+st.spiritMax);
+  setStyle('spirit-fill','width',pc(st.spiritMax?clamp(st.spiritUsed/st.spiritMax,0,1):0));
   const sks=activeSkills();
   const slots=$('slots').children;
   for(let i=0;i<slots.length;i++){
     const sk=sks[i], el=slots[i];
     const cdEl=el.querySelector('.cd');
-    if(!sk){ cdEl.style.height='0%'; continue; }
+    if(!sk){ setElStyle(cdEl,'height','0%'); continue; }
     const max=Math.max(0.12,sk.cd);
     const f=clamp(p.cds[i]/max,0,1);
-    cdEl.style.height=(f*100)+'%';
-    el.classList.toggle('ready',f<=0);
+    setElStyle(cdEl,'height',(Math.round(f*1000)/10)+'%');
+    setElClass(el,'ready',f<=0);
     const canPay = st.keys.blood_magic ? p.life>sk.mana : p.mana>=sk.mana;
-    el.classList.toggle('nomana',!canPay||!sk.usable);
+    setElClass(el,'nomana',!canPay||!sk.usable);
   }
   if(IS_TOUCH){
     for(let i=0;i<5;i++){
@@ -4456,36 +5129,37 @@ function updateHUD(){
       if(!b) continue;
       const max=sk?Math.max(0.12,sk.cd):1;
       const f=sk?clamp(p.cds[i]/max,0,1):0;
-      b.querySelector('.sweep').style.background=
-        'conic-gradient(rgba(0,0,0,.7) 0deg, rgba(0,0,0,.7) '+(f*360).toFixed(1)+'deg, rgba(0,0,0,0) '+(f*360).toFixed(1)+'deg)';
-      b.style.borderColor=(sk&&f<=0)?'rgba(200,169,110,.5)':'rgba(200,169,110,.16)';
+      const deg=(f*360).toFixed(1);
+      setElStyle(b.querySelector('.sweep'),'background',
+        'conic-gradient(rgba(0,0,0,.7) 0deg, rgba(0,0,0,.7) '+deg+'deg, rgba(0,0,0,0) '+deg+'deg)');
+      setElStyle(b,'borderColor',(sk&&f<=0)?'rgba(200,169,110,.5)':'rgba(200,169,110,.16)');
     }
   }
   const lf2=$('flask-life').children, mf=$('flask-mana').children;
   const needCharge=90+ch.level*14;
+  const setFill=(el,v)=>setElStyle(el.querySelector('i'),'height',(Math.round(v*1000)/10)+'%');
   for(let i=0;i<lf2.length;i++){
     const full=i<p.flask.life;
-    const partial=(i===p.flask.life)?clamp(p.flaskCharge.life/needCharge,0,1):0;
-    lf2[i].querySelector('i').style.height=(full?100:partial*100)+'%';
+    setFill(lf2[i],full?1:((i===p.flask.life)?clamp(p.flaskCharge.life/needCharge,0,1):0));
   }
   for(let i=0;i<mf.length;i++){
     const full=i<p.flask.mana;
-    const partial=(i===p.flask.mana)?clamp(p.flaskCharge.mana/needCharge,0,1):0;
-    mf[i].querySelector('i').style.height=(full?100:partial*100)+'%';
+    setFill(mf[i],full?1:((i===p.flask.mana)?clamp(p.flaskCharge.mana/needCharge,0,1):0));
   }
+  updatePlayerAilHud();
   const b=G.boss;
   if(b&&b.awake&&!b.dead){
-    $('bossbar').classList.add('on');
-    $('boss-fill').style.width=(clamp(b.hp/b.maxHp,0,1)*100)+'%';
-    $('boss-nm').textContent=b.name+'  ·  PHASE '+b.phase;
-  } else $('bossbar').classList.remove('on');
+    setElClass($('bossbar'),'on',true);
+    setStyle('boss-fill','width',(Math.round(clamp(b.hp/b.maxHp,0,1)*1000)/10)+'%');
+    setText('boss-nm',b.name+'  ·  PHASE '+b.phase);
+  } else setElClass($('bossbar'),'on',false);
 }
 
 /* ==========================================================================
    PANELS
    ========================================================================== */
 const PANEL_IDS={inv:'panel-inv',tree:'panel-tree',skills:'panel-skills',sheet:'panel-sheet',
-  map:'panel-map',menu:'panel-menu',npc:'panel-npc',death:'panel-death',level:'panel-level'};
+  map:'panel-map',menu:'panel-menu',npc:'panel-npc',death:'panel-death'};
 function openPanel(kind){
   for(const k in PANEL_IDS) $(PANEL_IDS[k]).classList.remove('on');
   G.panel=kind;
@@ -4498,7 +5172,6 @@ function openPanel(kind){
   if(kind==='sheet') renderSheet();
   if(kind==='menu') renderMenu();
   if(kind==='death') renderDeath();
-  if(kind==='level') renderLevel();
   if(kind==='tree'){
     if(!G.tree.centred){
       /* open centred on this class's own corner of the tree, not the middle */
@@ -4506,6 +5179,7 @@ function openPanel(kind){
       if(st){ G.tree.x=-st.x*0.72; G.tree.y=-st.y*0.72; G.tree.z=0.78; }
       G.tree.centred=true;
     }
+    treeDirty();
     renderTreeUI();
   }
   if(kind==='map') resizeCanvas();
@@ -4519,7 +5193,7 @@ function closePanel(){
 }
 function togglePanel(kind){
   if(G.panel===kind) closePanel();
-  else if(G.panel==='death'||G.panel==='level') return;
+  else if(G.panel==='death') return;
   else openPanel(kind);
 }
 
@@ -4574,8 +5248,17 @@ function compareLines(it){
   html+= rows?'':'<div style="color:#5f5b53">no numeric difference</div>';
   return html+'</div>';
 }
-function showTip(it,x,y,extra){
+/* the one place a tooltip gets positioned; everything else builds HTML */
+function showTipHtml(html,x,y){
   const el=$('tooltip');
+  el.innerHTML=html;
+  el.classList.add('on');
+  const r=el.getBoundingClientRect();
+  el.style.left=Math.min(window.innerWidth-r.width-10,Math.max(8,x+14))+'px';
+  el.style.top=Math.min(window.innerHeight-r.height-10,Math.max(8,y+14))+'px';
+}
+function showTip(it,x,y,extra){
+  if(isStack(it)){ showStackTip(it,x,y,extra); return; }
   const b=BASES[it.b];
   const lvl=itemLevelReq(it);
   let html='<div class="tnm" style="color:'+RARITY_COLOR[it.r]+'">'+esc(itemName(it))+'</div>';
@@ -4594,19 +5277,150 @@ function showTip(it,x,y,extra){
   if(lvl>G.ch.level) html+='<div class="dn">Requires level '+lvl+'</div>';
   html+=compareLines(it);
   if(extra) html+='<div class="hint">'+extra+'</div>';
-  el.innerHTML=html;
-  el.classList.add('on');
-  const r=el.getBoundingClientRect();
-  const px=Math.min(window.innerWidth-r.width-10,Math.max(8,x+14));
-  const py=Math.min(window.innerHeight-r.height-10,Math.max(8,y+14));
-  el.style.left=px+'px'; el.style.top=py+'px';
+  showTipHtml(html,x,y);
 }
 function hideTip(){ $('tooltip').classList.remove('on'); }
 
+/* ---- tooltip bodies for everything that is not an item ---- */
+function gemTipHtml(g,idx){
+  const ch=G.ch, def=GEMS[g.gem];
+  const sk=skillStats(g,idx);
+  let h='<div class="tnm" style="color:#e3d6b8">'+esc(def.name)+'</div>';
+  h+='<div class="tb2">'+esc(def.type.replace('_',' '))+'  ·  gem level '+sk.lvl+
+     '  ·  '+esc(def.tags.join(', '))+'</div>';
+  h+='<div class="mod">'+esc(def.mech||'')+'</div>';
+  h+='<div class="imp">'+esc(skillSummary(sk))+'</div>';
+  const attrName={str:'strength',dex:'dexterity',int:'intelligence',
+    strdex:'strength and dexterity',strint:'strength and intelligence',
+    dexint:'dexterity and intelligence'}[def.attr];
+  h+='<div class="mod">Requires '+def.req+' '+esc(attrName)+'</div>';
+  if(def.wep) h+='<div class="mod">Weapon: '+esc(def.wep.map(k=>WEAPON_KINDS[k].name.toLowerCase()).join(', '))+'</div>';
+  if(def.spirit) h+='<div class="rune">Reserves '+def.spirit+' spirit while active</div>';
+  if(def.combo) h+='<div class="up">Combo '+esc(def.combo)+(def.ailment?'  ·  builds '+esc(def.ailment):'')+'</div>';
+  const sups=g.sockets.filter(Boolean);
+  if(sups.length){
+    h+='<div class="cmp"><div style="color:#5f5b53;margin-bottom:3px">Supports</div>';
+    for(const k of sups) h+='<div class="mod">'+esc(SUPPORTS[k].name)+': '+esc(SUPPORTS[k].desc)+'</div>';
+    h+='<div class="mod">Mana multiplier x'+sups.reduce((a,k)=>a*SUPPORTS[k].manaMult,1).toFixed(2)+'</div></div>';
+  } else h+='<div class="hint">'+sk.nSock+' support socket'+(sk.nSock===1?'':'s')+' open</div>';
+  if(!sk.usable) h+='<div class="dn">'+esc(sk.reason)+'</div>';
+  h+='<div class="hint">'+esc(def.desc)+'</div>';
+  return h;
+}
+function gemDefTipHtml(key){
+  const def=GEMS[key];
+  let h='<div class="tnm" style="color:#e3d6b8">'+esc(def.name)+'</div>';
+  h+='<div class="tb2">'+esc(def.type.replace('_',' '))+'  ·  unlocks at level '+def.lvlReq+'</div>';
+  h+='<div class="mod">'+esc(def.mech||'')+'</div>';
+  h+='<div class="imp">'+esc(gemSummary(def))+'</div>';
+  if(def.spirit) h+='<div class="rune">Reserves '+def.spirit+' spirit while active</div>';
+  h+='<div class="hint">'+esc(def.desc)+'</div>';
+  return h;
+}
+function supportTipHtml(key,gemIdx){
+  const ch=G.ch, sup=SUPPORTS[key];
+  let h='<div class="tnm" style="color:#c8b48a">'+esc(sup.name)+'</div>';
+  h+='<div class="tb2">support  ·  supports '+esc(sup.allow)+' skills</div>';
+  h+='<div class="mod">'+esc(sup.desc)+'</div>';
+  h+='<div class="mod">'+pctText(sup.manaMult,'mana cost')+' (x'+sup.manaMult.toFixed(2)+')</div>';
+  const used=supportUsedBy(ch,key);
+  if(used>=0&&used!==gemIdx)
+    h+='<div class="dn">In use by '+esc(GEMS[ch.gems[used].gem].name)+'. Taking it here moves it.</div>';
+  else if(used<0&&ch.supports.indexOf(key)>=0) h+='<div class="up">Owned and free</div>';
+  else if(ch.supports.indexOf(key)<0) h+='<div class="hint">Not owned. Carve it from an uncut support gem.</div>';
+  return h;
+}
+function nodeTipHtml(n){
+  const ch=G.ch;
+  let h='<div class="tnm" style="color:'+(n.type==='keystone'?'#e0c070':'#e3d6b8')+'">'+esc(n.name)+'</div>';
+  h+='<div class="tb2">'+esc(n.type)+' passive</div>';
+  const lines=[];
+  for(const k in n.st){ if(k==='keystone') continue; lines.push(statLine(k,n.st[k])); }
+  for(const l of lines) h+='<div class="mod">'+esc(l)+'</div>';
+  if(n.st.keystone) h+='<div class="rune">'+esc(KEYSTONES[n.st.keystone].text)+'</div>';
+  if(!lines.length&&!n.st.keystone) h+='<div class="mod">A class starting point: no stats of its own.</div>';
+  if(isAllocated(n.id)){
+    const m=ch.passives[n.id];
+    h+='<div class="up">Allocated'+(m?' — weapon set '+(m===1?'I':'II')+' only':' for both weapon sets')+'</div>';
+  } else if(isStartNode(n.id)) h+='<div class="up">Your starting point</div>';
+  else if(canAllocate(n.id)) h+='<div class="up">Can allocate — click to take it</div>';
+  else if(charPoints(ch)-pointsSpent(ch)<=0) h+='<div class="dn">No passive points remaining</div>';
+  else h+='<div class="dn">Not connected to anything you have taken</div>';
+  if(n.desc&&!n.st.keystone) h+='<div class="hint">'+esc(n.desc)+'</div>';
+  return h;
+}
+
 /* ---------------------------------------------------------------- inventory */
 function itemCellSize(){
-  const w=Math.min(520,Math.max(240,window.innerWidth-64));
-  return Math.floor(Math.min(44,w/INV_W));
+  const w=Math.min(560,Math.max(240,window.innerWidth-64));
+  return Math.floor(Math.min(42,w/INV_W));
+}
+/* Can the armed tool be used on this item at all? Used both for the hint
+   line and for dimming every invalid target while a tool is armed. */
+function toolApplies(it){
+  if(!G.tool) return true;
+  if(G.tool==='salvage') return !isStack(it);
+  if(isStack(it)) return false;
+  if(isRuneKey(G.tool)) return it.runes.length>0 && !it.cor;
+  const c=CRAFT[G.tool];
+  return c? !!c.can(it) : false;
+}
+function toolWhyNot(it){
+  if(!G.tool) return '';
+  if(G.tool==='salvage') return isStack(it)?'Currency cannot be salvaged.':'';
+  if(isStack(it)) return 'Orbs cannot be used on currency.';
+  if(isRuneKey(G.tool)){
+    if(it.cor) return 'Corrupted items can no longer be modified.';
+    if(!it.runes.length) return 'This base has no rune sockets.';
+    return '';
+  }
+  const c=CRAFT[G.tool];
+  if(!c) return '';
+  if(c.can(it)) return '';
+  if(it.cor) return 'Corrupted items can no longer be modified.';
+  if(!it.idf) return 'Identify it first.';
+  if(G.tool==='transmute'&&it.r!==0) return 'Only a normal item can be transmuted.';
+  if(G.tool==='augment'&&it.r!==1) return 'Only a magic item can be augmented.';
+  if(G.tool==='augment') return 'That magic item already has two modifiers.';
+  if(G.tool==='regal'&&it.r!==1) return 'Only a magic item can be made rare.';
+  if(G.tool==='exalted'&&it.r!==2) return 'Only a rare item can be exalted.';
+  if(G.tool==='exalted') return 'That rare already has six modifiers.';
+  if(G.tool==='chaos'&&it.r!==2) return 'Only a rare item can be chaos-orbed.';
+  if(G.tool==='divine') return 'Only a magic or rare item has values to reroll.';
+  if(G.tool==='wisdom') return 'It is already identified.';
+  return 'It cannot be used on this item.';
+}
+function gridHint(it){
+  if(G.tool){
+    const why=toolWhyNot(it);
+    if(why) return '<span style="color:#c07a70">'+esc(why)+'</span>';
+    if(G.tool==='salvage') return 'Click to salvage: '+salvageValue(it)+' shards, '+salvageEssence(it)+' essence'+
+      (it.runes.filter(Boolean).length?', runes recovered':'')+'.';
+    if(isRuneKey(G.tool)) return 'Click to socket '+esc(RUNES[G.tool].name)+
+      (it.runes.every(r=>r)?' (overwrites the first rune)':'')+'.';
+    return 'Click to apply '+esc(curLabel(G.tool))+'.';
+  }
+  if(isStack(it)){
+    if(it.cur==='uncut_skill') return 'Click to carve a skill gem.';
+    if(it.cur==='uncut_support') return 'Click to carve a support gem.';
+    if(it.cur==='shard'||it.cur==='essence') return 'Spent at the vendor, the mirror and the bench.';
+    return 'Click to arm, then click the item to use it on. Right-click to drop.';
+  }
+  return 'Click to equip. Drag to move, or drag out of the bag to drop it. Right-click to drop.';
+}
+/* one tooltip entry point for stacks and gear alike */
+function tipFor(it,x,y,extra){
+  if(isStack(it)) showStackTip(it,x,y,extra);
+  else showTip(it,x,y,extra);
+}
+function showStackTip(it,x,y,extra){
+  let html='<div class="tnm" style="color:#c8a96e">'+esc(stackName(it))+'</div>';
+  html+='<div class="tb2">currency  \u00b7  '+it.n+' / '+MAX_STACK+' in this stack  \u00b7  '+
+    countCurrency(it.cur)+' held</div>';
+  html+='<div class="mod">'+esc(curDesc(it.cur))+'</div>';
+  if(G.tool===it.cur) html+='<div class="rune">Armed. Click an item to use it.</div>';
+  if(extra) html+='<div class="hint">'+extra+'</div>';
+  showTipHtml(html,x,y);
 }
 function renderGrid(host,list,w,h,onClick,onDragEnd){
   const cs=itemCellSize();
@@ -4621,42 +5435,50 @@ function renderGrid(host,list,w,h,onClick,onDragEnd){
     host.appendChild(c);
   }
   for(const it of list){
-    const b=BASES[it.b];
+    const stack=isStack(it);
     const el=document.createElement('div');
-    el.className='item r'+it.r+(it.idf?'':' unid');
+    el.className='item '+(stack?'stack':'r'+it.r)+(!stack&&!it.idf?' unid':'')+
+      (G.tool&&!toolApplies(it)?' dim':'')+(G.tool&&G.tool===it.cur?' armed':'');
     el.style.left=(it.pos.x*cs)+'px'; el.style.top=(it.pos.y*cs)+'px';
-    el.style.width=(b.w*cs-2)+'px'; el.style.height=(b.h*cs-2)+'px';
-    el.textContent=it.idf?itemName(it):('? '+b.name);
-    el.addEventListener('pointerenter',ev=>showTip(it,ev.clientX,ev.clientY,gridHint(it)));
-    el.addEventListener('pointerleave',hideTip);
+    el.style.width=(itemW(it)*cs-2)+'px'; el.style.height=(itemH(it)*cs-2)+'px';
+    if(stack) el.innerHTML='<span class="ab">'+esc(curAbbr(it.cur))+'</span><span class="ct">'+it.n+'</span>';
+    else el.textContent=it.idf?itemName(it):('? '+BASES[it.b].name);
+    el.addEventListener('pointerenter',ev=>{
+      tipFor(it,ev.clientX,ev.clientY,gridHint(it));
+      if(!stack) highlightSlotFor(it);
+    });
+    el.addEventListener('pointerleave',()=>{ hideTip(); clearSlotHighlight(); });
+    el.addEventListener('contextmenu',ev=>{ ev.preventDefault(); dropItem(it,list); });
     let moved=false,sx=0,sy=0;
     el.addEventListener('pointerdown',ev=>{
+      if(ev.button===2) return;
       ev.preventDefault();
       moved=false; sx=ev.clientX; sy=ev.clientY;
-      /* capture is a convenience; a browser that refuses it must not
-         take the whole click handler down with it */
       try{ el.setPointerCapture(ev.pointerId); }catch(err){}
-      G.drag={it:it,list:list,w:w,h:h,cs:cs,el:el,host:host,ox:ev.clientX,oy:ev.clientY,
-        px:it.pos.x,py:it.pos.y};
+      G.drag={it:it,list:list,w:w,h:h,cs:cs,el:el,host:host,px:it.pos.x,py:it.pos.y,out:false};
       el.classList.add('drag');
-      showTip(it,ev.clientX,ev.clientY,gridHint(it));
     });
     el.addEventListener('pointermove',ev=>{
       if(!G.drag||G.drag.it!==it) return;
       if(Math.abs(ev.clientX-sx)>6||Math.abs(ev.clientY-sy)>6) moved=true;
       const r=host.getBoundingClientRect();
-      const gx=Math.round((ev.clientX-r.left-(b.w*cs)/2)/cs);
-      const gy=Math.round((ev.clientY-r.top-(b.h*cs)/2)/cs);
-      el.style.left=(clamp(gx,0,w-b.w)*cs)+'px';
-      el.style.top=(clamp(gy,0,h-b.h)*cs)+'px';
-      G.drag.gx=clamp(gx,0,w-b.w); G.drag.gy=clamp(gy,0,h-b.h);
+      const gx=Math.round((ev.clientX-r.left-(itemW(it)*cs)/2)/cs);
+      const gy=Math.round((ev.clientY-r.top-(itemH(it)*cs)/2)/cs);
+      el.style.left=(clamp(gx,0,w-itemW(it))*cs)+'px';
+      el.style.top=(clamp(gy,0,h-itemH(it))*cs)+'px';
+      G.drag.gx=clamp(gx,0,w-itemW(it)); G.drag.gy=clamp(gy,0,h-itemH(it));
+      /* dragged clear of the grid: this is the drop gesture */
+      const out=ev.clientX<r.left-24||ev.clientX>r.right+24||ev.clientY<r.top-24||ev.clientY>r.bottom+24;
+      G.drag.out=out;
+      el.classList.toggle('dropping',out);
     });
     el.addEventListener('pointerup',ev=>{
-      el.classList.remove('drag');
-      hideTip();
+      el.classList.remove('drag','dropping');
+      hideTip(); clearSlotHighlight();
       if(!G.drag||G.drag.it!==it){ G.drag=null; return; }
       const d=G.drag; G.drag=null;
       if(!moved){ onClick&&onClick(it); return; }
+      if(d.out){ dropItem(it,list); return; }
       if(d.gx!=null&&gridFits(list,it,d.gx,d.gy,w,h,it)){
         it.pos.x=d.gx; it.pos.y=d.gy;
         markDirty();
@@ -4667,16 +5489,40 @@ function renderGrid(host,list,w,h,onClick,onDragEnd){
     host.appendChild(el);
   }
 }
-function gridHint(it){
-  if(G.tool){
-    if(G.tool==='salvage') return 'Click to salvage for '+salvageValue(it)+' shards.';
-    if(RUNES[G.tool]) return it.runes.length? 'Click to socket '+RUNES[G.tool].name+'.' : 'This base has no rune sockets.';
-    const c=CRAFT[G.tool];
-    if(c) return c.can(it)? 'Click to apply '+CURRENCY[G.tool].name+'.' : CURRENCY[G.tool].name+' cannot be used on this item.';
+/* an item can always leave the bag: drag it out, or right-click it */
+function dropItem(it,list){
+  const ch=G.ch;
+  const src=list||ch.inv;
+  const i=src.indexOf(it);
+  if(i<0) return;
+  if(src!==ch.inv&&src!==G.save.stash[G.stashTab||0]){ return; }
+  src.splice(i,1);
+  if(G.player){
+    if(isStack(it)) spawnGroundCurrency(it.cur,G.player.x+rnd(-30,30),G.player.y+rnd(-30,30),it.n);
+    else spawnGroundItem(it,G.player.x+rnd(-30,30),G.player.y+rnd(-30,30));
   }
-  return 'Click to equip · drag to move';
+  toast('Dropped '+(isStack(it)?stackName(it)+' x'+it.n:itemName(it)));
+  markDirty();
+  renderInvBodies();
+}
+/* hovering a bag item lights up the slot it would go into */
+function highlightSlotFor(it){
+  clearSlotHighlight();
+  if(isStack(it)||!it.idf) return;
+  const b=BASES[it.b];
+  let keys=[];
+  if(b.slot==='ring') keys=['ring1','ring2'];
+  else keys=[b.slot];
+  for(const k of keys){
+    const el=document.querySelector('[data-eq="'+k+'"]');
+    if(el) el.classList.add('target');
+  }
+}
+function clearSlotHighlight(){
+  document.querySelectorAll('.eqslot.target').forEach(e=>e.classList.remove('target'));
 }
 function equipItem(it){
+  if(isStack(it)){ toast('Currency cannot be equipped.'); return; }
   const ch=G.ch, b=BASES[it.b];
   if(itemLevelReq(it)>ch.level){ toast('Requires level '+itemLevelReq(it)+'.'); return; }
   if(!it.idf){ toast('Identify it first.'); return; }
@@ -4696,6 +5542,15 @@ function equipItem(it){
       const off=ch.sets[ch.activeSet].offhand;
       ch.sets[ch.activeSet].offhand=null;
       if(!addToInv(off)){ ch.sets[ch.activeSet].offhand=off; toast('No room to unequip the offhand.'); return; }
+    }
+  }
+  if(slot==='offhand'){
+    /* the reverse of the check above: a two-hander leaves no hand free */
+    const w=ch.sets[ch.activeSet].weapon;
+    const wk=w?WEAPON_KINDS[BASES[w.b].kind]:null;
+    if(wk&&wk.hands===2){
+      toast('Both hands are on the '+WEAPON_KINDS[BASES[w.b].kind].name.toLowerCase()+'.');
+      return;
     }
   }
   const idx=ch.inv.indexOf(it);
@@ -4718,7 +5573,8 @@ function equipItem(it){
     }
   }
   recalc(); buildSlotUI(); markDirty();
-  toast('Equipped '+itemName(it));
+  sfx('ui');
+  toast(target? 'Equipped '+itemName(it)+', removed '+itemName(target) : 'Equipped '+itemName(it));
   renderInvBodies();
 }
 function unequipSlot(slotKey){
@@ -4741,14 +5597,18 @@ function unequipSlot(slotKey){
 function applyTool(it){
   const ch=G.ch;
   if(G.tool==='salvage'){
+    if(isStack(it)){ toast('Currency cannot be salvaged.'); return; }
     const v=salvageValue(it);
+    const ess=salvageEssence(it);
     const recovered=it.runes.filter(r=>r);
     const idx=ch.inv.indexOf(it);
     if(idx<0) return;
     ch.inv.splice(idx,1);
     giveCurrency('shard',v);
+    giveCurrency('essence',ess);
     for(const r of recovered) giveCurrency(r,1);
-    toast('Salvaged for '+v+' shards'+(recovered.length?' and '+recovered.length+' rune(s)':'')+'.');
+    sfx('craft');
+    toast('Salvaged: '+v+' shards, '+ess+' essence'+(recovered.length?', '+recovered.length+' rune(s)':'')+'.');
     markDirty(); renderInvBodies();
     return;
   }
@@ -4770,60 +5630,98 @@ function applyTool(it){
   if(!takeCurrency(G.tool,1)) { toast('You have none left.'); return; }
   const msg=c.run(it);
   toast(msg);
-  if((ch.currency[G.tool]||0)<=0) G.tool=null;
+  if(countCurrency(G.tool)<=0) G.tool=null;
   recalc(); renderInvBodies();
 }
 function clickInvItem(it){
-  if(G.tool){ applyTool(it); return; }
+  if(G.tool){
+    if(!toolApplies(it)){ toast(toolWhyNot(it)); return; }
+    applyTool(it);
+    return;
+  }
+  if(isStack(it)){
+    if(it.cur==='uncut_skill'){ openCarveMenu('skill'); return; }
+    if(it.cur==='uncut_support'){ openCarveMenu('support'); return; }
+    if(it.cur==='shard'||it.cur==='essence'){ toast(curDesc(it.cur)); return; }
+    G.tool=it.cur;
+    sfx('ui');
+    renderInvBodies();
+    return;
+  }
   equipItem(it);
 }
-function eqSlotHtml(key,label,it){
-  const cls='eqslot'+(it?' filled':'');
-  const inner=it? '<div class="it" style="color:'+RARITY_COLOR[it.r]+'">'+esc(it.idf?itemName(it):'? '+BASES[it.b].name)+'</div>' : esc(label);
-  return '<div class="'+cls+'" data-eq="'+key+'">'+inner+'</div>';
+/* ------------------------------------------------------- paper-doll layout */
+const EQ_LAYOUT=[
+  ['weapon','Weapon'],['helmet','Helmet'],['amulet','Amulet'],['offhand','Offhand'],
+  ['gloves','Gloves'],['body','Body'],['ring1','Ring'],['ring2','Ring'],
+  ['belt','Belt'],['boots','Boots']
+];
+function eqItemFor(key){
+  const ch=G.ch;
+  if(key==='weapon') return ch.sets[ch.activeSet].weapon;
+  if(key==='offhand') return ch.sets[ch.activeSet].offhand;
+  return ch.equip[key];
+}
+function twoHandEquipped(){
+  const w=G.ch.sets[G.ch.activeSet].weapon;
+  if(!w) return false;
+  const k=WEAPON_KINDS[BASES[w.b].kind];
+  return !!(k&&k.hands===2);
+}
+function eqSlotHtml(key,label){
+  const it=eqItemFor(key);
+  const blocked=(key==='offhand'&&twoHandEquipped());
+  let cls='eqslot slot-'+key+(it?' filled r'+it.r:'')+(blocked?' blocked':'');
+  const inner=it
+    ? '<div class="it" style="color:'+RARITY_COLOR[it.r]+'">'+esc(it.idf?itemName(it):'? '+BASES[it.b].name)+'</div>'
+    : '<span class="lbl">'+esc(label)+'</span>';
+  return '<div class="'+cls+'" data-eq="'+key+'">'+inner+(blocked?'<span class="x">two-handed</span>':'')+'</div>';
 }
 function renderInv(){
   const ch=G.ch;
-  const body=$('inv-body');
   let html='<div class="ptitle">Inventory</div>';
-  html+='<div class="pnote">'+esc(ch.name)+' · level '+ch.level+' '+esc(CLASSES[ch.cls].name)+'</div>';
-  html+='<div class="tabs"><button class="tab'+(ch.activeSet===0?' on':'')+'" data-set="0">Weapon Set I</button>'+
-        '<button class="tab'+(ch.activeSet===1?' on':'')+'" data-set="1">Weapon Set II</button></div>';
+  html+='<div class="pnote">Click an item to equip it, drag to move, drag out of the bag to drop.<br>'+
+    '<span style="color:#5f5b53">'+esc(ch.name)+' \u00b7 level '+ch.level+' '+esc(CLASSES[ch.cls].name)+'</span></div>';
   html+='<div class="invwrap"><div>';
-  html+='<div class="sect">Equipped</div><div class="eqgrid">';
-  html+=eqSlotHtml('weapon','Weapon',ch.sets[ch.activeSet].weapon);
-  html+=eqSlotHtml('offhand','Offhand',ch.sets[ch.activeSet].offhand);
-  html+=eqSlotHtml('helmet','Helmet',ch.equip.helmet);
-  html+=eqSlotHtml('body','Body',ch.equip.body);
-  html+=eqSlotHtml('gloves','Gloves',ch.equip.gloves);
-  html+=eqSlotHtml('boots','Boots',ch.equip.boots);
-  html+=eqSlotHtml('belt','Belt',ch.equip.belt);
-  html+=eqSlotHtml('amulet','Amulet',ch.equip.amulet);
-  html+=eqSlotHtml('ring1','Ring',ch.equip.ring1);
-  html+=eqSlotHtml('ring2','Ring',ch.equip.ring2);
+  html+='<div class="sect">Equipped</div>';
+  html+='<div class="paperdoll">';
+  html+='<div class="setrow"><button class="tab'+(ch.activeSet===0?' on':'')+'" data-set="0">Set I</button>'+
+        '<button class="tab'+(ch.activeSet===1?' on':'')+'" data-set="1">Set II</button></div>';
+  for(const [k,l] of EQ_LAYOUT) html+=eqSlotHtml(k,l);
   html+='</div>';
   html+='<div class="sect">Summary</div><div id="inv-stats"></div>';
   html+='</div><div>';
-  html+='<div class="sect">Currency &amp; tools</div><div class="row" id="tools"></div>';
-  html+='<div class="sect">Bag</div><div class="grid" id="invgrid"></div>';
-  html+='<div class="pnote" id="invhint" style="font-size:13px;margin-top:10px"></div>';
+  html+='<div class="sect">Bag</div>';
+  html+='<div class="row" style="margin-bottom:8px"><button class="tab" id="salv-btn">Salvage mode</button>'+
+        '<button class="tab" id="disarm-btn">Disarm</button></div>';
+  html+='<div class="grid" id="invgrid"></div>';
+  html+='<div class="pnote" id="invhint" style="font-size:13px;margin-top:10px;text-align:left"></div>';
   html+='</div></div>';
-  body.innerHTML=html;
+  $('inv-body').innerHTML=html;
+  const body=$('inv-body');
   body.querySelectorAll('[data-set]').forEach(b=>b.addEventListener('click',()=>{
-    ch.activeSet=+b.dataset.set; recalc(); buildSlotUI(); markDirty(); renderInv();
+    ch.activeSet=+b.dataset.set; recalc(); buildSlotUI(); markDirty(); sfx('ui'); renderInv();
   }));
   body.querySelectorAll('[data-eq]').forEach(el=>{
     const key=el.dataset.eq;
-    let it=null;
-    if(key==='weapon') it=ch.sets[ch.activeSet].weapon;
-    else if(key==='offhand') it=ch.sets[ch.activeSet].offhand;
-    else it=ch.equip[key];
-    el.addEventListener('click',()=>{ if(it&&G.tool) applyTool(it); else unequipSlot(key); });
+    const it=eqItemFor(key);
+    el.addEventListener('click',()=>{
+      if(it&&G.tool){
+        if(!toolApplies(it)){ toast(toolWhyNot(it)); return; }
+        applyTool(it);
+      } else if(it) unequipSlot(key);
+    });
+    el.addEventListener('contextmenu',ev=>{ ev.preventDefault(); if(it) unequipSlot(key); });
     if(it){
-      el.addEventListener('pointerenter',ev=>showTip(it,ev.clientX,ev.clientY,'Click to unequip'));
+      el.addEventListener('pointerenter',ev=>tipFor(it,ev.clientX,ev.clientY,
+        G.tool?gridHint(it):'Click to unequip'));
       el.addEventListener('pointerleave',hideTip);
     }
   });
+  $('salv-btn').addEventListener('click',()=>{
+    G.tool=G.tool==='salvage'?null:'salvage'; sfx('ui'); renderInvBodies();
+  });
+  $('disarm-btn').addEventListener('click',()=>{ G.tool=null; sfx('ui'); renderInvBodies(); });
   renderInvBodies();
 }
 function renderInvBodies(){
@@ -4831,39 +5729,17 @@ function renderInvBodies(){
   if(G.panel!=='inv'&&G.panel!=='npc') return;
   const grid=$('invgrid');
   if(grid) renderGrid(grid,ch.inv,INV_W,INV_H,clickInvItem);
-  const tools=$('tools');
-  if(tools){
-    let html='';
-    for(const k of CURRENCY_KEYS){
-      const n=ch.currency[k]||0;
-      if(!n) continue;
-      if(k==='uncut_skill'||k==='uncut_support'||k==='shard'){
-        html+='<button class="tab" data-info="'+k+'">'+esc(CURRENCY[k].name)+' '+n+'</button>';
-      } else {
-        html+='<button class="tab'+(G.tool===k?' on':'')+'" data-tool="'+k+'">'+esc(CURRENCY[k].name)+' '+n+'</button>';
-      }
-    }
-    for(const k of RUNE_KEYS){
-      const n=ch.currency[k]||0;
-      if(!n) continue;
-      html+='<button class="tab'+(G.tool===k?' on':'')+'" data-tool="'+k+'">'+esc(RUNES[k].name)+' '+n+'</button>';
-    }
-    html+='<button class="tab'+(G.tool==='salvage'?' on':'')+'" data-tool="salvage">Salvage</button>';
-    tools.innerHTML=html;
-    tools.querySelectorAll('[data-tool]').forEach(b=>b.addEventListener('click',()=>{
-      G.tool = G.tool===b.dataset.tool? null : b.dataset.tool;
-      renderInvBodies();
-    }));
-    tools.querySelectorAll('[data-info]').forEach(b=>b.addEventListener('click',()=>{
-      toast(CURRENCY[b.dataset.info].desc);
-    }));
-  }
+  const salv=$('salv-btn');
+  if(salv) salv.classList.toggle('on',G.tool==='salvage');
+  const dis=$('disarm-btn');
+  if(dis) dis.style.display=G.tool?'inline-block':'none';
   const hint=$('invhint');
   if(hint){
-    hint.textContent = G.tool
-      ? (G.tool==='salvage'?'Salvage armed — click an item to break it down.'
-        : (RUNES[G.tool]?RUNES[G.tool].name:CURRENCY[G.tool].name)+' armed — click an item to apply it.')
-      : 'Click an item to equip it, drag to rearrange. Hover for a full comparison.';
+    hint.innerHTML = G.tool
+      ? (G.tool==='salvage'
+          ? 'Salvage armed. Click gear to break it down for shards, essence and its runes. Dimmed items cannot be salvaged.'
+          : '<b style="color:#c8a96e">'+esc(curLabel(G.tool))+'</b> armed. Click a valid item; dimmed items cannot take it. Escape or right-click to disarm.')
+      : 'Currency sits in the bag as stacks. Click a stack to arm it, then click the item to use it on.';
   }
   const stats=$('inv-stats');
   if(stats){
@@ -4872,7 +5748,15 @@ function renderInvBodies(){
       kv('Life',Math.round(st.maxLife))+kv('Mana',Math.round(st.maxMana))+
       (st.maxES?kv('Energy shield',Math.round(st.maxES)):'')+
       kv('Armour',st.armour)+kv('Evasion',st.evasion)+
-      kv('Spirit',st.spiritUsed+' / '+st.spiritMax);
+      kv('Spirit',st.spiritUsed+' / '+st.spiritMax)+
+      kv('Shards',countCurrency('shard'))+kv('Essence',countCurrency('essence'));
+  }
+  const eq=$('inv-body');
+  if(eq&&G.panel==='inv'){
+    eq.querySelectorAll('[data-eq]').forEach(el=>{
+      const it=eqItemFor(el.dataset.eq);
+      el.classList.toggle('dim',!!(G.tool&&it&&!toolApplies(it)));
+    });
   }
 }
 function kv(k,v){ return '<div class="kv"><span>'+esc(k)+'</span><span>'+esc(v)+'</span></div>'; }
@@ -4907,80 +5791,100 @@ function unbindSlot(slot){
 function socketSupport(gemIdx,sockIdx,supKey){
   const ch=G.ch;
   if(supKey){
-    const used=supportUsedBy(ch,supKey);
-    if(used>=0&&used!==gemIdx){ toast(SUPPORTS[supKey].name+' is already used by '+GEMS[ch.gems[used].gem].name+'.'); return; }
     const gem=GEMS[ch.gems[gemIdx].gem];
     const allow=SUPPORTS[supKey].allow;
     if(allow!=='any'&&gem.tags.indexOf(allow)<0){
       toast(SUPPORTS[supKey].name+' only supports '+allow+' skills.');
       return;
     }
+    const used=supportUsedBy(ch,supKey);
+    if(used>=0&&used!==gemIdx){
+      /* uniqueness holds, but taking it is one click: pull it out of the other skill */
+      const from=ch.gems[used];
+      from.sockets[from.sockets.indexOf(supKey)]=null;
+      toast(SUPPORTS[supKey].name+' moved from '+GEMS[from.gem].name+'.');
+    }
   }
   ch.gems[gemIdx].sockets[sockIdx]=supKey;
   markDirty(); recalc(); buildSlotUI(); renderSkills();
 }
+function gemLevelCap(def){ return Math.max(1,Math.min(20,G.ch.level-(def.lvlReq-1))); }
+function gemUpCost(level){ return 1+Math.floor(level/4); }
+function raiseGem(idx){
+  const ch=G.ch, g=ch.gems[idx], def=GEMS[g.gem];
+  const cap=gemLevelCap(def);
+  if(g.level>=cap){ toast(def.name+' is capped at gem level '+cap+' until you level up.'); return; }
+  const cost=gemUpCost(g.level);
+  if(countCurrency('uncut_skill')<cost){
+    toast('Raising '+def.name+' costs '+cost+' uncut skill gems. You have '+countCurrency('uncut_skill')+'.');
+    return;
+  }
+  takeCurrency('uncut_skill',cost);
+  g.level++;
+  recalc(); buildSlotUI(); markDirty(); sfx('craft');
+  toast(def.name+' is now gem level '+g.level+'.');
+  renderSkills();
+}
+/* the carve menus, reachable from the skills panel and from an uncut stack */
+function openCarveMenu(kind){
+  const ch=G.ch;
+  if(G.panel!=='skills') openPanel('skills');
+  G.carve=kind;
+  renderSkills();
+  const el=$('skills-body');
+  const anchor=el.querySelector('#carve-'+kind);
+  if(anchor) anchor.scrollIntoView({block:'center'});
+}
+function gemIsNew(key){
+  const ch=G.ch;
+  return GEMS[key].lvlReq<=ch.level && (!ch.seenGems||ch.seenGems.indexOf(key)<0) && !ownsGem(key);
+}
+function markGemsSeen(){
+  const ch=G.ch;
+  if(!ch.seenGems) ch.seenGems=[];
+  let added=false;
+  for(const k of GEM_KEYS) if(GEMS[k].lvlReq<=ch.level&&ch.seenGems.indexOf(k)<0){ ch.seenGems.push(k); added=true; }
+  if(added) markDirty();
+}
 function renderSkills(){
   const ch=G.ch,st=G.st;
   let html='<div class="ptitle">Skills</div>';
-  html+='<div class="pnote">Gems are self-contained. Each support may be used by only one skill in the whole build.</div>';
+  html+='<div class="pnote">Gems are self-contained: each carries its own support sockets. '+
+    'A support gem can only be used by one skill in the whole build.<br>'+
+    '<span style="color:#5f5b53">Hover anything here for its full numbers.</span></div>';
   html+='<div class="tabs"><button class="tab'+(ch.activeSet===0?' on':'')+'" data-set="0">Weapon Set I</button>'+
         '<button class="tab'+(ch.activeSet===1?' on':'')+'" data-set="1">Weapon Set II</button></div>';
   html+='<div class="summary" style="max-width:520px;margin:0 auto">'+
     kv('Spirit reserved',st.spiritUsed+' / '+st.spiritMax)+
-    kv('Uncut skill gems',ch.currency.uncut_skill||0)+
-    kv('Uncut support gems',ch.currency.uncut_support||0)+'</div>';
+    kv('Uncut skill gems',countCurrency('uncut_skill'))+
+    kv('Uncut support gems',countCurrency('uncut_support'))+'</div>';
 
-  /* carving menus */
-  const skillCands=GEM_KEYS.filter(k=>GEMS[k].lvlReq<=ch.level&&!ownsGem(k));
-  html+='<div class="sect">Carve an uncut skill gem</div>';
-  if(!(ch.currency.uncut_skill>0)) html+='<div class="pnote" style="text-align:left;font-size:14px">No uncut skill gems. They drop in the rift and the quartermaster sells them.</div>';
-  else if(!skillCands.length) html+='<div class="pnote" style="text-align:left;font-size:14px">You already know every skill your level allows.</div>';
-  else {
-    for(const k of skillCands){
-      const d=GEMS[k];
-      html+='<button class="pick" data-carve="'+k+'"><div class="nm">'+esc(d.name)+
-        ' <span class="tag">'+esc(d.type.replace('_',' '))+'</span>'+
-        (d.spirit?' <span class="tag">'+d.spirit+' spirit</span>':'')+'</div>'+
-        '<div class="ds">'+esc(d.desc)+'</div>'+
-        '<div class="mc">'+esc(gemSummary(d))+'</div></button>';
-    }
-  }
-  const supCands=SUPPORT_KEYS.filter(k=>ch.supports.indexOf(k)<0);
-  html+='<div class="sect">Carve an uncut support gem</div>';
-  if(!(ch.currency.uncut_support>0)) html+='<div class="pnote" style="text-align:left;font-size:14px">No uncut support gems.</div>';
-  else if(!supCands.length) html+='<div class="pnote" style="text-align:left;font-size:14px">You own every support gem.</div>';
-  else {
-    for(const k of supCands){
-      const s=SUPPORTS[k];
-      html+='<button class="pick" data-carvesup="'+k+'"><div class="nm">'+esc(s.name)+
-        ' <span class="tag">'+esc(s.allow)+'</span></div><div class="ds">'+esc(s.desc)+'</div>'+
-        '<div class="mc">mana multiplier x'+s.manaMult.toFixed(2)+'</div></button>';
-    }
-  }
-
-  /* owned gems */
+  /* ---- owned gems first: this is the panel's real content ---- */
   html+='<div class="sect">Your gems</div>';
   ch.gems.forEach((g,i)=>{
     const d=GEMS[g.gem];
     const sk=skillStats(g,i);
     const bound=ch.loadout[ch.activeSet].indexOf(i);
-    html+='<div class="gemcard'+(bound>=0?' on':'')+'">';
+    const cap=gemLevelCap(d);
+    html+='<div class="gemcard'+(bound>=0?' on':'')+'" data-gem="'+i+'">';
     html+='<div class="hd"><span class="nm">'+esc(d.name)+'</span>'+
       '<span class="tag '+(sk.isAttack?'att':'spell')+'">'+esc(d.type.replace('_',' '))+'</span>'+
-      '<span class="tag">level '+sk.lvl+'</span>'+
+      '<span class="tag">gem level '+g.level+' / '+cap+'</span>'+
       (d.combo?'<span class="tag combo">combo '+d.combo+'</span>':'')+
       (d.spirit?'<span class="tag">'+d.spirit+' spirit</span>':'')+
       (ch.auras[i]?'<span class="tag combo">active</span>':'')+'</div>';
-    html+='<div class="ds">'+esc(d.desc)+'</div>';
+    html+='<div class="mh">'+esc(d.mech||'')+'</div>';
     html+='<div class="mc">'+esc(skillSummary(sk))+'</div>';
+    html+='<div class="ds">'+esc(d.desc)+'</div>';
     if(!sk.usable) html+='<div class="mc" style="color:#b4685f">'+esc(sk.reason)+'</div>';
     html+='<div class="socks">';
-    for(let s=0;s<5;s++){
-      const unlocked=s<sk.nSock;
-      const cur=g.sockets[s];
+    for(let so=0;so<5;so++){
+      const unlocked=so<sk.nSock;
+      const cur=g.sockets[so];
       html+='<button class="sock'+(cur?' filled':'')+(unlocked?'':' locked')+'"'+
-        (unlocked?' data-sock="'+i+':'+s+'"':' disabled')+'>'+
-        (cur?esc(SUPPORTS[cur].name):(unlocked?'empty socket':'locked at gem '+SOCK_LADDER[s]))+'</button>';
+        (unlocked?' data-sock="'+i+':'+so+'"':' disabled')+
+        (cur?' data-suptip="'+cur+':'+i+'"':'')+'>'+
+        (cur?esc(SUPPORTS[cur].name):(unlocked?'empty socket':'locked at gem '+SOCK_LADDER[so]))+'</button>';
     }
     html+='</div>';
     if(d.type==='meta'){
@@ -4995,12 +5899,39 @@ function renderSkills(){
     if(d.type==='aura'||d.type==='meta'){
       html+='<button class="bind'+(ch.auras[i]?' on':'')+'" data-aura="'+i+'">'+(ch.auras[i]?'Deactivate':'Activate')+'</button>';
     }
-    for(let s=0;s<5;s++){
-      html+='<button class="bind'+(bound===s?' on':'')+'" data-bind="'+i+':'+s+'">'+SKILL_KEYS[s]+'</button>';
+    for(let so=0;so<5;so++){
+      html+='<button class="bind'+(bound===so?' on':'')+'" data-bind="'+i+':'+so+'">'+SKILL_KEYS[so]+'</button>';
     }
     if(bound>=0) html+='<button class="bind" data-unbind="'+bound+'">clear</button>';
+    html+='<button class="bind" data-raise="'+i+'">Raise gem \u2014 '+gemUpCost(g.level)+' uncut</button>';
     html+='</div></div>';
   });
+
+  /* ---- carving ---- */
+  const skillCands=GEM_KEYS.filter(k=>GEMS[k].lvlReq<=ch.level&&!ownsGem(k));
+  html+='<div class="sect" id="carve-skill">Carve an uncut skill gem  \u00b7  '+countCurrency('uncut_skill')+' held</div>';
+  if(!countCurrency('uncut_skill')) html+='<div class="pnote" style="text-align:left;font-size:14px">None held. They drop in the rift and the quartermaster sells them.</div>';
+  else if(!skillCands.length) html+='<div class="pnote" style="text-align:left;font-size:14px">You already know every skill your level allows.</div>';
+  else for(const k of skillCands){
+    const d=GEMS[k];
+    html+='<button class="pick" data-carve="'+k+'" data-gemtip="'+k+'"><div class="nm">'+esc(d.name)+
+      (gemIsNew(k)?' <span class="tag combo">NEW</span>':'')+
+      ' <span class="tag">'+esc(d.type.replace('_',' '))+'</span>'+
+      (d.spirit?' <span class="tag">'+d.spirit+' spirit</span>':'')+'</div>'+
+      '<div class="mh">'+esc(d.mech||'')+'</div>'+
+      '<div class="mc">'+esc(gemSummary(d))+'</div>'+
+      '<div class="ds">'+esc(d.desc)+'</div></button>';
+  }
+  const supCands=SUPPORT_KEYS.filter(k=>ch.supports.indexOf(k)<0);
+  html+='<div class="sect" id="carve-support">Carve an uncut support gem  \u00b7  '+countCurrency('uncut_support')+' held</div>';
+  if(!countCurrency('uncut_support')) html+='<div class="pnote" style="text-align:left;font-size:14px">None held.</div>';
+  else if(!supCands.length) html+='<div class="pnote" style="text-align:left;font-size:14px">You own every support gem.</div>';
+  else for(const k of supCands){
+    const sp=SUPPORTS[k];
+    html+='<button class="pick" data-carvesup="'+k+'" data-suptip="'+k+':-1"><div class="nm">'+esc(sp.name)+
+      ' <span class="tag">'+esc(sp.allow)+'</span></div><div class="mh">'+esc(sp.desc)+'</div>'+
+      '<div class="mc">'+pctText(sp.manaMult,'mana cost')+'</div></button>';
+  }
   $('skills-body').innerHTML=html;
   const b=$('skills-body');
   b.querySelectorAll('[data-set]').forEach(el=>el.addEventListener('click',()=>{
@@ -5009,10 +5940,10 @@ function renderSkills(){
   b.querySelectorAll('[data-carve]').forEach(el=>el.addEventListener('click',()=>carveSkill(el.dataset.carve)));
   b.querySelectorAll('[data-carvesup]').forEach(el=>el.addEventListener('click',()=>carveSupport(el.dataset.carvesup)));
   b.querySelectorAll('[data-bind]').forEach(el=>el.addEventListener('click',()=>{
-    const [gi,s]=el.dataset.bind.split(':').map(Number);
-    bindSkill(gi,s);
+    const [gi,so]=el.dataset.bind.split(':').map(Number); bindSkill(gi,so);
   }));
   b.querySelectorAll('[data-unbind]').forEach(el=>el.addEventListener('click',()=>unbindSlot(+el.dataset.unbind)));
+  b.querySelectorAll('[data-raise]').forEach(el=>el.addEventListener('click',()=>raiseGem(+el.dataset.raise)));
   b.querySelectorAll('[data-aura]').forEach(el=>el.addEventListener('click',()=>{
     toggleAura(+el.dataset.aura); renderSkills();
   }));
@@ -5025,6 +5956,32 @@ function renderSkills(){
     const [gi,si]=el.dataset.sock.split(':').map(Number);
     openSocketPicker(gi,si);
   }));
+  /* hover: gems, sockets, supports and carve buttons all explain themselves */
+  b.querySelectorAll('[data-gem]').forEach(el=>{
+    const i=+el.dataset.gem;
+    el.addEventListener('pointermove',ev=>{
+      if(ev.target.closest('[data-suptip],[data-sock],.bind')) return;
+      showTipHtml(gemTipHtml(ch.gems[i],i),ev.clientX,ev.clientY);
+    });
+    el.addEventListener('pointerleave',hideTip);
+  });
+  b.querySelectorAll('[data-gemtip]').forEach(el=>{
+    el.addEventListener('pointerenter',ev=>showTipHtml(gemDefTipHtml(el.dataset.gemtip),ev.clientX,ev.clientY));
+    el.addEventListener('pointerleave',hideTip);
+  });
+  b.querySelectorAll('[data-suptip]').forEach(el=>{
+    const [k,gi]=el.dataset.suptip.split(':');
+    el.addEventListener('pointerenter',ev=>showTipHtml(supportTipHtml(k,+gi),ev.clientX,ev.clientY));
+    el.addEventListener('pointerleave',hideTip);
+  });
+  b.querySelectorAll('[data-sock]').forEach(el=>{
+    el.addEventListener('pointerenter',ev=>{
+      if(el.dataset.suptip) return;
+      showTipHtml('<div class="tnm">Empty support socket</div><div class="mod">Click to choose a support gem for this skill.</div>',ev.clientX,ev.clientY);
+    });
+    el.addEventListener('pointerleave',hideTip);
+  });
+  markGemsSeen();
 }
 function gemSummary(d){
   const bits=[d.type.replace('_',' ')];
@@ -5055,21 +6012,24 @@ function openSocketPicker(gemIdx,sockIdx){
   const ch=G.ch;
   const gem=GEMS[ch.gems[gemIdx].gem];
   let html='<div class="ptitle">Support socket</div>';
-  html+='<div class="pnote">'+esc(gem.name)+' · socket '+(sockIdx+1)+
-    '<br>A support gem can only be used by one skill at a time.</div>';
-  html+='<button class="pick" data-set-sup="">'+'<div class="nm">Empty the socket</div></button>';
+  html+='<div class="pnote">'+esc(gem.name)+' \u00b7 socket '+(sockIdx+1)+
+    '<br>A support gem lives in one skill at a time. Taking one moves it.</div>';
+  html+='<button class="pick" data-set-sup=""><div class="nm">Empty the socket</div></button>';
   if(!ch.supports.length) html+='<div class="pnote" style="text-align:left">You own no support gems yet.</div>';
   for(const k of ch.supports){
-    const s=SUPPORTS[k];
+    const sp=SUPPORTS[k];
     const used=supportUsedBy(ch,k);
-    const wrongTag=s.allow!=='any'&&gem.tags.indexOf(s.allow)<0;
+    const wrongTag=sp.allow!=='any'&&gem.tags.indexOf(sp.allow)<0;
     const busy=used>=0&&used!==gemIdx;
-    html+='<button class="pick" data-set-sup="'+k+'"'+((busy||wrongTag)?' disabled':'')+'>'+
-      '<div class="nm">'+esc(s.name)+' <span class="tag">'+esc(s.allow)+'</span></div>'+
-      '<div class="ds">'+esc(s.desc)+'</div>'+
-      '<div class="mc">'+(busy?'in use by '+esc(GEMS[ch.gems[used].gem].name)
-        : wrongTag? 'this skill is not '+esc(s.allow)
-        : 'mana multiplier x'+s.manaMult.toFixed(2))+'</div></button>';
+    /* conflicts stay clickable: one click steals the support */
+    html+='<button class="pick'+(wrongTag?' bad':'')+'" data-set-sup="'+k+'"'+(wrongTag?' disabled':'')+
+      ' data-suptip="'+k+':'+gemIdx+'">'+
+      '<div class="nm">'+esc(sp.name)+' <span class="tag">'+esc(sp.allow)+'</span>'+
+      (busy?' <span class="tag" style="color:#c07a70">in '+esc(GEMS[ch.gems[used].gem].name)+'</span>':'')+'</div>'+
+      '<div class="mh">'+esc(sp.desc)+'</div>'+
+      '<div class="mc">'+(wrongTag? 'This skill is not '+esc(sp.allow)
+        : busy? 'Click to move it here from '+esc(GEMS[ch.gems[used].gem].name)
+        : pctText(sp.manaMult,'mana cost'))+'</div></button>';
   }
   html+='<div class="row c"><button class="btn sm ghost" id="sock-back">Back</button></div>';
   $('skills-body').innerHTML=html;
@@ -5077,6 +6037,11 @@ function openSocketPicker(gemIdx,sockIdx){
   b.querySelectorAll('[data-set-sup]').forEach(el=>el.addEventListener('click',()=>{
     socketSupport(gemIdx,sockIdx,el.dataset.setSup||null);
   }));
+  b.querySelectorAll('[data-suptip]').forEach(el=>{
+    const [k,gi]=el.dataset.suptip.split(':');
+    el.addEventListener('pointerenter',ev=>showTipHtml(supportTipHtml(k,+gi),ev.clientX,ev.clientY));
+    el.addEventListener('pointerleave',hideTip);
+  });
   $('sock-back').addEventListener('click',renderSkills);
 }
 
@@ -5113,7 +6078,7 @@ function renderSheet(){
     '<div class="sect">Resistances</div>'+
     kv('Fire',st.res.fire+'%')+kv('Cold',st.res.cold+'%')+
     kv('Lightning',st.res.lightning+'%')+kv('Chaos',st.res.chaos+'%')+
-    (st.zoneRes?'<div class="pnote" style="text-align:left;font-size:13px">This zone applies a '+st.zoneRes+'% resistance penalty.</div>':'')+
+    kv('Depth penalty',st.zoneRes?st.zoneRes+'% to all':'none')+
     '</div>';
   html+='<div><div class="sect">Offence</div>'+
     kv('Best skill DPS',Math.round(dps))+
@@ -5124,6 +6089,30 @@ function renderSheet(){
     kv('Cast speed',st.cspd.toFixed(2)+'x')+
     kv('Accuracy',st.accuracy)+
     kv('Movement',Math.round(st.moveSpeed))+
+    '</div>';
+  html+='</div>';
+  html+='<div class="cols">';
+  html+='<div><div class="sect">Ailment buildup you apply</div>'+
+    kv('Stun',Math.round(st.build.stun*100)+'%')+
+    kv('Freeze',Math.round(st.build.freeze*100)+'%')+
+    kv('Ignite',Math.round(st.build.ignite*100)+'%')+
+    kv('Shock',Math.round(st.build.shock*100)+'%')+
+    kv('Poison',Math.round(st.build.poison*100)+'%')+
+    kv('Bleed',Math.round(st.build.bleed*100)+'%')+
+    kv('Stun taken',Math.round(st.stunTaken*100)+'%')+
+    '</div>';
+  html+='<div><div class="sect">Spirit reserved</div>';
+  if(!st.spiritBreak||!st.spiritBreak.length) html+='<div class="pnote" style="text-align:left;font-size:14px">Nothing reserved. '+st.spiritMax+' spirit free.</div>';
+  else {
+    for(const r of st.spiritBreak) html+=kv(r.name,r.cost);
+    html+=kv('Free',st.spiritMax-st.spiritUsed);
+  }
+  html+='</div>';
+  html+='<div><div class="sect">Flasks</div>'+
+    kv('Life flasks',p.flask.life+' / '+ch.flasks.life)+
+    kv('Mana flasks',p.flask.mana+' / '+ch.flasks.mana)+
+    kv('Next life charge',Math.round(clamp(p.flaskCharge.life/(90+ch.level*14),0,1)*100)+'%')+
+    kv('Next mana charge',Math.round(clamp(p.flaskCharge.mana/(90+ch.level*14),0,1)*100)+'%')+
     '</div>';
   html+='</div>';
   const keys=Object.keys(st.keys);
@@ -5171,7 +6160,7 @@ function allocate(id){
     return;
   }
   ch.passives[id]=G.tree.set;   /* 0 = both sets, 1 = set I, 2 = set II */
-  recalc(); buildSlotUI(); markDirty();
+  recalc(); buildSlotUI(); markDirty(); updatePointBadge(); treeDirty();
   const n=TREE.nodes[id];
   toast('Allocated '+n.name+(G.tree.set?' ('+(G.tree.set===1?'set I':'set II')+' only)':''));
   renderTreeUI();
@@ -5181,10 +6170,10 @@ function respecAll(){
   const n=pointsSpent(ch);
   if(!n){ toast('Nothing to refund.'); return; }
   const cost=n*RESPEC_COST;
-  if((ch.currency.shard||0)<cost){ toast('A full respec costs '+cost+' salvage shards. You have '+(ch.currency.shard||0)+'.'); return; }
+  if(countCurrency('shard')<cost){ toast('A full respec costs '+cost+' shards. You have '+countCurrency('shard')+'.'); return; }
   takeCurrency('shard',cost);
   ch.passives={};
-  recalc(); buildSlotUI(); markDirty();
+  recalc(); buildSlotUI(); markDirty(); updatePointBadge(); treeDirty();
   toast('Refunded '+n+' passive points for '+cost+' shards.');
   renderTreeUI();
 }
@@ -5193,6 +6182,8 @@ function renderTreeUI(){
   const left=charPoints(ch)-pointsSpent(ch);
   $('tree-pts').textContent=left+' / '+charPoints(ch)+' POINTS';
   $('tree-set').textContent=G.tree.set===0?'BOTH SETS':(G.tree.set===1?'SET I ONLY':'SET II ONLY');
+  const fb=$('tree-filter');
+  if(fb) fb.classList.toggle('on',!!G.tree.filterSet);
   const info=$('treeinfo');
   const sel=G.tree.sel&&TREE.nodes[G.tree.sel];
   if(sel){
@@ -5202,14 +6193,15 @@ function renderTreeUI(){
       if(k==='keystone') continue;
       lines.push(statLine(k,sel.st[k]));
     }
-    if(sel.st.keystone) lines.push(KEYSTONES[sel.st.keystone].text);
-    if(lines.length) html+='<div class="st">'+esc(lines.join(' · '))+'</div>';
-    if(sel.desc) html+='<div class="ds">'+esc(sel.desc)+'</div>';
+    if(lines.length) html+='<div class="st">'+esc(lines.join('  ·  '))+'</div>';
+    if(sel.st.keystone) html+='<div class="st" style="color:#e0c070">'+esc(KEYSTONES[sel.st.keystone].text)+'</div>';
+    if(!lines.length&&!sel.st.keystone) html+='<div class="st">Class starting point.</div>';
     if(isAllocated(sel.id)){
       const m=ch.passives[sel.id];
-      html+='<div class="ds">Allocated'+(m?' — '+(m===1?'weapon set I only':'weapon set II only'):' for both weapon sets')+'.</div>';
-    } else if(canAllocate(sel.id)) html+='<div class="ds" style="color:#8fd08a">Tap again to allocate.</div>';
-    else html+='<div class="ds" style="color:#b4685f">Not reachable yet.</div>';
+      html+='<div class="st" style="color:#8fd08a">Allocated'+(m?' — weapon set '+(m===1?'I':'II')+' only':' for both weapon sets')+'.</div>';
+    } else if(canAllocate(sel.id)) html+='<div class="st" style="color:#8fd08a">Tap again to allocate.</div>';
+    else html+='<div class="st" style="color:#b4685f">Not connected to anything you have taken.</div>';
+    if(sel.desc&&!sel.st.keystone) html+='<div class="ds">'+esc(sel.desc)+'</div>';
     info.innerHTML=html;
     info.classList.add('on');
   } else info.classList.remove('on');
@@ -5232,8 +6224,11 @@ function nodeAtScreen(sx,sy){
   const rr=(best&&best.type==='keystone')?30:best&&best.type==='notable'?22:16;
   return bd<=(rr+10)*(rr+10)?best:null;
 }
+function treeDirty(){ G.tree.dirty=true; }
 function renderTree(){
   const dpr=G.view.dpr,w=G.view.w,h=G.view.h,t=G.tree;
+  if(!t.dirty) return;      /* only redraw when something actually changed */
+  t.dirty=false;
   treectx.setTransform(dpr,0,0,dpr,0,0);
   treectx.fillStyle='#06060a';
   treectx.fillRect(0,0,w,h);
@@ -5241,24 +6236,23 @@ function renderTree(){
   const search=t.search.toLowerCase();
   /* links first */
   treectx.lineWidth=Math.max(1,2*t.z);
-  const drawn=new Set();
-  for(const n of TREE.list){
-    const a=treeToScreen(n);
-    for(const id of n.adj){
-      const key=n.id<id?n.id+'|'+id:id+'|'+n.id;
-      if(drawn.has(key)) continue;
-      drawn.add(key);
-      const o=TREE.nodes[id];
-      const b=treeToScreen(o);
-      const both=(isAllocated(n.id)||isStartNode(n.id))&&(isAllocated(id)||isStartNode(id));
-      treectx.strokeStyle=both?'rgba(200,169,110,.55)':'rgba(255,255,255,.07)';
-      treectx.beginPath(); treectx.moveTo(a.x,a.y); treectx.lineTo(b.x,b.y); treectx.stroke();
-    }
+  for(const pair of TREE.links){
+    const a=treeToScreen(pair[0]), b=treeToScreen(pair[1]);
+    if((a.x<-40&&b.x<-40)||(a.y<-40&&b.y<-40)||(a.x>w+40&&b.x>w+40)||(a.y>h+40&&b.y>h+40)) continue;
+    const both=(isAllocated(pair[0].id)||isStartNode(pair[0].id))&&
+               (isAllocated(pair[1].id)||isStartNode(pair[1].id));
+    treectx.strokeStyle=both?'rgba(200,169,110,.55)':'rgba(255,255,255,.07)';
+    treectx.beginPath(); treectx.moveTo(a.x,a.y); treectx.lineTo(b.x,b.y); treectx.stroke();
   }
   for(const n of TREE.list){
     const s=treeToScreen(n);
     if(s.x<-60||s.y<-60||s.x>w+60||s.y>h+60) continue;
     const alloc=isAllocated(n.id), start=n.type==='start';
+    /* an allocation that belongs to the other weapon set is dimmed, or
+       hidden entirely when the filter is on */
+    const setTag=alloc?ch.passives[n.id]:0;
+    const otherSet=alloc&&setTag&&setTag!==(ch.activeSet+1);
+    if(otherSet&&t.filterSet) continue;
     const mine=start&&isStartNode(n.id);
     let r = n.type==='keystone'?15:n.type==='notable'?11:7;
     if(start) r=17;
@@ -5270,8 +6264,9 @@ function renderTree(){
       treectx.drawImage(glowSprite('#8fd08a'),s.x-r*3,s.y-r*3,r*6,r*6);
       treectx.globalAlpha=1;
     }
+    if(otherSet) treectx.globalAlpha=0.42;
     if(alloc||mine){
-      treectx.globalAlpha=.8;
+      treectx.globalAlpha=(otherSet?0.35:0.8);
       treectx.drawImage(glowSprite(n.type==='keystone'?'#e0c070':'#c8a96e'),s.x-r*2.6,s.y-r*2.6,r*5.2,r*5.2);
       treectx.globalAlpha=1;
     }
@@ -5285,9 +6280,10 @@ function renderTree(){
       : canAllocate(n.id)? 'rgba(200,169,110,.3)' : 'rgba(255,255,255,.13)';
     treectx.fill();
     treectx.strokeStyle = G.tree.sel===n.id? '#ffffff'
-      : alloc? 'rgba(255,255,255,.5)' : 'rgba(255,255,255,.14)';
+      : alloc? (otherSet?'rgba(255,255,255,.22)':'rgba(255,255,255,.5)') : 'rgba(255,255,255,.14)';
     treectx.lineWidth=G.tree.sel===n.id?2.4:1.2;
     treectx.stroke();
+    treectx.globalAlpha=1;
     /* set-specific allocations get a marker */
     if(alloc&&ch.passives[n.id]){
       treectx.fillStyle='#06060a';
@@ -5359,6 +6355,7 @@ function renderMenu(){
   html+='<button class="btn ghost" id="m-skills">Skills</button>';
   html+='<button class="btn ghost" id="m-tree">Passive Tree</button>';
   html+='<button class="btn ghost" id="m-sheet">Character</button>';
+  html+='<button class="btn ghost" id="m-sound">Sound: '+(SND.on?'On':'Off')+'</button>';
   html+='<button class="btn ghost" id="m-exit">Save and Leave</button>';
   $('menu-body').innerHTML=html;
   $('m-resume').addEventListener('click',closePanel);
@@ -5366,31 +6363,12 @@ function renderMenu(){
   $('m-skills').addEventListener('click',()=>openPanel('skills'));
   $('m-tree').addEventListener('click',()=>openPanel('tree'));
   $('m-sheet').addEventListener('click',()=>openPanel('sheet'));
+  $('m-sound').addEventListener('click',()=>{ sndResume(); setSound(!SND.on); renderMenu(); });
   $('m-exit').addEventListener('click',()=>{
     flushSave();
     G.running=false; closePanel();
     showScreen('select'); renderSelect();
   });
-}
-function renderLevel(){
-  const ch=G.ch;
-  const left=charPoints(ch)-pointsSpent(ch);
-  let html='<div class="ptitle">Level '+ch.level+'</div>';
-  html+='<div class="pnote">'+(G.pendingLevel>1?G.pendingLevel+' levels gained. ':'')+
-    'You have '+left+' passive point'+(left===1?'':'s')+' to spend.</div>';
-  html+='<div class="summary">'+kv('Life',Math.round(G.st.maxLife))+kv('Mana',Math.round(G.st.maxMana))+
-    kv('Spirit',G.st.spiritUsed+' / '+G.st.spiritMax)+'</div>';
-  const newGems=GEM_KEYS.filter(k=>GEMS[k].lvlReq===ch.level);
-  if(newGems.length){
-    html+='<div class="sect">Newly carvable with an uncut gem</div>';
-    for(const k of newGems) html+='<div class="card"><div class="nm">'+esc(GEMS[k].name)+
-      '</div><div class="ds">'+esc(GEMS[k].desc)+'</div></div>';
-  }
-  html+='<button class="btn" id="lv-tree">Open the Passive Tree</button>';
-  html+='<button class="btn ghost" id="lv-close">Later</button>';
-  $('level-body').innerHTML=html;
-  $('lv-tree').addEventListener('click',()=>{ G.pendingLevel=0; openPanel('tree'); });
-  $('lv-close').addEventListener('click',()=>{ G.pendingLevel=0; closePanel(); });
 }
 function renderDeath(){
   const ch=G.ch;
@@ -5420,21 +6398,199 @@ function renderNpc(){
   if(!npc) return;
   if(npc.kind==='vendor') renderVendor(npc);
   else if(npc.kind==='stash') renderStash(npc);
+  else if(npc.kind==='bench') renderBench(npc);
+  else if(npc.kind==='mirror') renderMirror(npc);
   else renderWaypoint(npc);
 }
+/* every fixture panel opens by saying what you can do here */
+function npcHeader(npc){
+  return '<div class="ptitle">'+esc(npc.name)+'</div>'+
+    '<div class="pnote"><span style="color:#9db4d4">'+esc(npc.mech||'')+'</span><br>'+
+    '<span style="font-style:italic">'+esc(npc.line||'')+'</span></div>';
+}
+
+/* ----------------------------------------------------- the crafting bench */
+function benchOutcome(key,it){
+  const why=(function(){ const t=G.tool; G.tool=key; const w=toolWhyNot(it); G.tool=t; return w; })();
+  if(why) return {ok:false,text:why};
+  const map={
+    wisdom:'Reveals the item\u2019s modifiers.',
+    transmute:'Normal to magic, adding one modifier.',
+    augment:'Adds a second modifier to this magic item.',
+    regal:'Magic to rare, keeping both modifiers and adding a third.',
+    exalted:'Adds one more modifier ('+(it.pre.length+it.suf.length)+' of 6 used).',
+    chaos:'Removes one modifier at random and adds a different one.',
+    divine:'Rerolls the numbers on every modifier, within their existing ranges.',
+    vaal:'Corrupts it: the result is unpredictable and it can never be changed again.'
+  };
+  if(isRuneKey(key)){
+    const free=it.runes.indexOf(null);
+    return {ok:true,text: free>=0? 'Socket '+RUNES[key].name+' ('+RUNES[key].desc+').'
+      : 'Overwrites the rune in the first socket, destroying it.'};
+  }
+  return {ok:true,text:map[key]||CURRENCY[key].desc};
+}
+function renderBench(npc){
+  const ch=G.ch;
+  const sel=G.benchItem&&ch.inv.indexOf(G.benchItem)>=0?G.benchItem:null;
+  let html=npcHeader(npc);
+  html+='<div class="sect">On the bench</div>';
+  if(!sel) html+='<div class="pnote" style="text-align:left;font-size:14px">Click an item below to put it on the bench.</div>';
+  else {
+    html+='<div class="card"><div class="nm" style="color:'+RARITY_COLOR[sel.r]+'">'+esc(itemName(sel))+
+      '</div><div class="mc">'+modLines(sel).join(' ').replace(/<[^>]+>/g,' \u00b7 ')+'</div></div>';
+    html+='<div class="sect">What you can do to it</div>';
+    const keys=CURRENCY_KEYS.concat(RUNE_KEYS).filter(k=>countCurrency(k)>0&&(CRAFT[k]||isRuneKey(k)));
+    if(!keys.length) html+='<div class="pnote" style="text-align:left;font-size:14px">You hold nothing that can change this item.</div>';
+    for(const k of keys){
+      const o=benchOutcome(k,sel);
+      html+='<button class="pick'+(o.ok?'':' bad')+'" data-apply="'+k+'"'+(o.ok?'':' disabled')+'>'+
+        '<div class="nm">'+esc(curLabel(k))+' <span class="tag">'+countCurrency(k)+' held</span></div>'+
+        '<div class="mh">'+esc(o.text)+'</div></button>';
+    }
+    /* the essence sink: choose the modifier instead of rolling for it */
+    const ess=countCurrency('essence');
+    html+='<div class="sect">Imprint a modifier  \u00b7  '+ess+' essence</div>';
+    if(sel.cor) html+='<div class="pnote" style="text-align:left;font-size:14px">Corrupted items cannot be imprinted.</div>';
+    else if(sel.r<1) html+='<div class="pnote" style="text-align:left;font-size:14px">Make it magic or rare first.</div>';
+    else {
+      const preFull=sel.pre.length>=(sel.r===1?1:3), sufFull=sel.suf.length>=(sel.r===1?1:3);
+      html+='<div class="pnote" style="text-align:left;font-size:13px">'+IMPRINT_COST+
+        ' essence each. Picks the modifier rather than rolling for it.</div>';
+      const cands=PREFIXES.filter(d=>!preFull&&modAllowed(d,sel.b)&&!sel.pre.some(m=>m.id===d.id)&&d.tiers.some(t=>t[0]<=sel.il))
+        .concat(SUFFIXES.filter(d=>!sufFull&&modAllowed(d,sel.b)&&!sel.suf.some(m=>m.id===d.id)&&d.tiers.some(t=>t[0]<=sel.il)));
+      if(!cands.length) html+='<div class="pnote" style="text-align:left;font-size:14px">No modifier can be added: both sides are full.</div>';
+      for(const d of cands.slice(0,14)){
+        const ok=ess>=IMPRINT_COST;
+        html+='<button class="pick" data-imprint="'+d.id+'"'+(ok?'':' disabled')+'>'+
+          '<div class="nm">'+esc((STAT_FMT[d.stat]||d.stat).replace('#','X'))+'</div>'+
+          '<div class="mc">'+(ok?'Costs '+IMPRINT_COST+' essence':'Needs '+IMPRINT_COST+' essence')+'</div></button>';
+      }
+    }
+  }
+  html+='<div class="sect">Your bag</div><div class="grid" id="invgrid"></div>';
+  html+='<div class="row c" style="margin-top:14px"><button class="btn sm ghost" id="npc-close">Leave</button></div>';
+  $('npc-body').innerHTML=html;
+  const b=$('npc-body');
+  renderGrid($('invgrid'),ch.inv,INV_W,INV_H,it=>{
+    if(isStack(it)){ toast('The bench works on gear.'); return; }
+    G.benchItem=it; sfx('ui'); renderBench(npc);
+  });
+  b.querySelectorAll('[data-apply]').forEach(el=>el.addEventListener('click',()=>{
+    const k=el.dataset.apply;
+    const prev=G.tool;
+    G.tool=k;
+    applyTool(sel);
+    G.tool=prev;
+    renderBench(npc);
+  }));
+  b.querySelectorAll('[data-imprint]').forEach(el=>el.addEventListener('click',()=>{
+    imprintMod(sel,el.dataset.imprint);
+    renderBench(npc);
+  }));
+  $('npc-close').addEventListener('click',closePanel);
+}
+function imprintMod(it,modId){
+  if(countCurrency('essence')<IMPRINT_COST){ toast('Not enough essence.'); return; }
+  const def=PREFIXES.find(d=>d.id===modId)||SUFFIXES.find(d=>d.id===modId);
+  if(!def) return;
+  const m=rollTier(def,it.il);
+  if(!m){ toast('That modifier cannot roll on this item.'); return; }
+  takeCurrency('essence',IMPRINT_COST);
+  (PREFIXES.some(d=>d.id===modId)?it.pre:it.suf).push(m);
+  recalc(); markDirty(); sfx('craft');
+  toast('Imprinted: '+statLine(m.stat,m.v));
+}
+
+/* --------------------------------------------------------------- the mirror */
+function isLeafNode(id){
+  /* refundable only if nothing else you have taken depends on it */
+  const ch=G.ch;
+  for(const other in ch.passives){
+    if(other===id) continue;
+    if(TREE.nodes[other].adj.indexOf(id)<0) continue;
+    /* does `other` still connect to the start without going through id? */
+    if(!connectsWithout(other,id)) return false;
+  }
+  return true;
+}
+function connectsWithout(fromId,banId){
+  const ch=G.ch;
+  const seen={}; const q=[fromId];
+  seen[fromId]=1;
+  while(q.length){
+    const cur=q.pop();
+    if(isStartNode(cur)) return true;
+    for(const a of TREE.nodes[cur].adj){
+      if(a===banId||seen[a]) continue;
+      if(isStartNode(a)) return true;
+      if(ch.passives[a]==null) continue;
+      seen[a]=1; q.push(a);
+    }
+  }
+  return false;
+}
+function refundNode(id){
+  const ch=G.ch;
+  if(ch.passives[id]==null) return;
+  if(!isLeafNode(id)){ toast('Other passives depend on that one. Refund those first.'); return; }
+  if(countCurrency('shard')<RESPEC_COST){ toast('One refund costs '+RESPEC_COST+' shards.'); return; }
+  takeCurrency('shard',RESPEC_COST);
+  delete ch.passives[id];
+  recalc(); buildSlotUI(); markDirty(); updatePointBadge(); treeDirty(); sfx('craft');
+  toast('Refunded '+TREE.nodes[id].name+'.');
+  renderMirror(G.npcOpen);
+}
+function renderMirror(npc){
+  const ch=G.ch;
+  const spent=pointsSpent(ch);
+  let html=npcHeader(npc);
+  html+='<div class="summary" style="max-width:420px">'+
+    kv('Points spent',spent)+kv('Points free',charPoints(ch)-spent)+
+    kv('Shards',countCurrency('shard'))+
+    kv('Per refund',RESPEC_COST+' shards')+
+    kv('Full respec',spent*RESPEC_COST+' shards')+'</div>';
+  html+='<button class="btn" id="mir-all"'+(spent?'':' disabled')+'>Refund everything for '+(spent*RESPEC_COST)+' shards</button>';
+  html+='<div class="sect">Refund one</div>';
+  if(!spent) html+='<div class="pnote" style="text-align:left;font-size:14px">Nothing allocated yet.</div>';
+  const ids=Object.keys(ch.passives);
+  for(const id of ids){
+    const n=TREE.nodes[id];
+    if(!n) continue;
+    const leaf=isLeafNode(id);
+    html+='<button class="pick'+(leaf?'':' bad')+'" data-refund="'+id+'"'+(leaf?'':' disabled')+'>'+
+      '<div class="nm">'+esc(n.name)+' <span class="tag">'+n.type+'</span></div>'+
+      '<div class="mc">'+(leaf?'Refund for '+RESPEC_COST+' shards':'Something else depends on this one')+'</div></button>';
+  }
+  html+='<div class="row c" style="margin-top:14px"><button class="btn sm ghost" id="npc-close">Leave</button></div>';
+  $('npc-body').innerHTML=html;
+  const b=$('npc-body');
+  $('mir-all').addEventListener('click',()=>{ respecAll(); renderMirror(npc); });
+  b.querySelectorAll('[data-refund]').forEach(el=>el.addEventListener('click',()=>refundNode(el.dataset.refund)));
+  b.querySelectorAll('[data-refund]').forEach(el=>{
+    const n=TREE.nodes[el.dataset.refund];
+    el.addEventListener('pointerenter',ev=>showTipHtml(nodeTipHtml(n),ev.clientX,ev.clientY));
+    el.addEventListener('pointerleave',hideTip);
+  });
+  $('npc-close').addEventListener('click',closePanel);
+}
+/* Each line must beat buying the result outright at SHOP_STOCK prices,
+   or there is no reason to ever use it. */
 const EXCHANGE=[
-  {give:'transmute',n:6,get:'regal',m:1},
+  {give:'transmute',n:4,get:'regal',m:1},
   {give:'augment',n:4,get:'exalted',m:1},
-  {give:'chaos',n:3,get:'divine',m:1},
-  {give:'shard',n:20,get:'wisdom',m:5}
+  {give:'chaos',n:2,get:'divine',m:1},
+  {give:'regal',n:2,get:'vaal',m:1},
+  {give:'shard',n:14,get:'wisdom',m:20},
+  {give:'essence',n:5,get:'exalted',m:2}
 ];
 function renderVendor(npc){
   const ch=G.ch;
-  let html='<div class="ptitle">'+esc(npc.name)+'</div>';
-  html+='<div class="pnote">'+esc(npc.line)+'<br>Salvage shards: <b style="color:#d8c69c">'+(ch.currency.shard||0)+'</b></div>';
+  let html=npcHeader(npc);
+  html+='<div class="pnote">Salvage shards: <b style="color:#d8c69c">'+countCurrency('shard')+'</b></div>';
   html+='<div class="sect">Buy</div>';
   for(const s of SHOP_STOCK){
-    const afford=(ch.currency.shard||0)>=s.price;
+    const afford=countCurrency('shard')>=s.price;
     html+='<button class="pick" data-buy="'+s.cur+':'+s.price+'"'+(afford?'':' disabled')+'>'+
       '<div class="nm">'+esc(CURRENCY[s.cur].name)+'</div>'+
       '<div class="ds">'+esc(CURRENCY[s.cur].desc)+'</div>'+
@@ -5443,10 +6599,10 @@ function renderVendor(npc){
   html+='<div class="sect">Exchange</div>';
   for(let i=0;i<EXCHANGE.length;i++){
     const e=EXCHANGE[i];
-    const have=(ch.currency[e.give]||0)>=e.n;
+    const have=countCurrency(e.give)>=e.n;
     html+='<button class="pick" data-ex="'+i+'"'+(have?'':' disabled')+'>'+
       '<div class="nm">'+e.n+' '+esc(CURRENCY[e.give].name)+' → '+e.m+' '+esc(CURRENCY[e.get].name)+'</div>'+
-      '<div class="mc">you hold '+(ch.currency[e.give]||0)+'</div></button>';
+      '<div class="mc">you hold '+countCurrency(e.give)+'</div></button>';
   }
   html+='<div class="sect">Sell</div>';
   html+='<div class="pnote" style="text-align:left;font-size:14px">Click an item to sell it for shards.</div>';
@@ -5470,9 +6626,11 @@ function renderVendor(npc){
   }));
   const grid=$('invgrid');
   if(grid) renderGrid(grid,ch.inv,INV_W,INV_H,it=>{
-    const v=salvageValue(it)*2;
+    if(isStack(it)){ toast('The quartermaster deals in gear, not currency.'); return; }
+    const v=sellValue(it);
     ch.inv.splice(ch.inv.indexOf(it),1);
     giveCurrency('shard',v);
+    sfx('ui');
     toast('Sold '+itemName(it)+' for '+v+' shards.');
     renderVendor(npc);
   });
@@ -5482,8 +6640,7 @@ function renderStash(npc){
   const ch=G.ch;
   const tab=G.stashTab||0;
   const stash=G.save.stash[tab];
-  let html='<div class="ptitle">'+esc(npc.name)+'</div>';
-  html+='<div class="pnote">'+esc(npc.line)+' Shared by every character on this save.</div>';
+  let html=npcHeader(npc);
   html+='<div class="tabs">';
   for(let i=0;i<4;i++) html+='<button class="tab'+(tab===i?' on':'')+'" data-tab="'+i+'">Tab '+roman(i)+'</button>';
   html+='</div>';
@@ -5515,8 +6672,7 @@ function renderStash(npc){
 }
 function renderWaypoint(npc){
   const ch=G.ch;
-  let html='<div class="ptitle">'+esc(npc.name)+'</div>';
-  html+='<div class="pnote">'+esc(npc.line)+'</div>';
+  let html=npcHeader(npc);
   html+='<div class="sect">Travel</div>';
   for(const z of ZONE_ORDER){
     if(ch.waypoints.indexOf(z)<0) continue;
@@ -5594,6 +6750,7 @@ function renderClassSelect(){
     html+='<button class="cls'+(G.pickedClass===k?' on':'')+'" data-cls="'+k+'">'+
       '<div class="nm">'+esc(c.name)+'</div>'+
       '<div class="at">STR '+c.attrs.str+' · DEX '+c.attrs.dex+' · INT '+c.attrs.int+'</div>'+
+      '<div class="mh">'+esc(c.mech)+'</div>'+
       '<div class="ds">'+esc(c.desc)+'</div>'+
       '<div class="sk">Starts with '+esc(start.name)+' · tree start: '+esc(START_LABEL[c.start])+'</div>'+
       '</button>';
@@ -5606,23 +6763,61 @@ function renderClassSelect(){
   }));
   $('btn-create').disabled=!(G.pickedClass&&$('charname').value.trim().length>0);
 }
+/* ------------------------------------------------------------- migration
+   A save written by an earlier version is brought forward here rather than
+   discarded. v1 kept currency as a counter object; v2 keeps it as stacks in
+   the bag, adds the hideout, per-zone clears and per-gem levels. */
+function migrateCharacter(ch){
+  ch.passives=ch.passives||{};
+  ch.gems=ch.gems||[]; ch.supports=ch.supports||[];
+  ch.auras=ch.auras||{};
+  ch.inv=ch.inv||[];
+  ch.waypoints=ch.waypoints||['town'];
+  ch.flasks=ch.flasks||{life:3,mana:3};
+  ch.zonesCleared=ch.zonesCleared||{};
+  ch.seenGems=ch.seenGems||[];
+  if(!ch.loadout) ch.loadout=[[null,null,null,null,null],[null,null,null,null,null]];
+  if(!ch.sets) ch.sets=[{weapon:null,offhand:null},{weapon:null,offhand:null}];
+  if(ch.waypoints.indexOf('hideout')<0) ch.waypoints.unshift('hideout');
+  if(!ch.returnZone) ch.returnZone=(ch.zone&&ch.zone!=='hideout')?ch.zone:'town';
+  /* gems gained their own level in v2 */
+  for(const g of ch.gems){
+    if(g.level==null) g.level=Math.max(1,Math.min(20,(ch.level||1)-((GEMS[g.gem]?GEMS[g.gem].lvlReq:1)-1)));
+    if(!g.sockets) g.sockets=[null,null,null,null,null];
+    if(g.link===undefined) g.link=null;
+  }
+  /* every item needs a grid position and a uid */
+  for(const it of ch.inv){
+    if(!it.pos) it.pos={x:0,y:0};
+    if(!it.uid) it.uid=newUid();
+  }
+  /* v1 currency counters become stacks in the bag */
+  if(ch.currency&&!ch.currencyMigrated){
+    const prev=G.ch; G.ch=ch;
+    const counts=ch.currency;
+    ch.currency=null;
+    for(const k in counts){
+      const n=counts[k]|0;
+      if(n>0&&(CURRENCY[k]||RUNES[k])) giveCurrency(k,n);
+    }
+    ch.currencyMigrated=true;
+    G.ch=prev;
+  }
+  return ch;
+}
 function startCharacter(slot){
   G.slot=slot;
   G.ch=G.save.chars[slot];
-  /* repair anything a schema change might have left missing */
-  const ch=G.ch;
-  ch.passives=ch.passives||{};
-  ch.gems=ch.gems||[]; ch.supports=ch.supports||[];
-  ch.auras=ch.auras||{}; ch.currency=ch.currency||{};
-  ch.inv=ch.inv||[]; ch.waypoints=ch.waypoints||['town'];
-  ch.flasks=ch.flasks||{life:3,mana:3};
-  if(!ch.loadout) ch.loadout=[[null,null,null,null,null],[null,null,null,null,null]];
-  if(!ch.sets) ch.sets=[{weapon:null,offhand:null},{weapon:null,offhand:null}];
+  const ch=migrateCharacter(G.ch);
+  G.save.v=SAVE_VERSION;
   G.player=null;
   G.kills=0;
   G.running=true;
+  G.benchItem=null;
   showScreen('game');
   resizeCanvas();
+  resetPlayerAilHud();
+  resetHudCache();
   enterZone(ch.zone&&ZONES[ch.zone]?ch.zone:'town');
   closePanel();
   toast('Welcome back, '+ch.name+'.');
@@ -5646,6 +6841,7 @@ function screenToWorld(sx,sy){
   return {x:sx+G.cam.x-G.view.w/2, y:sy+G.cam.y-G.view.h/2};
 }
 window.addEventListener('keydown',e=>{
+  sndResume();
   const k=e.key.toLowerCase();
   if(G.screen!=='game'){
     if(k==='enter'&&G.screen==='class'&&!$('btn-create').disabled) $('btn-create').click();
@@ -5653,7 +6849,8 @@ window.addEventListener('keydown',e=>{
   }
   if(k==='tab'){ e.preventDefault(); togglePanel('map'); return; }
   if(k==='escape'){
-    if(G.panel&&G.panel!=='death'&&G.panel!=='level') closePanel();
+    if(G.tool&&(G.panel==='inv'||G.panel==='npc')){ G.tool=null; renderInvBodies(); return; }
+    if(G.panel&&G.panel!=='death') closePanel();
     else if(!G.panel) openPanel('menu');
     return;
   }
@@ -5661,6 +6858,7 @@ window.addEventListener('keydown',e=>{
   G.keys[k]=true;
   if(k==='i'){ togglePanel('inv'); return; }
   if(k==='p'){ togglePanel('tree'); return; }
+  if(k==='h'){ goHideout(); return; }
   if(k==='c'){ togglePanel('sheet'); return; }
   if(G.panel) return;
   if(k==='x'){ swapSet(); return; }
@@ -5681,6 +6879,7 @@ cv.addEventListener('mousemove',e=>{
   G.mouse.wx=w.x; G.mouse.wy=w.y;
 });
 cv.addEventListener('mousedown',e=>{
+  sndResume();
   const r=cv.getBoundingClientRect();
   G.mouse.sx=e.clientX-r.left; G.mouse.sy=e.clientY-r.top;
   const w=screenToWorld(G.mouse.sx,G.mouse.sy);
@@ -5702,6 +6901,7 @@ function setupTouch(){
   function show(x,y){ stick.style.left=x+'px'; stick.style.top=y+'px'; stick.style.display='block'; }
   function knobTo(dx,dy){ knob.style.transform='translate('+dx+'px,'+dy+'px)'; }
   cv.addEventListener('touchstart',e=>{
+    sndResume();
     e.preventDefault();
     for(const t of e.changedTouches){
       if(t.clientX<window.innerWidth*0.5&&G.touch.id===null){
@@ -5762,6 +6962,12 @@ function setupTouch(){
   const doSwap=ev=>{ ev.preventDefault(); ev.stopPropagation(); swapSet(); };
   sw.addEventListener('touchstart',doSwap,{passive:false});
   sw.addEventListener('mousedown',doSwap);
+  const hb=$('tb-hide');
+  if(hb){
+    const go=ev=>{ ev.preventDefault(); ev.stopPropagation(); goHideout(); };
+    hb.addEventListener('touchstart',go,{passive:false});
+    hb.addEventListener('click',go);
+  }
   $('tmenu').querySelectorAll('[data-panel]').forEach(b=>{
     const go=ev=>{ ev.preventDefault(); ev.stopPropagation(); togglePanel(b.dataset.panel); };
     b.addEventListener('touchstart',go,{passive:false});
@@ -5785,7 +6991,15 @@ function setupTreeInput(){
   });
   el.addEventListener('pointermove',e=>{
     const prev=pts.get(e.pointerId);
-    if(!prev) return;
+    if(!prev){
+      /* not dragging: hover whatever node is under the cursor */
+      if(e.pointerType!=='touch'){
+        const n=nodeAtScreen(e.clientX,e.clientY);
+        if(n) showTipHtml(nodeTipHtml(n),e.clientX,e.clientY); else hideTip();
+      }
+      return;
+    }
+    hideTip();
     const dx=e.clientX-prev.x, dy=e.clientY-prev.y;
     pts.set(e.pointerId,{x:e.clientX,y:e.clientY});
     if(pts.size>=2){
@@ -5793,38 +7007,46 @@ function setupTreeInput(){
       const d=Math.hypot(a[0].x-a[1].x,a[0].y-a[1].y);
       if(pinchD>0){
         const t=G.tree;
-        t.z=clamp(t.z*(d/pinchD),0.28,2.2);
+        t.z=clamp(t.z*(d/pinchD),0.28,2.2); treeDirty();
       }
       pinchD=d;
       panned=true;
       return;
     }
     if(Math.abs(dx)>2||Math.abs(dy)>2) panned=true;
-    G.tree.x+=dx/G.tree.z; G.tree.y+=dy/G.tree.z;
+    G.tree.x+=dx/G.tree.z; G.tree.y+=dy/G.tree.z; treeDirty();
   });
   el.addEventListener('pointerup',e=>{
     pts.delete(e.pointerId);
     if(pts.size<2) pinchD=0;
     if(panned) return;
     const n=nodeAtScreen(e.clientX,e.clientY);
-    if(!n){ G.tree.sel=null; renderTreeUI(); return; }
+    if(!n){ G.tree.sel=null; treeDirty(); renderTreeUI(); return; }
     if(G.tree.sel===n.id&&canAllocate(n.id)) allocate(n.id);
-    else { G.tree.sel=n.id; renderTreeUI(); }
+    else { G.tree.sel=n.id; treeDirty(); renderTreeUI(); }
   });
   el.addEventListener('pointercancel',e=>{ pts.delete(e.pointerId); });
+  el.addEventListener('pointerleave',hideTip);
   el.addEventListener('wheel',e=>{
     e.preventDefault();
     const t=G.tree;
-    t.z=clamp(t.z*(e.deltaY<0?1.12:0.89),0.28,2.2);
+    t.z=clamp(t.z*(e.deltaY<0?1.12:0.89),0.28,2.2); treeDirty();
   },{passive:false});
   $('tree-set').addEventListener('click',()=>{
     G.tree.set=(G.tree.set+1)%3;
+    treeDirty();
     renderTreeUI();
     toast(G.tree.set===0?'New allocations apply to both weapon sets.'
       :'New allocations apply only to weapon set '+(G.tree.set===1?'I':'II')+'.');
   });
+  $('tree-filter').addEventListener('click',()=>{
+    G.tree.filterSet=!G.tree.filterSet;
+    treeDirty(); renderTreeUI();
+    toast(G.tree.filterSet?'Showing only allocations active in weapon set '+roman(G.ch.activeSet)
+      :'Showing every allocation.');
+  });
   $('tree-respec').addEventListener('click',respecAll);
-  $('treesearch').addEventListener('input',e=>{ G.tree.search=e.target.value||''; });
+  $('treesearch').addEventListener('input',e=>{ G.tree.search=e.target.value||''; treeDirty(); });
 }
 
 /* ==========================================================================
@@ -5833,6 +7055,7 @@ function setupTreeInput(){
 function boot(){
   if(IS_TOUCH) document.body.classList.add('touch');
   loadSave();
+  if(G.save&&G.save.sound===false) SND.on=false;
   initPools();
   G.theme=ZONES.town.theme;
   resizeCanvas();
