@@ -490,7 +490,7 @@ body.touch #spiritbar{left:50%;right:auto;transform:translateX(-50%);text-align:
    ========================================================================== */
 
 const SAVE_KEY = 'dungeonrift_save_v1';
-const SAVE_VERSION = 2;
+const SAVE_VERSION = 3;
 const TILE = 48;
 const GRID = 160;
 const MAX_SLOTS = 6;
@@ -539,13 +539,6 @@ const WEAPON_KINDS = {
   claw:{name:'Claw',hands:1,crit:7.5,aspd:1.5,dmg:[5,9],attr:'dexint'},
   wand:{name:'Wand',hands:1,crit:8,aspd:1.4,dmg:[5,9],attr:'int'},
   sceptre:{name:'Sceptre',hands:1,crit:6,aspd:1.3,dmg:[6,10],attr:'strint'}
-};
-
-/* --------------------------------------------------------------- attributes */
-const ATTR_TEXT = {
-  str:['Strength','+2 maximum life per point, and scales melee damage'],
-  dex:['Dexterity','+2 evasion rating per point, and scales attack speed and accuracy'],
-  int:['Intelligence','+2 maximum mana per point, and scales spell damage and energy shield']
 };
 
 /* -------------------------------------------------------------- active gems
@@ -1093,11 +1086,6 @@ const TREE = {nodes:{}, list:[]};
   }
 })();
 
-/* ------------------------------------------------------------------- slots */
-const SLOTS = ['weapon','offhand','helmet','body','gloves','boots','belt','ring1','ring2','amulet'];
-const SLOT_LABEL = {weapon:'Weapon',offhand:'Offhand',helmet:'Helmet',body:'Body Armour',
-  gloves:'Gloves',boots:'Boots',belt:'Belt',ring1:'Ring',ring2:'Ring',amulet:'Amulet'};
-
 /* -------------------------------------------------------------------- bases
    Bases carry an implicit mod and the core defence or damage numbers.
    w/h are inventory cell footprints. ilvl is the level the base starts
@@ -1408,26 +1396,53 @@ const BOSSES = {
 
 /* --------------------------------------------------------------------- zones */
 const ZONES = {
-  hideout:{name:'Your Hideout',level:0,town:1,hideout:1,
+  /* A hub is never procedural: the player has to be able to learn its
+     geography. '.' is floor, ' ' is wall, and a letter is floor plus the
+     fixture anchored there. S is the arrival point, P the portal. */
+  hideout:{name:'Your Hideout',level:0,town:1,hideout:1,safe:1,
     theme:{bg:'#06070a',floor:'#262b30',rim:'#8fa8c8',mote:'dust',moteColor:'#b8c8dc'},
-    blobs:5,pool:[],boss:null,next:null,
-    fixtures:[
-      {id:'stash',name:'Stash',kind:'stash',
-       mech:'Store and retrieve gear across all your characters. Four tabs.',
-       line:'Four drawers, shared by everyone who still comes back.'},
-      {id:'bench',name:'Crafting Bench',kind:'bench',
-       mech:'Put an item on the bench to see every orb you hold that can change it, and what each would do, before you commit. Essence buys a modifier you pick.',
-       line:'Someone else\u2019s tools, left where they fell.'},
-      {id:'mirror',name:'Mirror of Second Thoughts',kind:'mirror',
-       mech:'Refund one leaf passive, or all of them, for salvage shards.',
-       line:'It shows you the version of yourself that chose differently.'},
-      {id:'gate',name:'Standing Gate',kind:'waypoint',
-       mech:'Travel to any zone you have already reached.',
-       line:'It remembers every place you have already survived.'}
-    ]},
-  town:{name:'The Last Landing',level:0,town:1,
+    pool:[],boss:null,next:null,
+    layout:{
+      rows:[
+      '       ......       ',
+      '    ............    ',
+      '  ....X......B....  ',
+      ' .................. ',
+      '....................',
+      '....................',
+      '.........S..........',
+      '....................',
+      '....................',
+      ' .................. ',
+      '  ....M......G....  ',
+      '    .....P......    ',
+      '       ......       '
+    ],
+      at:{X:'stash',B:'bench',M:'mirror',G:'waypoint'}
+    }},
+  town:{name:'The Last Landing',level:0,town:1,safe:1,
+    layout:{
+      rows:[
+      '         ......         ',
+      '      ............      ',
+      '    ................    ',
+      '   ..................   ',
+      '  ....................  ',
+      ' ...................... ',
+      '.....V............G.....',
+      '........................',
+      '........................',
+      ' .........S............ ',
+      '  ....................  ',
+      '   ..................   ',
+      '    ................    ',
+      '      .....P......      ',
+      '         ......         '
+    ],
+      at:{V:'vendor',G:'waypoint'}
+    },
     theme:{bg:'#07070a',floor:'#2e2a22',rim:'#c8a96e',mote:'dust',moteColor:'#c8a96e'},
-    blobs:7,pool:[],boss:null,next:'drowned_shore'},
+    pool:[],boss:null,next:'drowned_shore'},
   drowned_shore:{name:'Drowned Shore',level:1,
     theme:{bg:'#04070c',floor:'#1d2a35',rim:'#6fa8c8',mote:'bubble',moteColor:'#8ec6e4'},
     pool:[['drowned_hand',3],['brinecrawler',3],['tide_archer',2],['bloatfish',1]],
@@ -1465,14 +1480,25 @@ const ZONE_ORDER = ['hideout','town','drowned_shore','tidewrack_caves','sunken_r
   'cathedral_ruins','the_ossuary','emberdeep','wardens_sanctum'];
 
 /* -------------------------------------------------------------------- vendors */
-const NPCS = [
-  {id:'vendor',name:'Serrec, Quartermaster',kind:'vendor',
+/* Every hub fixture in one place. Hub layouts reference these by letter,
+   so a fixture's position is authored in the map itself. */
+const FIXTURES = {
+  vendor:{name:'Serrec, Quartermaster',kind:'vendor',
     mech:'Buy currency with shards, exchange orbs at better rates than buying, and sell gear.',
     line:'Everything here belonged to somebody who stopped needing it.'},
-  {id:'waypoint',name:'The Standing Gate',kind:'waypoint',
+  waypoint:{name:'The Standing Gate',kind:'waypoint',
     mech:'Travel to any zone you have already reached.',
-    line:'It remembers every place you have already survived.'}
-];
+    line:'It remembers every place you have already survived.'},
+  stash:{name:'Stash',kind:'stash',
+    mech:'Store and retrieve gear across all your characters. Four tabs.',
+    line:'Four drawers, shared by everyone who still comes back.'},
+  bench:{name:'Crafting Bench',kind:'bench',
+    mech:'Put an item on the bench to see every orb you hold that can change it, and what each would do, before you commit. Essence buys a modifier you pick.',
+    line:'Someone else\u2019s tools, left where they fell.'},
+  mirror:{name:'Mirror of Second Thoughts',kind:'mirror',
+    mech:'Refund one leaf passive, or all of them, for salvage shards.',
+    line:'It shows you the version of yourself that chose differently.'}
+};
 /* what the quartermaster sells, and the currency exchange rates */
 const SHOP_STOCK = [
   {cur:'wisdom',price:1},{cur:'transmute',price:2},{cur:'augment',price:4},
@@ -1525,7 +1551,6 @@ function roman(n){return ['I','II','III','IV'][n]||String(n+1);}
 let uidCounter = 1;
 function newUid(){ return 'i'+(uidCounter++)+'_'+Math.floor(Math.random()*1e6); }
 
-const DTYPES = ['physical','fire','cold','lightning','chaos'];
 /* damage type -> the key it uses in st.m. 'physical' is stored as 'phys',
    which is exactly the mismatch that silently ate every physical increase. */
 const DTYPE_MULT = {physical:'phys',fire:'fire',cold:'cold',lightning:'lightning',chaos:'chaos'};
@@ -1561,7 +1586,7 @@ const G = {
   view:{w:0,h:0,dpr:1}, dprCap:2, slowT:0,
   panel:null, tree:{x:0,y:0,z:0.62,drag:false,sel:null,set:0,search:''},
   drag:null, tip:null, toastT:0, prompt:null,
-  explored:null, mapMode:0, kills:0, pendingLevel:0
+  explored:null, kills:0
 };
 window.G=G;
 
@@ -1706,7 +1731,10 @@ function makeItem(base,ilvl,rarity,uniqueKey){
   const it={uid:newUid(),b:base,il:Math.max(1,ilvl|0),r:rarity|0,pre:[],suf:[],q:0,
     runes:new Array(runeSocketCount(base)).fill(null),uq:null,idf:true,nm:null,cor:false};
   if(uniqueKey){
+    /* uniques carry no rolled mods, but they are still physical objects and
+       roll quality like anything else */
     it.uq=uniqueKey; it.r=3; it.idf=false;
+    if(Math.random()<0.35) it.q=rndi(1,12);
     return it;
   }
   if(it.r>=1){
@@ -1804,7 +1832,6 @@ function itemLevelReq(it){ return Math.max(1, Math.round(BASES[it.b].ilvl*0.9));
 
 /* ------------------------------------------------------------------ crafting */
 function modCount(it){ return it.pre.length+it.suf.length; }
-function maxMods(it){ return it.r===1?2 : it.r===2?6 : 0; }
 function addRandomMod(it){
   const ex=it.pre.concat(it.suf).map(m=>m.id);
   const preFull = it.pre.length >= (it.r===1?1:3);
@@ -2019,6 +2046,8 @@ function recalc(){
   st.stunTaken=1-((flags.stunResist||0)/100);
   st.raw=S;
   G.st=st;
+  /* every resolved skill reads from st, so they are all stale now */
+  invalidateSkills();
 
   /* clamp the live pools to the new maxima */
   const p=G.player;
@@ -2159,8 +2188,14 @@ function skillStats(g,idx){
     trigger:def.trigger||null, energyMax:def.energyMax||0, energyPer:def.energyPer||0
   };
 }
-/* the five bound skills for the active weapon set */
+/* The five bound skills for the active weapon set. skillStats() is not cheap
+   and this is read several times a frame, so the resolved set is cached and
+   thrown away whenever anything it reads from changes: recalc(), a gear or
+   socket change, a rebind, a gem level, or a weapon swap. */
+let _skCache=null;
+function invalidateSkills(){ _skCache=null; }
 function activeSkills(){
+  if(_skCache) return _skCache;
   const ch=G.ch;
   const out=[];
   for(let i=0;i<5;i++){
@@ -2168,6 +2203,7 @@ function activeSkills(){
     if(gi==null||!ch.gems[gi]){ out.push(null); continue; }
     out.push(skillStats(ch.gems[gi],gi));
   }
+  _skCache=out;
   return out;
 }
 
@@ -2379,10 +2415,45 @@ function snapToWalkable(x,y,r){
   return tileCenter(t.x,t.y);
 }
 
+/* Carves a hand-authored layout centred in the nav grid and returns the
+   letter-anchored fixture tiles. */
+function carveLayout(L){
+  const h=L.rows.length, w=L.rows[0].length;
+  const ox=(GRID-w)>>1, oy=(GRID-h)>>1;
+  const spots={};
+  for(let y=0;y<h;y++){
+    const row=L.rows[y];
+    for(let x=0;x<row.length;x++){
+      const c=row.charAt(x);
+      if(c===' ') continue;
+      G.nav[NAV(ox+x,oy+y)]=1;
+      if(c!=='.') spots[c]={x:ox+x,y:oy+y};
+    }
+  }
+  return spots;
+}
 function generateZone(zoneKey){
   const z=ZONES[zoneKey];
   G.zoneKey=zoneKey; G.zdef=z; G.theme=z.theme;
   G.nav=new Uint8Array(GRID*GRID);
+  G.hubSpots=null;
+  if(z.layout){
+    /* a hub is authored, and identical on every visit */
+    const spots=carveLayout(z.layout);
+    buildEdge();
+    G.blobs=[]; G.liveBlobs=[];
+    G.explored=new Uint8Array(GRID*GRID);
+    const sp=spots.S||{x:GRID>>1,y:GRID>>1};
+    G.hubSpots=spots;
+    G.spawnTile=sp;
+    G.bossTile=sp;
+    G.exitTile=spots.P||sp;
+    G.reach=floodFrom(sp.x,sp.y);
+    bakeSprites(G.theme);
+    bakeMinimap();
+    initMotes();
+    return;
+  }
   const blobs=scatterBlobs(z.blobs||22);
   for(const b of blobs) carveBlob(b.x,b.y,b.r);
   connectBlobs(blobs);
@@ -2795,26 +2866,32 @@ function spawnEnemies(){
   G.enemies=[];
   const z=G.zdef;
   if(!z.pool.length) return;
+  /* Nothing spawns inside the safe radius around the arrival point, whichever
+     blob it happens to sit in. Measured from the spawn tile rather than the
+     player so it holds before the player exists. */
+  const sp=tileCenter(G.spawnTile.x,G.spawnTile.y);
+  const SAFE2=(TILE*5)*(TILE*5);
   for(const b of G.liveBlobs){
     const bt=navAt(b.x,b.y)?b:nearestWalkableTile(b.x,b.y);
-    const isSpawn=(bt.x===G.spawnTile.x&&bt.y===G.spawnTile.y);
     const n=rndi(2,4);
     for(let i=0;i<n;i++){
       let placed=false;
-      for(let att=0;att<10&&!placed;att++){
+      for(let att=0;att<14&&!placed;att++){
         const rad=b.r*rnd(.15,.95), ang=rnd(0,TAU);
         const tx=Math.round(bt.x+Math.cos(ang)*rad), ty=Math.round(bt.y+Math.sin(ang)*rad);
         if(navAt(tx,ty)!==1) continue;
         if(!G.reach[NAV(tx,ty)]) continue;
         const c=tileCenter(tx,ty);
-        if(isSpawn && d2(c.x,c.y,G.player.x,G.player.y)<(TILE*5)*(TILE*5)) continue;
+        if(d2(c.x,c.y,sp.x,sp.y)<SAFE2) continue;
         const e=makeEnemy(weightedPick(z.pool),c.x,c.y);
         if(e) G.enemies.push(e);
         placed=true;
       }
-      if(!placed && !isSpawn){
-        /* every offset missed — fall back to the blob centre rather than skip */
+      if(!placed){
+        /* every offset missed — fall back to the blob centre, unless that is
+           itself inside the safe radius, in which case this one just skips */
         const c=tileCenter(bt.x,bt.y);
+        if(d2(c.x,c.y,sp.x,sp.y)<SAFE2) continue;
         const e=makeEnemy(weightedPick(z.pool),c.x,c.y);
         if(e) G.enemies.push(e);
       }
@@ -2830,7 +2907,6 @@ function makeBoss(){
   }
   const def=BOSSES[z.boss];
   const c=tileCenter(G.bossTile.x,G.bossTile.y);
-  const sc=monsterScale(z.level);
   const b={
     key:z.boss,name:def.name,boss:true,x:c.x,y:c.y,r:def.r,rot:0,
     maxHp:Math.round(def.hp*(1+z.level*0.07)),hp:0,dmg:def.dmg*(1+z.level*0.05),
@@ -2852,25 +2928,20 @@ function makeBoss(){
 function placeNpcsAndPortals(){
   G.npcs=[]; G.portals=[];
   const z=G.zdef;
-  if(z.town){
-    /* town: three fixtures spread across the middle blobs, no monsters */
-    const spots=[];
-    for(const b of G.liveBlobs){
-      const t=navAt(b.x,b.y)?b:nearestWalkableTile(b.x,b.y);
-      spots.push(t);
-    }
-    const fixtures=z.fixtures||NPCS;
-    fixtures.forEach((n,i)=>{
-      const t=spots[Math.min(spots.length-1,i+1)]||spots[0];
+  if(z.layout){
+    /* fixtures stand exactly where the layout puts them, every visit */
+    const spots=G.hubSpots||{};
+    for(const letter in z.layout.at){
+      const key=z.layout.at[letter];
+      const t=spots[letter], f=FIXTURES[key];
+      if(!t||!f) continue;
       const c=tileCenter(t.x,t.y);
-      const q=snapToWalkable(c.x,c.y,20);
-      G.npcs.push({id:n.id,name:n.name,kind:n.kind,line:n.line,mech:n.mech,x:q.x,y:q.y,r:20});
-    });
-    const t=spots[spots.length-1];
-    const c=tileCenter(t.x,t.y);
+      G.npcs.push({id:key,name:f.name,kind:f.kind,line:f.line,mech:f.mech,x:c.x,y:c.y,r:20});
+    }
     const dest=(G.zoneKey==='hideout')?(G.ch.returnZone||'town'):(G.ch.reached||'drowned_shore');
-    const q=snapToWalkable(c.x,c.y+80,26);
-    G.portals.push({kind:'zone',to:dest,x:q.x,y:q.y,r:26,
+    const pt=spots.P||G.spawnTile;
+    const c=tileCenter(pt.x,pt.y);
+    G.portals.push({kind:'zone',to:dest,x:c.x,y:c.y,r:26,
       label:(G.zoneKey==='hideout'?'Return to ':'Descend to ')+ZONES[dest].name});
   } else {
     /* every zone has a way back to town at its entrance, and an exit at the far end */
@@ -2886,7 +2957,7 @@ function placeNpcsAndPortals(){
     }
   }
 }
-function enterZone(zoneKey,keepProgress){
+function enterZone(zoneKey){
   const ch=G.ch;
   generateZone(zoneKey);
   ch.zone=zoneKey;
@@ -3658,7 +3729,6 @@ function addToInv(item){
   markDirty();
   return true;
 }
-function invCount(){ return G.ch.inv.length; }
 function countCurrency(key){
   let n=0;
   for(const it of G.ch.inv) if(it.cur===key) n+=it.n;
@@ -5426,13 +5496,26 @@ function renderGrid(host,list,w,h,onClick,onDragEnd){
   const cs=itemCellSize();
   host.style.width=(cs*w)+'px';
   host.style.height=(cs*h)+'px';
-  host.innerHTML='';
-  for(let y=0;y<h;y++) for(let x=0;x<w;x++){
-    const c=document.createElement('div');
-    c.className='cell';
-    c.style.left=(x*cs)+'px'; c.style.top=(y*cs)+'px';
-    c.style.width=cs+'px'; c.style.height=cs+'px';
-    host.appendChild(c);
+  /* The empty cells never change unless the grid shape or the cell size does,
+     so they live in their own layer that is built once and then left alone;
+     only the item elements after it are replaced on a re-render. */
+  const sig=w+'x'+h+'@'+cs;
+  let cells=host.firstElementChild;
+  if(!cells||cells.className!=='cells'||cells.__sig!==sig){
+    host.innerHTML='';
+    cells=document.createElement('div');
+    cells.className='cells';
+    for(let y=0;y<h;y++) for(let x=0;x<w;x++){
+      const c=document.createElement('div');
+      c.className='cell';
+      c.style.left=(x*cs)+'px'; c.style.top=(y*cs)+'px';
+      c.style.width=cs+'px'; c.style.height=cs+'px';
+      cells.appendChild(c);
+    }
+    cells.__sig=sig;
+    host.appendChild(cells);
+  } else {
+    while(host.lastElementChild&&host.lastElementChild!==cells) host.removeChild(host.lastElementChild);
   }
   for(const it of list){
     const stack=isStack(it);
@@ -5767,6 +5850,7 @@ function carveSkill(gemKey){
   const ch=G.ch;
   if(!takeCurrency('uncut_skill',1)) { toast('You have no uncut skill gems.'); return; }
   ch.gems.push({gem:gemKey,level:1,sockets:[null,null,null,null,null],link:null});
+  invalidateSkills();
   toast('Carved '+GEMS[gemKey].name+'.');
   markDirty(); renderSkills();
 }
@@ -5782,10 +5866,12 @@ function bindSkill(gemIdx,slot){
   const lo=ch.loadout[ch.activeSet];
   for(let i=0;i<5;i++) if(lo[i]===gemIdx) lo[i]=null;
   lo[slot]=gemIdx;
+  invalidateSkills();
   markDirty(); buildSlotUI(); renderSkills();
 }
 function unbindSlot(slot){
   G.ch.loadout[G.ch.activeSet][slot]=null;
+  invalidateSkills();
   markDirty(); buildSlotUI(); renderSkills();
 }
 function socketSupport(gemIdx,sockIdx,supKey){
@@ -5950,6 +6036,7 @@ function renderSkills(){
   b.querySelectorAll('[data-link]').forEach(el=>el.addEventListener('click',()=>{
     const [gi,oi]=el.dataset.link.split(':').map(Number);
     ch.gems[gi].link = ch.gems[gi].link===oi? null : oi;
+    invalidateSkills();
     markDirty(); renderSkills();
   }));
   b.querySelectorAll('[data-sock]').forEach(el=>el.addEventListener('click',()=>{
@@ -6810,6 +6897,12 @@ function startCharacter(slot){
   G.ch=G.save.chars[slot];
   const ch=migrateCharacter(G.ch);
   G.save.v=SAVE_VERSION;
+  /* the tree view is per-character: recentre it on this class's own start
+     rather than wherever the last character left the camera */
+  G.tree.x=0; G.tree.y=0; G.tree.z=0.62; G.tree.drag=false;
+  G.tree.sel=null; G.tree.set=0; G.tree.search='';
+  G.tree.filterSet=null; G.tree.centred=false; G.tree.dirty=true;
+  invalidateSkills();
   G.player=null;
   G.kills=0;
   G.running=true;
