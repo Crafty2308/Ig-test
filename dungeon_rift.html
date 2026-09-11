@@ -194,8 +194,24 @@ body.touch #slots{display:none}
 #tb1{right:74px;bottom:20px}
 #tb2{right:112px;bottom:84px}
 #tb3{right:52px;bottom:118px}
-#tb4{right:132px;bottom:2px}
+#tb4{right:144px;bottom:0}
 #tbswap{position:absolute;right:6px;bottom:78px;width:44px;height:44px;font-size:10px}
+/* the roll sits where the thumb already rests; sprint is a hold beside it */
+#tbroll{position:absolute;right:176px;bottom:62px;width:62px;height:62px;font-size:10px;
+  border-color:rgba(143,192,224,.45);color:#9fd8ee}
+#tbsprint{position:absolute;right:196px;bottom:132px;width:48px;height:48px;font-size:9px;
+  border-color:rgba(143,192,224,.28);color:#8fa8c8}
+#tbsprint.down{background:rgba(143,192,224,.22)}
+/* Stun. It fills from heavy hits only, and at full you are staggered — which
+   is what makes Unwavering Stance a keystone instead of a pure downside. */
+#stungauge{position:absolute;left:calc(14px + env(safe-area-inset-left));
+  bottom:calc(6px + env(safe-area-inset-bottom));width:92px;height:5px;border-radius:3px;
+  background:rgba(20,16,10,.75);border:1px solid rgba(232,216,160,.2);overflow:hidden;display:none}
+#stungauge.on{display:block}
+#stungauge i{display:block;height:100%;width:0;background:#e8d8a0}
+#stungauge.full{border-color:rgba(232,216,160,.8)}
+#stungauge.full i{background:#fff0c0}
+body.touch #stungauge{bottom:calc(4px + env(safe-area-inset-bottom));width:80px}
 #tmenu{position:absolute;top:calc(8px + env(safe-area-inset-top));left:calc(8px + env(safe-area-inset-left));
   display:none;gap:6px;pointer-events:auto}
 body.touch #tmenu{display:flex}
@@ -453,6 +469,7 @@ body.touch #spiritbar{left:50%;right:auto;transform:translateX(-50%);text-align:
       <div class="armour" id="boss-armour"><i id="boss-armour-fill"></i></div></div>
     <div class="orb" id="orb-life"><div class="fill" id="life-fill"></div><div class="es" id="es-fill"></div>
       <div class="txt" id="life-txt"></div></div>
+    <div id="stungauge"><i id="stun-fill"></i></div>
     <div class="orb" id="orb-mana"><div class="fill" id="mana-fill"></div><div class="txt" id="mana-txt"></div></div>
     <div class="flasks" id="flask-life"></div>
     <div class="flasks" id="flask-mana"></div>
@@ -480,6 +497,8 @@ body.touch #spiritbar{left:50%;right:auto;transform:translateX(-50%);text-align:
       <div class="tb" id="tb3" data-sk="3"><div class="sweep"></div><span>4</span><span class="lb"></span></div>
       <div class="tb" id="tb4" data-sk="4"><div class="sweep"></div><span>5</span><span class="lb"></span></div>
       <div class="tb" id="tbswap"><span>SET</span></div>
+      <div class="tb" id="tbroll"><span>ROLL</span></div>
+      <div class="tb" id="tbsprint"><span>RUN</span></div>
     </div>
   </div>
 
@@ -525,7 +544,7 @@ const TILE = 48;
 const GRID = 160;
 const MAX_SLOTS = 6;
 const RES_CAP = 75;
-const SKILL_KEYS = ['LMB','Q','E','R','SPACE'];
+const SKILL_KEYS = ['LMB','Q','E','R','T'];
 
 /* ---------------------------------------------------------------- classes */
 const CLASSES = {
@@ -3309,7 +3328,9 @@ function makePlayer(){
     flaskCharge:{life:0,mana:0},trailT:0,
     ail:{stun:0,freeze:0,ignite:0,shock:0,poison:0,bleed:0},
     ailT:{stun:0,freeze:0,ignite:0,shock:0,poison:0,bleed:0},
-    dots:[],shockMag:0,moving:false};
+    dots:[],shockMag:0,moving:false,
+    /* dodge roll and sprint */
+    roll:0,rollMax:0,rollA:0,sprint:false,down:0,hitR:14};
   recalc();
   const p=G.player,st=G.st;
   p.life=st.maxLife; p.mana=st.maxMana; p.es=st.maxES;
@@ -3870,7 +3891,8 @@ function killEnemy(e){
   if(e.mods.indexOf('volatile')>=0){
     spawnFx({type:'shock',x:e.x,y:e.y,r:0,max:130,life:.42,maxLife:.42,color:'#ff9a45'});
     burst(e.x,e.y,30,'#ff9a45',340,4.4,.6,true);
-    if(d2(G.player.x,G.player.y,e.x,e.y)<130*130) damagePlayer(e.dmg*1.3,'fire',e);
+    /* an exploder's blast is telegraphed and large: no rolling through it */
+    if(d2(G.player.x,G.player.y,e.x,e.y)<130*130) damagePlayer(e.dmg*1.3,'fire',e,true);
     for(const o of nearbyEnemies(e.x,e.y,130)){
       if(o===e||o.dead||o.dying) continue;
       o.hp-=e.dmg*0.9; if(o.hp<=0) killEnemy(o);
@@ -3904,9 +3926,14 @@ function evadeRoll(){
   const chance=clamp(ev/(ev+acc),0,0.75);
   return Math.random()<chance;
 }
-function damagePlayer(amount,dtype,src){
+/* `heavy` marks a large telegraphed area: it ignores the roll's i-frames,
+   because those are the attacks you are meant to walk out of. */
+function damagePlayer(amount,dtype,src,heavy){
   const p=G.player,st=G.st;
-  if(!p||p.iframe>0||G.dead||G.paused) return;
+  if(!p||G.dead||G.paused) return;
+  if(p.iframe>0&&!heavy) return;
+  /* a hit taken while sprinting puts you on the floor */
+  const wasSprinting=p.sprint;
   if(evadeRoll()){
     dmgNumber(p.x,p.y-p.r-6,0,false,'physical','evaded');
     return;
@@ -3953,6 +3980,10 @@ function damagePlayer(amount,dtype,src){
   }
   if(dmg>0){ p.life-=dmg; if(!st.wardUninterrupted) p.esDelay=2.4*(st.esDelayMult||1); }
   p.iframe=0.34;
+  /* the stun gauge fills off how big the hit was relative to your life, so
+     heavy hits stagger and chip damage does not */
+  const share=dmg/Math.max(1,st.maxLife);
+  if(share>0.045) addPlayerBuildup('stun',dmg*(0.6+share*5),dmg);
   G.flash=Math.min(1,0.3+ (amount/Math.max(1,st.maxLife))*2.2);
   dmgNumber(p.x,p.y-p.r-6,amount,false,dtype);
   burst(p.x,p.y,11,'#c0402f',210,3.2,.42,true);
@@ -3963,6 +3994,7 @@ function damagePlayer(amount,dtype,src){
     src.hp=Math.min(src.maxHp,src.hp+amount*1.4);
     burst(src.x,src.y,9,'#e06a8a',150,3,.4,true);
   }
+  if(wasSprinting&&p.life>0) knockDown();
   if(p.life<=0){ p.life=0; onDeath(); }
 }
 function healPlayer(amount,quiet){
@@ -4064,6 +4096,67 @@ function respawn(){
 function canStand(x,y,r){
   const k=r*0.72;
   return walkable(x,y)&&walkable(x-k,y)&&walkable(x+k,y)&&walkable(x,y-k)&&walkable(x,y+k);
+}
+/* ==========================================================================
+   DODGE ROLL AND SPRINT
+   The roll is the responsiveness valve: it cancels whatever you were doing,
+   it costs nothing, and the invulnerability sits at the FRONT of it, so a
+   well-timed roll beats a projectile or a fast strike. What it does not beat
+   is a big telegraphed area — those you walk out of, and they are flagged
+   so they cut straight through the i-frames.
+   Sprinting is the opposite bargain: faster, but a hit while sprinting puts
+   you on the floor.
+   ========================================================================== */
+const ROLL_TIME = 0.30;        /* how long the roll lasts */
+const ROLL_IFRAME = 0.17;      /* invulnerable for the first 57% of it */
+const ROLL_DIST = 196;         /* total distance covered */
+const SPRINT_MULT = 1.45;
+const KNOCKDOWN_TIME = 1.1;
+function rolling(){ const p=G.player; return !!p&&p.roll>0; }
+function playerDown(){ const p=G.player; return !!p&&p.down>0; }
+function startRoll(){
+  const p=G.player;
+  if(!p||G.dead||G.paused||G.panel) return false;
+  if(p.roll>0) return false;              /* a roll cannot cancel a roll */
+  if(playerDown()) return false;          /* knocked down: get up first */
+  /* Frozen solid still stops you, but an ordinary stagger does not: the roll
+     is what you reach for when you have been staggered. */
+  if(p.ailT.freeze>0) return false;
+  const mv=moveInput();
+  /* roll where you are steering, or where you are facing if standing still */
+  const a=(mv.len>0.05)?Math.atan2(mv.y,mv.x):p.face;
+  p.roll=ROLL_TIME; p.rollMax=ROLL_TIME; p.rollA=a;
+  p.iframe=Math.max(p.iframe,ROLL_IFRAME);
+  p.sprint=false;
+  p.ailT.stun=0;                          /* the roll cancels the stagger */
+  p.hitR=3;                               /* near-zero hitbox: slip the pack */
+  burst(p.x,p.y,10,'#cfe0ff',150,2.6,.3,true);
+  sfx('ui');
+  return true;
+}
+function updateRoll(dt){
+  const p=G.player;
+  if(p.roll<=0) return false;
+  p.roll-=dt;
+  const sp=ROLL_DIST/ROLL_TIME;
+  moveEnt(p,Math.cos(p.rollA)*sp*dt,Math.sin(p.rollA)*sp*dt);
+  p.face=p.rollA;
+  if(Math.random()<dt*40) spawnPart(p.x+rnd(-8,8),p.y+rnd(-8,8),rnd(-20,20),rnd(-20,20),.3,2,'#b8c8dc',.9,false);
+  if(p.roll<=0){ p.roll=0; p.hitR=p.r; }
+  return true;
+}
+function knockDown(){
+  const p=G.player;
+  if(!p||p.down>0) return;
+  p.down=KNOCKDOWN_TIME;
+  p.sprint=false;
+  p.roll=0; p.hitR=p.r;
+  /* a knockdown is a heavy stun: the gauge goes straight to full */
+  p.ail.stun=playerThreshold();
+  p.ailT.stun=Math.max(p.ailT.stun,KNOCKDOWN_TIME);
+  burst(p.x,p.y,20,'#e8d8a0',220,3.4,.55,true);
+  shakeCam(16); setHitStop(0.1); sfx('stun');
+  toast('Knocked down \u2014 sprinting into a hit puts you on the floor.');
 }
 function moveEnt(e,dx,dy){
   if(dx){ const nx=e.x+dx; if(canStand(nx,e.y,e.r)) e.x=nx; }
@@ -4339,6 +4432,8 @@ function fireMetaGem(gemIdx){
 function useSkill(slot,fromTouch){
   const p=G.player,ch=G.ch,st=G.st;
   if(!p||G.paused||G.dead||G.panel) return;
+  if(p.roll>0||p.down>0) return;          /* the roll and the floor own the frame */
+  p.sprint=false;                          /* any skill breaks the sprint */
   if(playerStunned()) return;
   const sk=activeSkills()[slot];
   if(!sk) return;
@@ -4623,7 +4718,7 @@ function updateEnemies(dt){
     if(e.kind==='melee'){
       if(d>e.r+p.r-4){ moveEnt(e,Math.cos(ang)*e.speed*dt,Math.sin(ang)*e.speed*dt); e.moving=true; }
       if(e.touchCd>0) e.touchCd-=dt;
-      if(d<e.r+p.r+2&&e.touchCd<=0){ e.touchCd=a.touchCd; damagePlayer(e.dmg,e.dtype,e); }
+      if(d<e.r+(p.hitR||p.r)+2&&e.touchCd<=0){ e.touchCd=a.touchCd; damagePlayer(e.dmg,e.dtype,e); }
     } else if(e.kind==='exploder'){
       if(d>e.r+p.r){ moveEnt(e,Math.cos(ang)*e.speed*dt,Math.sin(ang)*e.speed*dt); e.moving=true; }
       if(d<a.radius*0.55||e.fuse>0){
@@ -4632,7 +4727,7 @@ function updateEnemies(dt){
         if(e.fuse>=a.fuse){
           spawnFx({type:'shock',x:e.x,y:e.y,r:0,max:a.radius,life:.4,maxLife:.4,color:e.color});
           burst(e.x,e.y,26,e.color,320,4,.6,true);
-          if(d2(p.x,p.y,e.x,e.y)<a.radius*a.radius) damagePlayer(e.dmg,e.dtype,e);
+          if(d2(p.x,p.y,e.x,e.y)<a.radius*a.radius) damagePlayer(e.dmg,e.dtype,e,true);
           e.hp=0; killEnemy(e);
           shakeCam(9);
           continue;
@@ -4671,7 +4766,7 @@ function updateEnemies(dt){
         if(e.cd<=0&&d<keep*1.5){ e.cd=a.shotCd*rnd(.85,1.2); e.tele=0.34; e.teleMax=0.34; e.aim=ang; }
       }
       if(e.touchCd>0) e.touchCd-=dt;
-      if(d<e.r+p.r&&e.touchCd<=0){ e.touchCd=1; damagePlayer(e.dmg*0.6,e.dtype,e); }
+      if(d<e.r+(p.hitR||p.r)&&e.touchCd<=0){ e.touchCd=1; damagePlayer(e.dmg*0.6,e.dtype,e); }
     }
     enemySeparate(e,dt);
   }
@@ -4722,13 +4817,14 @@ function bossFire(b,kind){
     const ox=(b.windupAt&&b.windupAt.x!=null)?b.windupAt.x:p.x;
     const oy=(b.windupAt&&b.windupAt.y!=null)?b.windupAt.y:p.y;
     spawnFx({type:'shock',x:ox,y:oy,r:0,max:170,life:.45,maxLife:.45,color:b.rim});
-    if(d2(p.x,p.y,ox,oy)<170*170) damagePlayer(b.dmg*1.2,'physical',b);
+    /* the boss slam is the archetypal walk-out-of-it attack */
+    if(d2(p.x,p.y,ox,oy)<170*170) damagePlayer(b.dmg*1.2,'physical',b,true);
     shakeCam(14);
   } else if(kind==='beam'){
     const len=760;
     const ex=b.x+Math.cos(ang)*len, ey=b.y+Math.sin(ang)*len;
     spawnFx({type:'beam',x:b.x,y:b.y,x2:ex,y2:ey,life:.4,maxLife:.4,color:b.rim,w:20});
-    if(distToSeg(p.x,p.y,b.x,b.y,ex,ey)<p.r+24) damagePlayer(b.dmg*1.1,'lightning',b);
+    if(distToSeg(p.x,p.y,b.x,b.y,ex,ey)<(p.hitR||p.r)+24) damagePlayer(b.dmg*1.1,'lightning',b);
     shakeCam(10);
   } else if(kind==='ring'){
     /* a ring of standing fire, centred where the telegraph was */
@@ -4785,7 +4881,7 @@ function updateBoss(dt){
       spawnFx({type:'shock',x:b.x,y:b.y,r:0,max:120,life:.35,maxLife:.35,color:b.rim});
     } else {
       burst(b.x,b.y,3,b.rim,80,3,.3,true);
-      if(d<b.r+p.r+8&&b.touchCd<=0){ b.touchCd=.7; damagePlayer(b.dmg*1.1,'physical',b); }
+      if(d<b.r+(p.hitR||p.r)+8&&b.touchCd<=0){ b.touchCd=.7; damagePlayer(b.dmg*1.1,'physical',b); }
       if(b.dash&&b.dash.t<=0) b.dash=null;
     }
   } else if(b.windup){
@@ -4813,7 +4909,7 @@ function updateBoss(dt){
     }
   }
   if(b.touchCd>0) b.touchCd-=dt;
-  if(!b.dash&&d<b.r+p.r&&b.touchCd<=0){ b.touchCd=.9; damagePlayer(b.dmg*.7,'physical',b); }
+  if(!b.dash&&d<b.r+(p.hitR||p.r)&&b.touchCd<=0){ b.touchCd=.9; damagePlayer(b.dmg*.7,'physical',b); }
 }
 function onBossDead(){
   const b=G.boss;
@@ -4856,11 +4952,35 @@ function moveInput(){
 function updatePlayer(dt){
   const p=G.player,st=G.st,ch=G.ch;
   tickPlayerAilments(dt);
+  if(p.down>0){
+    /* on the floor: nothing but the clocks run */
+    p.down-=dt;
+    for(let i=0;i<5;i++) if(p.cds[i]>0) p.cds[i]-=dt;
+    if(p.iframe>0) p.iframe-=dt;
+    if(p.esDelay>0) p.esDelay-=dt;
+    if(p.down<=0){ p.ailT.stun=0; p.ail.stun=0; }
+    updatePrompt();
+    return;
+  }
+  /* The roll owns the frame while it lasts. Cooldowns and pools keep
+     ticking, but nothing else gets a say. */
+  if(updateRoll(dt)){
+    for(let i=0;i<5;i++) if(p.cds[i]>0) p.cds[i]-=dt;
+    if(p.iframe>0) p.iframe-=dt;
+    if(p.esDelay>0) p.esDelay-=dt;
+    else if(p.es<st.maxES) p.es=Math.min(st.maxES,p.es+st.maxES*0.28*dt);
+    if(p.mana<st.maxMana) p.mana=Math.min(st.maxMana,p.mana+st.manaRegen*dt);
+    p.moving=true;
+    updatePrompt();
+    return;
+  }
   const frozen=playerStunned();
   const mv=frozen?{x:0,y:0,len:0}:moveInput();
   p.moving=false;
+  /* sprint: held, and only while actually moving */
+  if(p.sprint&&(frozen||mv.len<=0.05)) p.sprint=false;
   if(mv.len>0.05){
-    const sp=st.moveSpeed;
+    const sp=st.moveSpeed*(p.sprint?SPRINT_MULT:1);
     moveEnt(p,mv.x*sp*dt,mv.y*sp*dt);
     p.walkT+=dt*mv.len*9;
     p.moving=true;
@@ -4889,7 +5009,7 @@ function updatePlayer(dt){
   if(G.keys['q']) useSkill(1,false);
   if(G.keys['e']) useSkill(2,false);
   if(G.keys['r']) useSkill(3,false);
-  if(G.keys[' ']) useSkill(4,false);
+  if(G.keys['t']) useSkill(4,false);
   /* fog-free map still records where you have been, for the map overlay */
   const tx=(p.x/TILE)|0, ty=(p.y/TILE)|0;
   for(let y=ty-4;y<=ty+4;y++) for(let x=tx-4;x<=tx+4;x++){
@@ -5033,7 +5153,7 @@ function updateClouds(dt){
     if(c.tick<=0){
       c.tick=0.35;
       if(c.hostile){
-        if(d2(p.x,p.y,c.x,c.y)<c.r*c.r) damagePlayer(c.dps*0.35,c.dtype,null);
+        if(d2(p.x,p.y,c.x,c.y)<c.r*c.r) damagePlayer(c.dps*0.35,c.dtype,null,true);
       } else {
         for(const e of nearbyEnemies(c.x,c.y,c.r+40)){
           if(e.dead||e.dying) continue;
@@ -5324,7 +5444,9 @@ function drawEnemy(e){
   ctx.drawImage(glowSprite(e.color),-gr,-gr,gr*2,gr*2);
   ctx.globalAlpha=alpha;
   let col=e.hurt>0?'#ffffff':e.color;
-  if(e.ailT.freeze>0) col='#9fd8ee';
+  /* winding up something that cannot be rolled through: flash red */
+  if(e.tele>0&&Math.sin(G.time*26)>-0.1) col='#e0503c';
+  else if(e.ailT.freeze>0) col='#9fd8ee';
   else if(e.ailT.ignite>0) col=shadeHex(e.color,30);
   ctx.fillStyle=col;
   ctx.strokeStyle=rgba(shadeHex(e.color,60),.9);
@@ -5363,9 +5485,9 @@ function drawEnemy(e){
   if(e.tele>0){
     const t=1-e.tele/e.teleMax;
     ctx.save();
-    ctx.globalAlpha=.25+.5*t;
-    ctx.strokeStyle=rgba(e.color,.85);
-    ctx.lineWidth=1.5;
+    ctx.globalAlpha=.3+.6*t;
+    ctx.strokeStyle='rgba(224,80,60,.9)';
+    ctx.lineWidth=2;
     if(e.kind==='exploder'){
       ctx.beginPath(); ctx.arc(e.x,e.y,ARCH.exploder.radius*t,0,TAU); ctx.stroke();
     } else {
@@ -5411,9 +5533,10 @@ function drawBoss(){
   if(b.windup){
     const t=1-b.windup.t/b.windup.total;
     ctx.save();
-    ctx.globalAlpha=.3+.55*t;
-    ctx.strokeStyle=rgba(b.rim,.9);
-    ctx.lineWidth=2.5;
+    /* red, because none of these can be rolled through */
+    ctx.globalAlpha=.35+.6*t;
+    ctx.strokeStyle='rgba(224,80,60,.92)';
+    ctx.lineWidth=2.8;
     const p=G.player;
     if(b.windup.kind==='dash'||b.windup.kind==='beam'){
       const a=Math.atan2(p.y-b.y,p.x-b.x);
@@ -5454,7 +5577,17 @@ function drawPlayer(){
   }
   ctx.globalAlpha=.5;
   ctx.drawImage(glowSprite(G.theme.rim),-p.r*2.6,-p.r*2.6,p.r*5.2,p.r*5.2);
-  ctx.globalAlpha=p.iframe>0?(.45+.55*Math.abs(Math.sin(G.time*30))):1;
+  if(p.roll>0){
+    /* a streak behind the roll, and the body low and small */
+    const t=p.roll/p.rollMax;
+    ctx.globalAlpha=.28;
+    for(let i=1;i<=3;i++){
+      const d=i*16*t;
+      ctx.drawImage(glowSprite('#9fd8ee'),p.x-Math.cos(p.rollA)*d-14,p.y-Math.sin(p.rollA)*d-14,28,28);
+    }
+    ctx.globalAlpha=1;
+  }
+  ctx.globalAlpha=p.down>0?.55:(p.iframe>0?(.45+.55*Math.abs(Math.sin(G.time*30))):1);
   ctx.rotate(p.face);
   ctx.fillStyle='#e8dfc9';
   ctx.beginPath();
@@ -5834,9 +5967,20 @@ function buildSlotUI(){
 /* one standing badge wherever the tree is reachable, while points are unspent */
 /* the player's own ailment buildup, mirroring the monster meters */
 let pailBuilt=false;
+function updateStunGauge(){
+  const p=G.player;
+  const el=$('stungauge');
+  if(!el||!p) return;
+  const staggered=p.ailT.stun>0||p.down>0;
+  const v=staggered?1:clamp((p.ail.stun||0)/playerThreshold(),0,1);
+  setElClass(el,'on',v>0.02||staggered);
+  setElClass(el,'full',staggered);
+  if(v>0.02||staggered) setElStyle($('stun-fill'),'width',(Math.round(v*1000)/10)+'%');
+}
 function updatePlayerAilHud(){
   const host=$('pail'), p=G.player;
   if(!host||!p) return;
+  updateStunGauge();
   if(!pailBuilt){
     host.innerHTML=AILMENTS.map(k=>'<div class="m" data-a="'+k+'"><i></i><b>'+k.toUpperCase()+'</b></div>').join('');
     pailBuilt=true;
@@ -7444,6 +7588,19 @@ function renderMenu(){
   html+='<button class="btn ghost" id="m-skills">Skills</button>';
   html+='<button class="btn ghost" id="m-tree">Passive Tree</button>';
   html+='<button class="btn ghost" id="m-sheet">Character</button>';
+  html+='<div class="sect">Controls</div>';
+  html+='<div class="summary">'+
+    kv('Move','WASD, or hold right mouse')+
+    kv('Sprint','hold Shift (a hit knocks you down)')+
+    kv('Dodge roll','Space \u2014 free, and invulnerable at the start')+
+    kv('Skills','left click, Q, E, R, T')+
+    kv('Flasks','1 and 2')+
+    kv('Weapon set','X')+
+    kv('Panels','I bag, P tree, C sheet, Tab map, H hideout')+
+    '</div>';
+  html+='<div class="pnote" style="font-size:13.5px">A roll cancels anything except another roll, '+
+    'and shrinks you to almost nothing while it lasts. It will not save you from a '+
+    '<b style="color:#e0503c">red telegraph</b> \u2014 walk out of those.</div>';
   html+='<button class="btn ghost" id="m-sound">Sound: '+(SND.on?'On':'Off')+'</button>';
   html+='<button class="btn ghost" id="m-exit">Save and Leave</button>';
   $('menu-body').innerHTML=html;
@@ -7975,12 +8132,19 @@ window.addEventListener('keydown',e=>{
   if(k==='f'){ interact(); return; }
   if(k==='1'){ useFlask('life'); return; }
   if(k==='2'){ useFlask('mana'); return; }
+  /* Space is the dodge roll. The fifth skill moved to T. */
+  if(k===' '){ e.preventDefault(); startRoll(); return; }
+  if(k==='shift'){ G.player&&(G.player.sprint=true); return; }
   if(k==='q') useSkill(1,false);
   if(k==='e') useSkill(2,false);
   if(k==='r') useSkill(3,false);
-  if(k===' '){ e.preventDefault(); useSkill(4,false); }
+  if(k==='t') useSkill(4,false);
 });
-window.addEventListener('keyup',e=>{ G.keys[e.key.toLowerCase()]=false; });
+window.addEventListener('keyup',e=>{
+  const k=e.key.toLowerCase();
+  G.keys[k]=false;
+  if(k==='shift'&&G.player) G.player.sprint=false;
+});
 window.addEventListener('blur',()=>{ G.keys=Object.create(null); G.mouse.left=false; G.mouse.right=false; });
 cv.addEventListener('mousemove',e=>{
   const r=cv.getBoundingClientRect();
@@ -8072,6 +8236,28 @@ function setupTouch(){
   const doSwap=ev=>{ ev.preventDefault(); ev.stopPropagation(); swapSet(); };
   sw.addEventListener('touchstart',doSwap,{passive:false});
   sw.addEventListener('mousedown',doSwap);
+  /* the roll is a tap; the sprint is a hold, exactly as on the keyboard */
+  const rb=$('tbroll');
+  if(rb){
+    const go=ev=>{ ev.preventDefault(); ev.stopPropagation();
+      rb.classList.add('down'); startRoll();
+      setTimeout(()=>rb.classList.remove('down'),140); };
+    rb.addEventListener('touchstart',go,{passive:false});
+    rb.addEventListener('mousedown',go);
+  }
+  const sp=$('tbsprint');
+  if(sp){
+    const on=ev=>{ ev.preventDefault(); ev.stopPropagation(); sp.classList.add('down');
+      if(G.player) G.player.sprint=true; };
+    const off=ev=>{ ev.preventDefault(); ev.stopPropagation(); sp.classList.remove('down');
+      if(G.player) G.player.sprint=false; };
+    sp.addEventListener('touchstart',on,{passive:false});
+    sp.addEventListener('touchend',off,{passive:false});
+    sp.addEventListener('touchcancel',off,{passive:false});
+    sp.addEventListener('mousedown',on);
+    sp.addEventListener('mouseup',off);
+    sp.addEventListener('mouseleave',off);
+  }
   const hb=$('tb-hide');
   if(hb){
     const go=ev=>{ ev.preventDefault(); ev.stopPropagation(); goHideout(); };
