@@ -273,7 +273,7 @@ body.touch #tmenu{display:flex}
 .item{position:absolute;border-radius:3px;background:rgba(16,16,22,.9);border:1px solid rgba(255,255,255,.1);
   display:flex;align-items:center;justify-content:center;text-align:center;font-size:10px;line-height:1.1;
   padding:2px;cursor:grab;overflow:hidden;font-family:'Crimson Pro',serif}
-.item.drag{opacity:.45;cursor:grabbing}
+.item.dragging{opacity:.2;cursor:grabbing}
 .item.r0{border-color:rgba(207,202,189,.35);color:var(--r0)}
 .item.r1{border-color:rgba(106,143,200,.5);color:var(--r1)}
 .item.r2{border-color:rgba(212,192,96,.5);color:var(--r2)}
@@ -285,7 +285,30 @@ body.touch #tmenu{display:flex}
 .item.stack .ct{font-family:'Cinzel',serif;font-size:9px;color:#efe4c4}
 .item.armed{border-color:var(--gold);box-shadow:inset 0 0 0 1px rgba(200,169,110,.5)}
 .item.dim{opacity:.3}
-.item.dropping{border-color:#b4685f;opacity:.75}
+/* Drag feedback. The footprint box rides above the item elements: as cell
+   classes it was hidden behind the very items that blocked the drop, which
+   is exactly when the player needs to see it. */
+#fitbox{position:fixed;z-index:59;display:none;pointer-events:none;border-radius:3px;border:1px solid}
+#fitbox.on{display:block}
+#fitbox.ok{background:rgba(104,186,118,.22);border-color:rgba(132,214,150,.85);
+  box-shadow:inset 0 0 0 1px rgba(132,214,150,.35)}
+#fitbox.bad{background:rgba(198,72,60,.26);border-color:rgba(224,104,88,.9);
+  box-shadow:inset 0 0 0 1px rgba(224,104,88,.4)}
+#dragghost.fit{border-color:rgba(132,214,150,.9)}
+#dragghost.unfit{border-color:rgba(224,104,88,.95)}
+.eqslot.nope{border-color:rgba(198,72,60,.6);background:rgba(198,72,60,.12)}
+/* the dragged item rides on a ghost so it never jumps to the cursor */
+#dragghost{position:fixed;z-index:62;display:none;pointer-events:none;opacity:.94;
+  box-shadow:0 8px 22px rgba(0,0,0,.6)}
+#dragghost.on{display:flex}
+/* panels cover the whole screen, so the ground needs a real target */
+#dropzone{position:fixed;z-index:58;display:none;left:50%;transform:translateX(-50%);
+  bottom:calc(16px + env(safe-area-inset-bottom));padding:11px 22px;border-radius:5px;
+  border:1px dashed rgba(200,169,110,.45);background:rgba(6,6,9,.94);
+  font-family:'Cinzel',serif;font-size:11px;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--dim);pointer-events:none;white-space:nowrap}
+#dropzone.on{display:block}
+#dropzone.hot{border-style:solid;border-color:#b4685f;color:#e0b4a8;background:rgba(40,12,10,.95)}
 #tooltip{position:fixed;z-index:60;max-width:290px;background:rgba(6,6,9,.97);
   border:1px solid rgba(200,169,110,.28);border-radius:4px;padding:11px 13px;display:none;
   pointer-events:none;font-size:13.5px;line-height:1.45}
@@ -1585,7 +1608,7 @@ const G = {
   touch:{id:null,ox:0,oy:0,dx:0,dy:0,active:false,btn:{}},
   view:{w:0,h:0,dpr:1}, dprCap:2, slowT:0,
   panel:null, tree:{x:0,y:0,z:0.62,drag:false,sel:null,set:0,search:''},
-  drag:null, tip:null, toastT:0, prompt:null,
+  tip:null, toastT:0, prompt:null,
   explored:null, kills:0
 };
 window.G=G;
@@ -2639,7 +2662,7 @@ function bakeVignettes(){
   VIG.dark=mk([[0,'rgba(0,0,0,0)'],[1,'rgba(0,0,0,.6)']],w/2,h*0.46,Math.min(w,h)*0.3,Math.max(w,h)*0.78);
   VIG.red=mk([[0,'rgba(150,20,14,0)'],[1,'rgba(150,20,14,1)']],w/2,h/2,Math.min(w,h)*0.2,Math.max(w,h)*0.72);
 }
-window.addEventListener('resize',()=>{resizeCanvas(); if(G.panel==='inv') openPanel('inv');});
+window.addEventListener('resize',()=>{ if(DRAG) endDrag(); resizeCanvas(); if(G.panel==='inv') openPanel('inv');});
 window.addEventListener('orientationchange',()=>setTimeout(()=>{resizeCanvas(); if(G.panel==='inv') openPanel('inv');},140));
 
 /* ==========================================================================
@@ -5231,6 +5254,7 @@ function updateHUD(){
 const PANEL_IDS={inv:'panel-inv',tree:'panel-tree',skills:'panel-skills',sheet:'panel-sheet',
   map:'panel-map',menu:'panel-menu',npc:'panel-npc',death:'panel-death'};
 function openPanel(kind){
+  if(DRAG) endDrag();
   for(const k in PANEL_IDS) $(PANEL_IDS[k]).classList.remove('on');
   G.panel=kind;
   $(PANEL_IDS[kind]).classList.add('on');
@@ -5255,6 +5279,7 @@ function openPanel(kind){
   if(kind==='map') resizeCanvas();
 }
 function closePanel(){
+  if(DRAG) endDrag();
   for(const k in PANEL_IDS) $(PANEL_IDS[k]).classList.remove('on');
   G.panel=null;
   G.tool=null; G.stashTab=G.stashTab||0;
@@ -5492,6 +5517,228 @@ function showStackTip(it,x,y,extra){
   if(extra) html+='<div class="hint">'+extra+'</div>';
   showTipHtml(html,x,y);
 }
+/* ==========================================================================
+   DRAG CONTROLLER
+   One controller owns every drag; item elements hold no drag state of their
+   own. An item's pointerdown records intent and nothing more, and the move
+   and up listeners live on WINDOW for exactly as long as the drag lasts.
+   Pointer capture is requested as an optimisation and allowed to fail
+   silently: correctness never depends on it. Depending on it is what used
+   to strand an item on the cursor, because once the pointer left the item
+   element neither of its own handlers fired again.
+   ========================================================================== */
+const DRAG_SLOP=6;          /* px of travel before a press becomes a drag */
+let DRAG=null;              /* the one live drag, or null */
+
+/* Grids register themselves as they render, so the drop resolver can find
+   whichever one the pointer is over — including one in a different panel,
+   which is what makes bag <-> stash transfers work. */
+const GRIDS=[];
+function registerGrid(g){
+  for(let i=GRIDS.length-1;i>=0;i--)
+    if(GRIDS[i].host===g.host||!GRIDS[i].host.isConnected) GRIDS.splice(i,1);
+  GRIDS.push(g);
+}
+function gridFor(host){ for(const g of GRIDS) if(g.host===host) return g; return null; }
+function inRect(r,cx,cy){ return cx>=r.left&&cx<=r.right&&cy>=r.top&&cy<=r.bottom; }
+function gridUnder(cx,cy){
+  for(const g of GRIDS){
+    if(!g.host.isConnected) continue;
+    if(inRect(g.host.getBoundingClientRect(),cx,cy)) return g;
+  }
+  return null;
+}
+function slotUnder(cx,cy){
+  const els=document.querySelectorAll('[data-eq]');
+  for(let i=0;i<els.length;i++){
+    const el=els[i];
+    if(el.offsetParent&&inRect(el.getBoundingClientRect(),cx,cy)) return el;
+  }
+  return null;
+}
+/* Where the item's top-left cell lands in this grid. Measured from the grab
+   offset, not the cursor, so the item keeps the grip you picked it up by. */
+function dragCell(g,cx,cy){
+  const r=g.host.getBoundingClientRect();
+  return {x:Math.round((cx-DRAG.ox-r.left)/g.cs), y:Math.round((cy-DRAG.oy-r.top)/g.cs)};
+}
+function ghostEl(){
+  let el=$('dragghost');
+  if(!el){ el=document.createElement('div'); el.id='dragghost'; document.body.appendChild(el); }
+  return el;
+}
+function fitBoxEl(){
+  let el=$('fitbox');
+  if(!el){ el=document.createElement('div'); el.id='fitbox'; document.body.appendChild(el); }
+  return el;
+}
+function hideFitBox(){ const f=$('fitbox'); if(f) f.className=''; }
+/* Highlights the cells the footprint would occupy, green if it fits there
+   and red if it does not. */
+function showFitBox(g,x,y,iw,ih,ok){
+  const r=g.host.getBoundingClientRect();
+  const f=fitBoxEl();
+  f.className='on '+(ok?'ok':'bad');
+  f.style.left=(r.left+x*g.cs)+'px';
+  f.style.top=(r.top+y*g.cs)+'px';
+  f.style.width=(iw*g.cs)+'px';
+  f.style.height=(ih*g.cs)+'px';
+}
+function dropZoneEl(){
+  let el=$('dropzone');
+  if(!el){
+    el=document.createElement('div'); el.id='dropzone';
+    el.textContent='Release here to drop on the ground';
+    document.body.appendChild(el);
+  }
+  return el;
+}
+/* Can this item go in this particular slot? '' means yes. */
+function equipWhyNot(it,slotKey){
+  if(isStack(it)) return 'Currency cannot be equipped.';
+  const ch=G.ch, b=BASES[it.b];
+  const want = b.slot==='ring'? ['ring1','ring2'] : [b.slot];
+  if(want.indexOf(slotKey)<0) return b.name+' does not go in that slot.';
+  if(!it.idf) return 'Identify it first.';
+  if(itemLevelReq(it)>ch.level) return 'Requires level '+itemLevelReq(it)+'.';
+  if(slotKey==='offhand'&&twoHandEquipped()) return 'Both hands are on your weapon.';
+  return '';
+}
+function canGroundDrop(list){
+  return list===G.ch.inv || list===G.save.stash[G.stashTab||0];
+}
+function beginDrag(it,list,host,el,ev,onClick){
+  const r=el.getBoundingClientRect();
+  DRAG={it:it, list:list, host:host, el:el, onClick:onClick,
+    ox:ev.clientX-r.left, oy:ev.clientY-r.top,
+    sx:ev.clientX, sy:ev.clientY, pid:ev.pointerId,
+    live:false, hl:[], slot:null, target:null, zone:false};
+  window.addEventListener('pointermove',onDragMove,true);
+  window.addEventListener('pointerup',onDragUp,true);
+  window.addEventListener('pointercancel',onDragCancel,true);
+  window.addEventListener('blur',onDragCancel);
+}
+function dragGoLive(){
+  const d=DRAG;
+  d.live=true;
+  hideTip(); clearSlotHighlight();
+  d.el.classList.add('dragging');
+  const g=gridFor(d.host);
+  const cs=g?g.cs:itemCellSize();
+  const gh=ghostEl();
+  gh.className=d.el.className.replace(/\bdragging\b/,'')+' on';
+  gh.style.width=(itemW(d.it)*cs-2)+'px';
+  gh.style.height=(itemH(d.it)*cs-2)+'px';
+  gh.innerHTML=d.el.innerHTML;
+  if(canGroundDrop(d.list)) dropZoneEl().classList.add('on');
+}
+function clearDragHl(){
+  hideFitBox();
+  ghostEl().classList.remove('fit','unfit');
+  const d=DRAG;
+  if(!d) return;
+  for(const el of d.hl) el.classList.remove('target','nope');
+  d.hl.length=0;
+}
+function onDragMove(ev){
+  const d=DRAG;
+  if(!d) return;
+  if(d.pid!=null&&ev.pointerId!=null&&ev.pointerId!==d.pid) return;
+  if(!d.live){
+    if(Math.abs(ev.clientX-d.sx)<DRAG_SLOP&&Math.abs(ev.clientY-d.sy)<DRAG_SLOP) return;
+    dragGoLive();
+  }
+  if(ev.cancelable) ev.preventDefault();
+  const gh=ghostEl();
+  gh.style.left=(ev.clientX-d.ox)+'px';
+  gh.style.top=(ev.clientY-d.oy)+'px';
+  clearDragHl();
+  d.slot=null; d.target=null; d.zone=false;
+  const zone=dropZoneEl();
+  if(zone.classList.contains('on')&&inRect(zone.getBoundingClientRect(),ev.clientX,ev.clientY)){
+    zone.classList.add('hot'); d.zone=true; return;
+  }
+  zone.classList.remove('hot');
+  const slot=slotUnder(ev.clientX,ev.clientY);
+  if(slot){
+    d.slot=slot.dataset.eq;
+    slot.classList.add(equipWhyNot(d.it,d.slot)?'nope':'target');
+    d.hl.push(slot);
+    return;
+  }
+  const g=gridUnder(ev.clientX,ev.clientY);
+  if(!g) return;
+  const c=dragCell(g,ev.clientX,ev.clientY);
+  const ok=gridFits(g.list,d.it,c.x,c.y,g.w,g.h,g.list===d.list?d.it:null);
+  d.target={g:g,x:c.x,y:c.y,ok:ok};
+  const cx=clamp(c.x,0,g.w-itemW(d.it)), cy=clamp(c.y,0,g.h-itemH(d.it));
+  showFitBox(g,cx,cy,itemW(d.it),itemH(d.it),ok);
+  gh.classList.add(ok?'fit':'unfit');
+}
+function onDragUp(ev){
+  const d=DRAG;
+  if(!d) return;
+  if(d.pid!=null&&ev.pointerId!=null&&ev.pointerId!==d.pid) return;
+  finishDrag();
+}
+function onDragCancel(){ if(DRAG) endDrag(); }
+/* Tears the drag down without resolving it: the item never moved, so there
+   is nothing to put back. Safe to call from anywhere, any number of times. */
+function endDrag(){
+  const d=DRAG;
+  DRAG=null;
+  window.removeEventListener('pointermove',onDragMove,true);
+  window.removeEventListener('pointerup',onDragUp,true);
+  window.removeEventListener('pointercancel',onDragCancel,true);
+  window.removeEventListener('blur',onDragCancel);
+  if(d){
+    for(const el of d.hl) el.classList.remove('target','nope');
+    d.el.classList.remove('dragging');
+    try{ d.el.releasePointerCapture(d.pid); }catch(err){}
+  }
+  hideFitBox();
+  ghostEl().classList.remove('on','fit','unfit');
+  const z=dropZoneEl();
+  z.classList.remove('on','hot');
+}
+/* Every drop outcome is decided here and nowhere else. */
+function finishDrag(){
+  const d=DRAG;
+  if(!d) return;
+  const live=d.live, it=d.it, src=d.list, onClick=d.onClick;
+  const zone=d.zone, slot=d.slot, target=d.target;
+  endDrag();
+  if(!live){ onClick&&onClick(it); return; }          /* a press, not a drag */
+  if(zone){ dropItem(it,src); return; }               /* onto the ground */
+  if(slot){                                            /* onto an equip slot */
+    if(src!==G.ch.inv){ toast('Move it to your bag first.'); return; }
+    const why=equipWhyNot(it,slot);
+    if(why){ toast(why); return; }
+    equipItem(it,slot);
+    return;
+  }
+  if(!target) return;                                  /* nowhere: snaps back */
+  if(!target.ok){ toast('It does not fit there.'); return; }
+  if(target.g.list===src){                             /* within one grid */
+    it.pos.x=target.x; it.pos.y=target.y;
+    markDirty();
+    /* one element moves; the cell layer and every other item are untouched */
+    const el=target.g.els.get(it);
+    if(el){ el.style.left=(it.pos.x*target.g.cs)+'px'; el.style.top=(it.pos.y*target.g.cs)+'px'; }
+    else target.g.redraw();
+    return;
+  }
+  transferItem(it,src,target.g,target.x,target.y);     /* bag <-> stash */
+}
+function transferItem(it,src,g,x,y){
+  const i=src.indexOf(it);
+  if(i<0) return;
+  src.splice(i,1);
+  it.pos={x:x,y:y};
+  g.list.push(it);
+  markDirty(); sfx('ui');
+  for(const gg of GRIDS.slice()) if(gg.host.isConnected) gg.redraw();
+}
 function renderGrid(host,list,w,h,onClick,onDragEnd){
   const cs=itemCellSize();
   host.style.width=(cs*w)+'px';
@@ -5517,6 +5764,7 @@ function renderGrid(host,list,w,h,onClick,onDragEnd){
   } else {
     while(host.lastElementChild&&host.lastElementChild!==cells) host.removeChild(host.lastElementChild);
   }
+  const els=new Map();
   for(const it of list){
     const stack=isStack(it);
     const el=document.createElement('div');
@@ -5527,50 +5775,25 @@ function renderGrid(host,list,w,h,onClick,onDragEnd){
     if(stack) el.innerHTML='<span class="ab">'+esc(curAbbr(it.cur))+'</span><span class="ct">'+it.n+'</span>';
     else el.textContent=it.idf?itemName(it):('? '+BASES[it.b].name);
     el.addEventListener('pointerenter',ev=>{
+      if(DRAG) return;
       tipFor(it,ev.clientX,ev.clientY,gridHint(it));
       if(!stack) highlightSlotFor(it);
     });
-    el.addEventListener('pointerleave',()=>{ hideTip(); clearSlotHighlight(); });
+    el.addEventListener('pointerleave',()=>{ if(DRAG) return; hideTip(); clearSlotHighlight(); });
     el.addEventListener('contextmenu',ev=>{ ev.preventDefault(); dropItem(it,list); });
-    let moved=false,sx=0,sy=0;
+    /* This is the whole of the item's involvement in a drag: record intent
+       and hand off to the controller. No move or up handler lives here. */
     el.addEventListener('pointerdown',ev=>{
-      if(ev.button===2) return;
-      ev.preventDefault();
-      moved=false; sx=ev.clientX; sy=ev.clientY;
+      if(ev.button===2||DRAG) return;
+      if(ev.cancelable) ev.preventDefault();
       try{ el.setPointerCapture(ev.pointerId); }catch(err){}
-      G.drag={it:it,list:list,w:w,h:h,cs:cs,el:el,host:host,px:it.pos.x,py:it.pos.y,out:false};
-      el.classList.add('drag');
+      beginDrag(it,list,host,el,ev,onClick);
     });
-    el.addEventListener('pointermove',ev=>{
-      if(!G.drag||G.drag.it!==it) return;
-      if(Math.abs(ev.clientX-sx)>6||Math.abs(ev.clientY-sy)>6) moved=true;
-      const r=host.getBoundingClientRect();
-      const gx=Math.round((ev.clientX-r.left-(itemW(it)*cs)/2)/cs);
-      const gy=Math.round((ev.clientY-r.top-(itemH(it)*cs)/2)/cs);
-      el.style.left=(clamp(gx,0,w-itemW(it))*cs)+'px';
-      el.style.top=(clamp(gy,0,h-itemH(it))*cs)+'px';
-      G.drag.gx=clamp(gx,0,w-itemW(it)); G.drag.gy=clamp(gy,0,h-itemH(it));
-      /* dragged clear of the grid: this is the drop gesture */
-      const out=ev.clientX<r.left-24||ev.clientX>r.right+24||ev.clientY<r.top-24||ev.clientY>r.bottom+24;
-      G.drag.out=out;
-      el.classList.toggle('dropping',out);
-    });
-    el.addEventListener('pointerup',ev=>{
-      el.classList.remove('drag','dropping');
-      hideTip(); clearSlotHighlight();
-      if(!G.drag||G.drag.it!==it){ G.drag=null; return; }
-      const d=G.drag; G.drag=null;
-      if(!moved){ onClick&&onClick(it); return; }
-      if(d.out){ dropItem(it,list); return; }
-      if(d.gx!=null&&gridFits(list,it,d.gx,d.gy,w,h,it)){
-        it.pos.x=d.gx; it.pos.y=d.gy;
-        markDirty();
-      }
-      onDragEnd&&onDragEnd();
-      renderInvBodies();
-    });
+    els.set(it,el);
     host.appendChild(el);
   }
+  registerGrid({host:host,list:list,w:w,h:h,cs:cs,els:els,
+    redraw:()=>renderGrid(host,list,w,h,onClick,onDragEnd)});
 }
 /* an item can always leave the bag: drag it out, or right-click it */
 function dropItem(it,list){
@@ -5578,7 +5801,10 @@ function dropItem(it,list){
   const src=list||ch.inv;
   const i=src.indexOf(it);
   if(i<0) return;
-  if(src!==ch.inv&&src!==G.save.stash[G.stashTab||0]){ return; }
+  if(src!==ch.inv&&src!==G.save.stash[G.stashTab||0]){
+    toast('Only the bag and the open stash tab can drop to the ground.'); return;
+  }
+  if(!G.player){ toast('Nowhere to drop it.'); return; }
   src.splice(i,1);
   if(G.player){
     if(isStack(it)) spawnGroundCurrency(it.cur,G.player.x+rnd(-30,30),G.player.y+rnd(-30,30),it.n);
@@ -5604,13 +5830,21 @@ function highlightSlotFor(it){
 function clearSlotHighlight(){
   document.querySelectorAll('.eqslot.target').forEach(e=>e.classList.remove('target'));
 }
-function equipItem(it){
+/* forceSlot names the slot to use — set when the player dropped the item on
+   a particular slot. Without it the slot is chosen the way a click does. */
+function equipItem(it,forceSlot){
   if(isStack(it)){ toast('Currency cannot be equipped.'); return; }
   const ch=G.ch, b=BASES[it.b];
   if(itemLevelReq(it)>ch.level){ toast('Requires level '+itemLevelReq(it)+'.'); return; }
   if(!it.idf){ toast('Identify it first.'); return; }
   let slot=b.slot, target=null;
-  if(slot==='weapon'||slot==='offhand'){
+  if(forceSlot){
+    if(equipWhyNot(it,forceSlot)){ toast(equipWhyNot(it,forceSlot)); return; }
+    slot=forceSlot;
+    target = (slot==='weapon')? ch.sets[ch.activeSet].weapon
+           : (slot==='offhand')? ch.sets[ch.activeSet].offhand
+           : ch.equip[slot];
+  } else if(slot==='weapon'||slot==='offhand'){
     const s=ch.sets[ch.activeSet];
     if(slot==='weapon'&&s.weapon) target=s.weapon;
     if(slot==='offhand'&&s.offhand) target=s.offhand;
@@ -5739,6 +5973,8 @@ const EQ_LAYOUT=[
   ['gloves','Gloves'],['body','Body'],['ring1','Ring'],['ring2','Ring'],
   ['belt','Belt'],['boots','Boots']
 ];
+const EQ_LABEL={};
+for(const [k,l] of EQ_LAYOUT) EQ_LABEL[k]=l;
 function eqItemFor(key){
   const ch=G.ch;
   if(key==='weapon') return ch.sets[ch.activeSet].weapon;
@@ -5763,7 +5999,8 @@ function eqSlotHtml(key,label){
 function renderInv(){
   const ch=G.ch;
   let html='<div class="ptitle">Inventory</div>';
-  html+='<div class="pnote">Click an item to equip it, drag to move, drag out of the bag to drop.<br>'+
+  html+='<div class="pnote">Click to equip. Drag to rearrange, onto a slot to equip it there, '+
+    'or onto the bar at the bottom of the screen to drop it. Right-click also drops.<br>'+
     '<span style="color:#5f5b53">'+esc(ch.name)+' \u00b7 level '+ch.level+' '+esc(CLASSES[ch.cls].name)+'</span></div>';
   html+='<div class="invwrap"><div>';
   html+='<div class="sect">Equipped</div>';
@@ -5787,14 +6024,15 @@ function renderInv(){
   }));
   body.querySelectorAll('[data-eq]').forEach(el=>{
     const key=el.dataset.eq;
-    const it=eqItemFor(key);
     el.addEventListener('click',()=>{
+      const it=eqItemFor(key);
       if(it&&G.tool){
         if(!toolApplies(it)){ toast(toolWhyNot(it)); return; }
         applyTool(it);
       } else if(it) unequipSlot(key);
     });
-    el.addEventListener('contextmenu',ev=>{ ev.preventDefault(); if(it) unequipSlot(key); });
+    el.addEventListener('contextmenu',ev=>{ ev.preventDefault(); if(eqItemFor(key)) unequipSlot(key); });
+    const it=eqItemFor(key);
     if(it){
       el.addEventListener('pointerenter',ev=>tipFor(it,ev.clientX,ev.clientY,
         G.tool?gridHint(it):'Click to unequip'));
@@ -5834,13 +6072,24 @@ function renderInvBodies(){
       kv('Spirit',st.spiritUsed+' / '+st.spiritMax)+
       kv('Shards',countCurrency('shard'))+kv('Essence',countCurrency('essence'));
   }
+  refreshEqSlots();
+}
+/* Rewrites each paper-doll slot in place. Equipping used to leave the doll
+   showing the previous item until the whole panel was rebuilt. */
+function refreshEqSlots(){
   const eq=$('inv-body');
-  if(eq&&G.panel==='inv'){
-    eq.querySelectorAll('[data-eq]').forEach(el=>{
-      const it=eqItemFor(el.dataset.eq);
-      el.classList.toggle('dim',!!(G.tool&&it&&!toolApplies(it)));
-    });
-  }
+  if(!eq||G.panel!=='inv') return;
+  eq.querySelectorAll('[data-eq]').forEach(el=>{
+    const key=el.dataset.eq;
+    const it=eqItemFor(key);
+    const label=(EQ_LABEL[key]||key);
+    const blocked=(key==='offhand'&&twoHandEquipped());
+    el.className='eqslot slot-'+key+(it?' filled r'+it.r:'')+(blocked?' blocked':'')+
+      (G.tool&&it&&!toolApplies(it)?' dim':'');
+    el.innerHTML=(it
+      ? '<div class="it" style="color:'+RARITY_COLOR[it.r]+'">'+esc(it.idf?itemName(it):'? '+BASES[it.b].name)+'</div>'
+      : '<span class="lbl">'+esc(label)+'</span>')+(blocked?'<span class="x">two-handed</span>':'');
+  });
 }
 function kv(k,v){ return '<div class="kv"><span>'+esc(k)+'</span><span>'+esc(v)+'</span></div>'; }
 
