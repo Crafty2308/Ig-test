@@ -196,8 +196,7 @@ body.touch #tmenu{display:flex}
   border:1px solid rgba(200,169,110,.2);font-size:12px;color:var(--gold)}
 
 /* ---------- panels ---------- */
-.panel{position:absolute;inset:0;display:none;background:rgba(4,4,6,.93);z-index:30;
-  backdrop-filter:blur(2px);-webkit-backdrop-filter:blur(2px)}
+.panel{position:absolute;inset:0;display:none;background:rgba(4,4,6,.96);z-index:30}
 .panel.on{display:block}
 .ptitle{font-family:'Cinzel',serif;font-size:clamp(17px,3.4vw,25px);color:var(--gold);letter-spacing:.18em;
   text-transform:uppercase;text-align:center}
@@ -513,7 +512,7 @@ body.touch #spiritbar{left:50%;right:auto;transform:translateX(-50%);text-align:
    ========================================================================== */
 
 const SAVE_KEY = 'dungeonrift_save_v1';
-const SAVE_VERSION = 3;
+const SAVE_VERSION = 4;
 const TILE = 48;
 const GRID = 160;
 const MAX_SLOTS = 6;
@@ -782,6 +781,10 @@ function pctText(mult,noun){
   const pct=Math.round(Math.abs(1-mult)*100);
   return pct+'% '+(mult<1?'less':'more')+(noun?' '+noun:'');
 }
+/* ------------------------------------------------------------------ keystones
+   Twenty-four, each one build-defining and each one carrying a real cost.
+   The id is what the engine reads: every keystone below is wired somewhere in
+   recalc(), the damage path, or the ailment code. */
 const KEYSTONES = {
   resolute:{name:'Resolute Technique',
     text:'Your hits can never be evaded. You can never deal a critical strike.'},
@@ -798,316 +801,710 @@ const KEYSTONES = {
   unwavering:{name:'Unwavering Stance',
     text:'You cannot be stunned, and cold builds on you half as fast. Your evasion rating is always zero.'},
   crimson_dance:{name:'Crimson Dance',
-    text:'Your bleeds stack up to four times, but each stack deals 45% less damage.'}
+    text:'Your bleeds stack up to four times, but each stack deals 45% less damage.'},
+  glass_cannon:{name:'Glass Cannon',
+    text:'55% more damage. 45% less maximum life.'},
+  chaos_inoc:{name:'Chaos Inoculation',
+    text:'Your maximum life becomes 1. You are immune to chaos damage.'},
+  eldritch:{name:'Eldritch Battery',
+    text:'Your energy shield is added to your mana. Skills cost 25% less. You have no energy shield.'},
+  acrobatics:{name:'Acrobatics',
+    text:'45% more evasion rating. 50% less armour and energy shield.'},
+  point_blank:{name:'Point Blank',
+    text:'Projectiles deal 45% more damage within 200 units and 35% less beyond 500.'},
+  vaal_pact:{name:'Vaal Pact',
+    text:'60% more life leeched. You cannot regenerate life.'},
+  mind_matter:{name:'Mind over Matter',
+    text:'30% of damage is taken from mana before life. Half mana regeneration.'},
+  perfect_agony:{name:'Perfect Agony',
+    text:'Critical strikes apply 60% more ailment buildup and deal 35% less hit damage.'},
+  conduit:{name:'Conduit',
+    text:'Shock you apply is 60% stronger and chains reach one further target. You cannot ignite.'},
+  frostbound:{name:'Frostbound',
+    text:'Freeze builds 70% faster. You can no longer stun.'},
+  berserk:{name:'Berserker’s Fury',
+    text:'30% more attack speed and 30% more damage. You take 30% more damage.'},
+  iron_grip:{name:'Iron Grip',
+    text:'Strength raises projectile damage as it does melee. You cannot use an offhand.'},
+  runic_skin:{name:'Runic Skin',
+    text:'Your armour applies in full against elemental hits. 35% less armour.'},
+  wicked_ward:{name:'Wicked Ward',
+    text:'Energy shield recharge is never interrupted, but begins 60% slower.'},
+  ancestral:{name:'Ancestral Bond',
+    text:'Totems deal 80% more damage. Your own hits deal 35% less.'},
+  shatterborn:{name:'Shatterborn',
+    text:'Shattering a frozen target costs no cooldown and deals 50% more area damage. You cannot freeze bosses.'}
 };
 
-/* -------------------------------------------------------------- passive tree
-   Authored as branches. Each branch walks outward-to-inward (or along the
-   rim) from a class start or another node; the builder below turns this into
-   a linked graph with polar positions. m = minor, n = notable, k = keystone. */
-const TREE_STARTS = {str:270, strdex:330, dex:30, dexint:90, int:150, strint:210};
+/* ---------------------------------------------------------------- passive tree
+   A dense web of 600 allocatable nodes plus six class starts, authored as an
+   explicit graph and generated offline: the coordinates below are final, so
+   the game does no layout and no relaxation at boot. The old version walked
+   polar branches outward from each start and then relaxed 200 nodes over 90
+   O(n^2) passes, which both stalled the boot and left a tree with no routing
+   decision in it — you followed your spoke.
+
+   Shape: six class starts on the rim; four bands of clusters per class going
+   inward; six contested boundary regions that each reach into the two class
+   regions either side of them, so a Marauder can route into dexterity ground
+   if they are willing to spend the points; a twelve-cluster inner ring that is
+   expensive to reach from anywhere; and a six-cluster core behind gates.
+   Bands are joined tangentially as well as radially, so there are 255
+   independent loops — more than one way to reach almost anything.
+
+   A cluster is a ring of minors with its notable on the far side: you pay for
+   the cluster to get the notable. Travel nodes sit on the long band-to-band
+   roads and give nothing at all, so crossing the tree costs points you can
+   feel. No keystone touches a class start; the nearest is nine nodes out and
+   the median is seventeen.
+
+   Row = [x, y, kind, name, stats, keystone?]
+   kind: 0 minor, 1 notable, 2 travel, 3 keystone, 4 class start.
+   stats of 0 means none. */
+const TREE_NODES = [
+[0,-660,4,'Strength Start',0],
+[572,-330,4,'Strength / Dexterity Start',0],
+[572,330,4,'Dexterity Start',0],
+[0,660,4,'Dexterity / Intelligence Start',0],
+[-572,330,4,'Intelligence Start',0],
+[-572,-330,4,'Strength / Intelligence Start',0],
+[-177,-575,0,'Close Quarters',{meleePct:6}],
+[-106,-582,0,'Vitality',{life:8}],
+[-138,-524,0,'Concussion',{stunBuild:10}],
+[-118,-490,1,'Bloodletter',{life:22}],
+[-14,-547,0,'Butchery',{physPct:6}],
+[-32,-601,0,'Brawn',{str:4}],
+[39,-589,0,'Heavy Swing',{stunBuild:13}],
+[76,-603,1,'Stonebreaker',{str:14}],
+[132,-599,0,'Constitution',{life:9}],
+[178,-543,0,'Knitting',{lifeRegen:2}],
+[111,-535,0,'Thick Hide',{life:6}],
+[79,-510,1,'Ironwood',{life:22}],
+[-205,-449,0,'Sinew',{str:6}],
+[-149,-466,0,'Ringing Blow',{stunBuild:8}],
+[-148,-426,0,'Blood Vessels',{life:7}],
+[-121,-364,1,'Oxhide',{meleePct:13}],
+[-71,-428,0,'Bludgeon',{meleePct:5}],
+[-79,-499,0,'Strong Arm',{meleePct:6}],
+[-33,-475,0,'Hammerfall',{meleePct:6}],
+[45,-481,1,'Brutal-Hand',{stunBuild:26}],
+[7,-468,0,'Heart of Oak',{life:6}],
+[41,-521,0,'Close Quarters',{meleePct:8}],
+[103,-478,0,'Mending Flesh',{lifeRegen:2}],
+[82,-435,0,'Slow Recovery',{lifeRegen:2}],
+[42,-438,0,'Sanguine',{life:7}],
+[13,-411,1,'Titanbone',{armour:40,physPct:13}],
+[140,-462,0,'Bludgeon',{meleePct:6}],
+[207,-479,0,'Skullcracker',{stunBuild:8}],
+[160,-418,0,'Plating',{armour:16}],
+[149,-380,1,'Warcry',{str:11}],
+[-201,-366,0,'Thewed Arm',{str:4}],
+[-84,-347,0,'Fortitude',{life:7}],
+[-147,-314,0,'Scar Tissue',{lifeRegen:2}],
+[-159,-250,1,'Hearthguard',{armour:37}],
+[-79,-387,0,'Hardened',{armour:12}],
+[-30,-380,0,'Concussion',{stunBuild:13}],
+[-42,-342,0,'Strong Arm',{meleePct:8}],
+[-67,-311,1,'Bastion',{meleePct:16}],
+[46,-356,0,'Heavy Swing',{stunBuild:11}],
+[9,-371,0,'Knitting',{lifeRegen:2}],
+[70,-388,0,'Heavy Hands',{str:4}],
+[121,-427,1,'Redoubt',{armour:40}],
+[125,-348,0,'Brutality',{physPct:5}],
+[188,-389,0,'Mending Flesh',{lifeRegen:2}],
+[159,-302,0,'Scale',{armour:17}],
+[151,-263,1,'Anvilheart',{life:18}],
+[-130,-278,0,'Hammerfall',{meleePct:8}],
+[-107,-310,0,'Ringing Blow',{stunBuild:9}],
+[-53,-274,0,'Close Quarters',{meleePct:6}],
+[-83,-221,0,'Heft',{physPct:8}],
+[-88,-155,0,'Vitality',{life:8}],
+[-162,-173,1,'Crushblow',{armour:35,physPct:17}],
+[24,-250,0,'Cleaving',{physPct:5}],
+[-43,-221,0,'Bludgeon',{meleePct:8}],
+[-27,-304,0,'Ox Blood',{str:6}],
+[40,-317,0,'Brawn',{str:7}],
+[79,-308,1,'Wallbreaker',{physPct:15}],
+[99,-274,0,'Skullcracker',{stunBuild:10}],
+[92,-209,0,'Strong Arm',{meleePct:6}],
+[52,-279,0,'Bulwark',{armour:12}],
+[10,-289,1,'Granitegrip',{physPct:15}],
+[424,-439,0,'Iron Skin',{armour:8}],
+[443,-371,0,'Ragged Wound',{bleedBuild:12}],
+[385,-389,0,'Steady Aim',{accuracy:27}],
+[345,-390,1,'Boneshaker',{aspd:10}],
+[454,-317,0,'Lithe',{evasion:17}],
+[502,-333,0,'Riveted',{armour:11}],
+[543,-297,0,'Slippery',{evasion:17}],
+[527,-248,0,'Constitution',{life:5}],
+[487,-245,0,'Light Step',{evasion:17}],
+[420,-217,1,'Dreadnought',{bleedBuild:27,evasion:35}],
+[536,-118,0,'Thick Hide',{life:9}],
+[539,-197,0,'Fast Hands',{aspd:5}],
+[590,-151,0,'Blood Vessels',{life:5}],
+[629,-140,1,'Swiftblade',{bleedBuild:30}],
+[274,-359,0,'Plating',{armour:9}],
+[267,-399,0,'Practised Eye',{accuracy:32}],
+[316,-418,0,'Wristwork',{aspd:4}],
+[361,-353,0,'Flurry',{aspd:3}],
+[296,-326,0,'Heart of Oak',{life:5}],
+[333,-301,1,'Duelling',{evasion:39,bleedBuild:26}],
+[413,-304,0,'Hardened',{armour:11}],
+[394,-248,0,'Loose Grip',{aspd:5}],
+[355,-267,0,'Shifting Guard',{evasion:11}],
+[371,-315,0,'Fast Hands',{aspd:4}],
+[320,-358,1,'Form',{allAttr:7}],
+[474,-168,0,'Wristwork',{aspd:5}],
+[422,-136,0,'Unseen',{evasion:10}],
+[384,-200,0,'Flurry',{aspd:4}],
+[460,-215,0,'Sanguine',{life:6}],
+[468,-280,1,'Feint',{aspd:10}],
+[477,-39,0,'Fortitude',{life:5}],
+[446,-89,0,'Balance',{allAttr:3}],
+[491,-105,0,'Open Cut',{bleedBuild:13}],
+[507,-145,1,'Riposte',{allAttr:7}],
+[189,-275,0,'Laceration',{bleedBuild:8}],
+[205,-353,0,'Scale',{armour:14}],
+[256,-260,0,'Roundness',{allAttr:4}],
+[284,-230,1,'Whirlwind',{allAttr:7}],
+[320,-248,0,'Even Hand',{allAttr:4}],
+[319,-208,0,'Hooked Blade',{bleedBuild:10}],
+[285,-187,0,'Wholeness',{allAttr:2}],
+[246,-219,0,'Range Finder',{accuracy:36}],
+[218,-248,1,'Lightfoot',{armour:37}],
+[367,-104,0,'Vitality',{life:6}],
+[307,-111,0,'Loose Grip',{aspd:3}],
+[312,-151,0,'Bulwark',{armour:12}],
+[343,-176,0,'Fast Hands',{aspd:4}],
+[376,-152,0,'Wristwork',{aspd:5}],
+[416,-176,1,'Quickened',{aspd:10,life:17}],
+[331,-11,0,'Iron Skin',{armour:9}],
+[334,-81,0,'Balance',{allAttr:3}],
+[387,-65,0,'Ragged Wound',{bleedBuild:14}],
+[409,-18,0,'Roundness',{allAttr:3}],
+[444,3,1,'Bladedancer',{allAttr:6}],
+[105,-171,0,'Flurry',{aspd:5}],
+[180,-236,0,'Loose Grip',{aspd:4}],
+[206,-176,0,'Riveted',{armour:12}],
+[231,-140,1,'Huntsmark',{bleedBuild:26}],
+[246,-179,0,'Fleet',{evasion:16}],
+[267,-109,0,'Sight Line',{accuracy:31}],
+[210,-104,0,'Even Hand',{allAttr:4}],
+[170,-87,1,'Farshot',{allAttr:8}],
+[241,-78,0,'Steady Aim',{accuracy:37}],
+[312,-48,0,'Plating',{armour:12}],
+[227,11,0,'Wholeness',{allAttr:3}],
+[187,6,1,'Longbowman',{allAttr:6}],
+[592,145,0,'Keen Edge',{critChance:11}],
+[545,199,0,'Windage',{projSpeed:11}],
+[522,133,0,'Nimble',{dex:4}],
+[499,100,1,'Eagle-Eye',{dex:11}],
+[463,285,0,'Lithe',{evasion:13}],
+[502,242,0,'Eye for Weakness',{critChance:12}],
+[543,277,0,'Precision',{critChance:10}],
+[522,327,0,'Taut String',{projSpeed:11}],
+[469,324,0,'Swift Arrow',{projSpeed:9}],
+[441,353,1,'Hawkwatch',{aspd:11,evasion:44}],
+[397,437,0,'Slippery',{evasion:16}],
+[391,368,0,'Fast Hands',{aspd:5}],
+[455,395,0,'Fletching',{projPct:6}],
+[494,392,1,'Trueflight',{critChance:37}],
+[503,50,0,'Fleet Foot',{moveSpeed:2}],
+[463,118,0,'Draw Weight',{projSpeed:9}],
+[441,75,0,'Windage',{projSpeed:7}],
+[401,72,1,'Windrunner',{projPct:19}],
+[474,186,0,'Long Stride',{moveSpeed:3}],
+[414,230,0,'Unburdened',{moveSpeed:3}],
+[425,150,0,'Quick Fingers',{dex:7}],
+[413,110,1,'Arrowstorm',{evasion:40}],
+[416,286,0,'Thin Blade',{critChance:13}],
+[343,307,0,'Loose Joints',{dex:5}],
+[370,270,0,'Cat Step',{dex:6}],
+[308,236,1,'Silksteel',{critChance:38}],
+[311,401,0,'Fleet Foot',{moveSpeed:2}],
+[279,376,0,'Wristwork',{aspd:6}],
+[331,347,0,'Marksman',{projPct:6}],
+[376,331,1,'Shadowstep',{critChance:33}],
+[346,27,0,'Long Stride',{moveSpeed:3}],
+[425,39,0,'True Flight',{projPct:8}],
+[362,63,0,'Light Step',{evasion:18}],
+[337,116,1,'Nightblade',{aspd:9}],
+[314,173,0,'Bowyer',{projPct:7}],
+[301,134,0,'Nimble',{dex:6}],
+[325,78,0,'Quick Fingers',{dex:7}],
+[374,101,0,'Fletching',{projPct:8}],
+[386,140,0,'Loose Joints',{dex:4}],
+[349,154,0,'Fine Point',{critChance:11}],
+[368,230,1,'Ghostwalk',{moveSpeed:6,dex:13}],
+[330,270,0,'Shifting Guard',{evasion:20}],
+[279,269,0,'Unburdened',{moveSpeed:2}],
+[258,235,0,'Unseen',{evasion:20}],
+[286,203,0,'Marksman',{projPct:8}],
+[336,207,0,'True Flight',{projPct:8}],
+[411,190,1,'Venomcraft',{critChance:32,projSpeed:21}],
+[225,268,0,'Taut String',{projSpeed:9}],
+[252,298,0,'Fleet Foot',{moveSpeed:2}],
+[223,374,0,'Cat Step',{dex:6}],
+[171,385,1,'Serpent\'s',{projSpeed:24}],
+[241,49,0,'Nimble',{dex:4}],
+[267,17,0,'Long Stride',{moveSpeed:3}],
+[281,55,0,'Unburdened',{moveSpeed:2}],
+[250,88,0,'Keen Edge',{critChance:16}],
+[235,158,1,'Kiss',{moveSpeed:4}],
+[261,126,0,'Bowyer',{projPct:5}],
+[246,197,0,'Eye for Weakness',{critChance:9}],
+[196,151,0,'Precision',{critChance:14}],
+[211,82,0,'Flurry',{aspd:5}],
+[171,75,1,'Creeping',{dex:13}],
+[207,190,0,'Quick Fingers',{dex:6}],
+[218,228,0,'Thin Blade',{critChance:9}],
+[148,244,0,'Fletching',{projPct:8}],
+[165,177,0,'Fleet',{evasion:13}],
+[112,129,1,'Death',{moveSpeed:5}],
+[114,593,0,'Deep Cuts',{critDmg:5}],
+[104,533,0,'Fine Point',{critChance:11}],
+[165,523,0,'Frostbite',{coldPct:8}],
+[175,583,0,'Venom',{poisonBuild:15}],
+[207,606,1,'Quiet',{dex:9}],
+[-18,544,0,'Study',{int:5}],
+[43,567,0,'Toxin',{poisonBuild:10}],
+[8,618,0,'Sharp Wit',{int:4}],
+[-38,583,0,'Ward',{es:9}],
+[-78,585,1,'Kill',{int:8}],
+[-179,569,0,'Keen Edge',{critChance:14}],
+[-117,519,0,'Static Skin',{es:8}],
+[-118,586,0,'Lithe',{evasion:9}],
+[-83,624,1,'Coldforge',{evasion:38}],
+[205,451,0,'Chill',{coldPct:5}],
+[151,485,0,'Cruelty',{critDmg:7}],
+[159,423,0,'Slippery',{evasion:13}],
+[105,352,1,'Rimeward',{poisonBuild:33}],
+[43,501,0,'Shimmering Shell',{es:10}],
+[42,447,0,'Eye for Weakness',{critChance:14}],
+[94,468,0,'Septic',{poisonBuild:11}],
+[131,451,1,'Winterheart',{critChance:34}],
+[-84,452,0,'Loose Joints',{dex:4}],
+[-18,455,0,'Bad Blood',{poisonBuild:10}],
+[-67,506,0,'Glass Armour',{es:7}],
+[-76,545,1,'Deep',{evasion:30}],
+[-212,429,0,'Rime',{coldPct:7}],
+[-134,424,0,'Hollow Ward',{es:8}],
+[-149,481,0,'Precision',{critChance:12}],
+[-158,520,1,'Frost',{poisonBuild:30}],
+[191,350,0,'Thin Blade',{critChance:16}],
+[132,393,0,'Light Step',{evasion:9}],
+[125,317,0,'Ward',{es:11}],
+[74,253,1,'Icebreaker',{es:23}],
+[76,382,0,'Static Skin',{es:7}],
+[34,373,0,'Venom',{poisonBuild:12}],
+[60,338,0,'Shifting Guard',{evasion:15}],
+[52,286,1,'Hoarfrost',{int:11}],
+[-15,385,0,'Vital Strike',{critDmg:7}],
+[-95,414,0,'Shimmering Shell',{es:10}],
+[-38,352,0,'Killing Blow',{critDmg:6}],
+[-53,315,1,'Glacial',{dex:11}],
+[-180,379,0,'Unseen',{evasion:12}],
+[-126,307,0,'Cat Step',{dex:3}],
+[-97,374,0,'Deep Cuts',{critDmg:6}],
+[-59,386,1,'Mind',{evasion:27}],
+[86,307,0,'Nimble',{dex:3}],
+[35,250,0,'Cruelty',{critDmg:9}],
+[56,217,0,'Lucid',{int:5}],
+[137,205,0,'Glass Armour',{es:11}],
+[109,274,0,'Quick Fingers',{dex:4}],
+[187,253,1,'Frozen',{poisonBuild:28,int:8}],
+[-41,238,0,'Toxin',{poisonBuild:10}],
+[14,195,0,'Loose Joints',{dex:4}],
+[26,317,0,'Deep Winter',{coldPct:5}],
+[-13,310,0,'Cat Step',{dex:4}],
+[-87,335,1,'Well',{es:21}],
+[-88,295,0,'Fleet',{evasion:12}],
+[-157,282,0,'Nimble',{dex:4}],
+[-143,202,0,'Fine Point',{critChance:14}],
+[-60,180,0,'Vital Strike',{critDmg:8}],
+[-38,278,0,'Cold Reason',{int:4}],
+[2,273,1,'Arcanist',{int:9,evasion:27}],
+[-395,360,0,'Elemental Focus',{elePct:4}],
+[-374,418,0,'Reservoir',{mana:11}],
+[-432,439,0,'Study',{int:4}],
+[-453,381,0,'Hollow Ward',{es:13}],
+[-489,364,1,'Spellbinder',{manaRegen:5}],
+[-460,310,0,'Incantation',{spellPct:8}],
+[-518,326,0,'Arcane Study',{spellPct:9}],
+[-537,268,0,'Mental Depth',{mana:9}],
+[-484,253,0,'Four Winds',{elePct:4}],
+[-457,194,1,'Mana',{int:14}],
+[-571,201,0,'Sharp Wit',{int:6}],
+[-599,154,0,'Thaumaturgy',{spellPct:8}],
+[-563,114,0,'Trickle',{manaRegen:2}],
+[-513,135,0,'Prismatic',{elePct:6}],
+[-521,185,0,'Static',{lightPct:9}],
+[-493,214,1,'Font',{int:11,mana:40}],
+[-303,294,0,'Ward',{es:10}],
+[-272,357,0,'Refilling',{manaRegen:1}],
+[-294,390,0,'Attunement',{elePct:4}],
+[-323,418,0,'Quiet Focus',{manaRegen:2}],
+[-342,382,0,'Elemental Focus',{elePct:5}],
+[-348,343,0,'Arcing',{lightPct:8}],
+[-378,315,1,'Runewright',{spellPct:18,elePct:12}],
+[-415,299,0,'Four Winds',{elePct:7}],
+[-378,244,0,'Spellcraft',{spellPct:8}],
+[-343,295,0,'Lucid',{int:6}],
+[-308,338,1,'Loremaster',{elePct:14}],
+[-394,204,0,'Prismatic',{elePct:7}],
+[-446,233,0,'Clarity of Mind',{mana:14}],
+[-474,158,0,'Static Skin',{es:11}],
+[-427,164,0,'Wellspring',{mana:13}],
+[-368,121,1,'Thoughtform',{es:29}],
+[-504,86,0,'Attunement',{elePct:6}],
+[-462,43,0,'Deep Cistern',{mana:16}],
+[-453,110,0,'Reservoir',{mana:10}],
+[-416,126,1,'Mindspring',{es:36}],
+[-251,261,0,'Mental Depth',{mana:16}],
+[-188,256,0,'Elemental Focus',{elePct:4}],
+[-237,338,0,'Storm Charge',{lightPct:6}],
+[-219,376,1,'Clear',{spellPct:16}],
+[-254,209,0,'Shimmering Shell',{es:10}],
+[-293,255,0,'Cold Reason',{int:5}],
+[-312,204,0,'Incantation',{spellPct:6}],
+[-359,184,1,'Sight',{lightPct:14}],
+[-325,163,0,'Still Water',{manaRegen:1}],
+[-388,156,0,'Arcane Study',{spellPct:8}],
+[-328,123,0,'Four Winds',{elePct:4}],
+[-316,84,1,'Stormcaller',{manaRegen:5}],
+[-336,49,0,'Study',{int:7}],
+[-359,82,0,'Clarity of Mind',{mana:16}],
+[-384,42,0,'Prismatic',{elePct:5}],
+[-419,-4,1,'Thunderhead',{manaRegen:3}],
+[-151,242,0,'Thaumaturgy',{spellPct:5}],
+[-222,234,0,'Attunement',{elePct:4}],
+[-208,155,0,'Wellspring',{mana:15}],
+[-136,163,0,'Tesla Coil',{lightPct:5}],
+[-99,150,1,'Lightning',{lightPct:16}],
+[-215,195,0,'Elemental Focus',{elePct:5}],
+[-245,169,0,'Glass Armour',{es:8}],
+[-272,123,0,'Deep Cistern',{mana:16}],
+[-236,84,0,'Hollow Ward',{es:9}],
+[-172,133,0,'Trickle',{manaRegen:2}],
+[-160,93,1,'Rod',{lightPct:18,manaRegen:3}],
+[-226,23,0,'Spellcraft',{spellPct:5}],
+[-276,84,0,'Four Winds',{elePct:4}],
+[-303,8,0,'Static',{lightPct:5}],
+[-333,-19,1,'Charged',{es:36}],
+[-577,-195,0,'Reservoir',{mana:11}],
+[-516,-183,0,'Mental Depth',{mana:7}],
+[-529,-122,0,'Sharp Wit',{int:3}],
+[-589,-134,0,'Presence',{spirit:2}],
+[-622,-112,1,'Core',{str:8}],
+[-488,-332,0,'Hardened',{armour:8}],
+[-452,-297,0,'Constitution',{life:7}],
+[-487,-243,0,'Sinew',{str:3}],
+[-533,-257,0,'Command',{spirit:2}],
+[-536,-308,0,'Clarity of Mind',{mana:13}],
+[-537,-350,1,'Arc',{es:20,life:16}],
+[-444,-368,0,'Force of Will',{spirit:4}],
+[-437,-433,0,'Bearing',{spirit:4}],
+[-373,-403,0,'Kindling',{firePct:9}],
+[-333,-406,1,'Weaver',{es:21}],
+[-435,-77,0,'Presence',{spirit:2}],
+[-514,-69,0,'Scale',{armour:14}],
+[-451,-114,0,'Elemental Ward',{resAll:3}],
+[-421,-148,1,'Skyfire',{armour:30}],
+[-462,-152,0,'Thick Hide',{life:8}],
+[-457,-216,0,'Wellspring',{mana:10}],
+[-407,-198,0,'Thewed Arm',{str:5}],
+[-337,-191,1,'Galvanic',{mana:24}],
+[-349,-309,0,'Bulwark',{armour:10}],
+[-352,-255,0,'Iron Skin',{armour:9}],
+[-410,-262,0,'Command',{spirit:4}],
+[-396,-316,0,'Ward',{es:10}],
+[-406,-355,1,'Static',{mana:22}],
+[-303,-345,0,'Four Wards',{resAll:3}],
+[-340,-359,0,'Lucid',{int:5}],
+[-289,-404,0,'Blood Vessels',{life:5}],
+[-272,-453,1,'Field',{int:9}],
+[-334,-99,0,'Heavy Hands',{str:5}],
+[-355,14,0,'Cold Reason',{int:3}],
+[-413,-43,0,'Ox Blood',{str:3}],
+[-452,-32,1,'Emberward',{mana:24}],
+[-309,-130,0,'Heart of Oak',{life:6}],
+[-369,-119,0,'Force of Will',{spirit:4}],
+[-343,-151,0,'Riveted',{armour:10}],
+[-366,-217,1,'Pyre-Tender',{life:19}],
+[-285,-195,0,'Deep Cistern',{mana:12}],
+[-313,-223,0,'Prismatic Skin',{resAll:5}],
+[-293,-257,0,'Bearing',{spirit:4}],
+[-275,-306,1,'Cinderheart',{armour:38}],
+[-219,-293,0,'Reservoir',{mana:11}],
+[-214,-253,0,'Brawn',{str:3}],
+[-253,-273,0,'Ember',{firePct:7}],
+[-313,-292,1,'Firebrand',{int:10}],
+[-299,-41,0,'Elemental Ward',{resAll:4}],
+[-286,-79,0,'Sanguine',{life:9}],
+[-238,-94,0,'Mental Depth',{mana:12}],
+[-177,-13,0,'Static Skin',{es:6}],
+[-186,26,1,'Forgewarden',{firePct:20}],
+[-229,-134,0,'Smoulder',{firePct:5}],
+[-272,-116,0,'Presence',{spirit:2}],
+[-239,-173,0,'Study',{int:4}],
+[-264,-229,1,'Ash',{life:20}],
+[-227,-214,0,'Four Wards',{resAll:3}],
+[-200,-184,0,'Fortitude',{life:9}],
+[-191,-146,0,'Sinew',{str:4}],
+[-155,-123,1,'Priest',{firePct:14}],
+[270,-490,0,'Rot',{chaosPct:6}],
+[280,-436,0,'Fire Ward',{resFire:8}],
+[232,-438,0,'Cold Iron',{resCold:5}],
+[193,-442,1,'Flamekeeper',{resCold:18}],
+[165,-342,0,'Force',{dmgPct:5}],
+[227,-398,0,'Warded',{resChaos:5}],
+[242,-336,0,'Bloodletting',{leech:1}],
+[264,-303,1,'Slow',{allAttr:7}],
+[227,-287,0,'Balance',{allAttr:2}],
+[172,-197,0,'Violence',{dmgPct:5}],
+[119,-308,0,'Reach',{areaSize:7}],
+[85,-348,1,'Burn',{leech:3}],
+[540,36,0,'Harm',{dmgPct:4}],
+[484,0,0,'Void Touch',{chaosPct:9}],
+[541,-35,0,'Grounded',{resLight:7}],
+[562,-70,1,'Zealot\'s',{dmgPct:11}],
+[465,37,0,'Clean Blood',{resChaos:5}],
+[386,31,0,'Escalation',{dmgPct:5}],
+[425,-55,0,'Roundness',{allAttr:4}],
+[407,-99,1,'Oath',{leech:3}],
+[273,-54,0,'Ash Skin',{resFire:6}],
+[352,-45,0,'Force',{dmgPct:3}],
+[306,24,0,'Wide Arc',{areaSize:4}],
+[289,96,1,'Templar\'s',{resChaos:11}],
+[232,484,0,'Earthing',{resLight:8}],
+[239,427,0,'Frost Ward',{resCold:8}],
+[279,427,0,'Expanse',{areaSize:6}],
+[294,478,0,'Untainted',{resChaos:5}],
+[325,503,1,'Vow',{chaosPct:15}],
+[203,409,0,'Feeding',{leech:1}],
+[145,355,0,'Siphon',{leech:1}],
+[252,347,0,'Heat Shield',{resFire:7}],
+[292,338,1,'Sanctified',{resCold:13}],
+[147,284,0,'Violence',{dmgPct:4}],
+[176,215,0,'Warm Blood',{resCold:8}],
+[194,293,0,'Reach',{areaSize:4}],
+[220,323,1,'Consecration',{areaSize:14}],
+[-266,494,0,'Wide Arc',{areaSize:5}],
+[-301,452,0,'Insulated',{resLight:8}],
+[-251,435,0,'Bloodletting',{leech:1}],
+[-223,468,0,'Grounded',{resLight:8}],
+[-181,458,1,'Faithward',{resChaos:14}],
+[-173,418,0,'Warded',{resChaos:6}],
+[-255,395,0,'Fire Ward',{resFire:8}],
+[-270,316,0,'Expanse',{areaSize:4}],
+[-197,343,0,'Harm',{dmgPct:5}],
+[-140,385,0,'Ash Skin',{resFire:5}],
+[-127,347,1,'Reliquary',{resCold:17,resLight:15}],
+[-181,216,0,'Clean Blood',{resChaos:4}],
+[-117,268,0,'Withering',{chaosPct:9}],
+[-194,296,0,'Feeding',{leech:1}],
+[-234,298,1,'Martyr',{areaSize:11}],
+[-500,31,0,'Heat Shield',{resFire:7}],
+[-552,29,0,'Cold Iron',{resCold:9}],
+[-549,-32,0,'Siphon',{leech:2}],
+[-492,-29,0,'Untainted',{resChaos:5}],
+[-474,-66,1,'Ordained',{chaosPct:20}],
+[-469,4,0,'Warded',{resChaos:5}],
+[-375,-55,0,'Frost Ward',{resCold:6}],
+[-423,36,0,'Bloodletting',{leech:2}],
+[-435,74,1,'Corrupted',{resCold:17}],
+[-296,48,0,'Even Hand',{allAttr:2}],
+[-335,-59,0,'Escalation',{dmgPct:5}],
+[-261,-30,0,'Earthing',{resLight:5}],
+[-230,-55,1,'Soil',{chaosPct:18}],
+[-308,-471,0,'Fire Ward',{resFire:7}],
+[-231,-480,0,'Feeding',{leech:1}],
+[-246,-422,0,'Ash Skin',{resFire:5}],
+[-255,-383,1,'Rotcaller',{resCold:16}],
+[-225,-333,0,'Heat Shield',{resFire:8}],
+[-263,-344,0,'Siphon',{leech:2}],
+[-210,-405,0,'Insulated',{resLight:7}],
+[-172,-393,0,'Clean Blood',{resChaos:7}],
+[-115,-403,1,'Blightmark',{leech:3}],
+[-92,-266,0,'Fire Ward',{resFire:5}],
+[-188,-223,0,'Untainted',{resChaos:6}],
+[-180,-285,0,'Force',{dmgPct:4}],
+[-160,-355,1,'Plaguebearer',{resChaos:11}],
+[173,-31,0,'Wholeness',{allAttr:3}],
+[212,-26,0,'Killing Blow',{critDmg:7}],
+[201,43,0,'Command',{spirit:4}],
+[147,-1,0,'Swelling Vigour',{lifePct:5}],
+[92,51,1,'Wither',{areaSize:13}],
+[162,36,0,'Deep Cuts',{critDmg:12}],
+[222,121,0,'Layered Plate',{armourPct:6}],
+[140,101,0,'Tempered Steel',{armourPct:11}],
+[85,158,1,'Entropy',{esPct:14}],
+[151,139,0,'Prismatic Skin',{resAll:5}],
+[91,198,0,'Thickened Ward',{esPct:7}],
+[51,137,0,'Cruelty',{critDmg:12}],
+[24,108,1,'Unravel',{dmgPct:11}],
+[49,177,0,'Broadened Mind',{manaPct:6}],
+[-26,201,0,'Force of Will',{spirit:5}],
+[-25,160,0,'Vital Strike',{critDmg:7}],
+[-53,100,1,'Soul',{spirit:8}],
+[-174,176,0,'Elemental Ward',{resAll:7}],
+[-60,140,0,'Four Wards',{resAll:5}],
+[-75,217,0,'Bearing',{spirit:5}],
+[-76,257,1,'Rend',{areaSize:18}],
+[-232,124,0,'Prismatic Skin',{resAll:4}],
+[-154,53,0,'Balance',{allAttr:4}],
+[-91,110,0,'Killing Blow',{critDmg:9}],
+[-121,83,1,'Crossroads',{allAttr:8}],
+[-190,-51,0,'Lingering',{dotPct:8}],
+[-148,14,0,'Greater Vitality',{lifePct:4}],
+[-202,63,0,'Elemental Ward',{resAll:4}],
+[-256,49,1,'Contested',{lifePct:13}],
+[-167,-84,0,'Amplified Shell',{esPct:9}],
+[-128,-152,0,'Reinforced Aegis',{esPct:6}],
+[-146,-39,0,'Widened Channel',{manaPct:9}],
+[-105,-48,1,'Ground',{resAll:10}],
+[-109,-117,0,'Roundness',{allAttr:4}],
+[-111,-189,0,'Abundant Blood',{lifePct:6}],
+[-69,-119,0,'Blurred Form',{evasionPct:6}],
+[17,-186,1,'No',{armourPct:25}],
+[-31,-106,0,'Deep Reserves',{lifePct:5}],
+[-23,-186,0,'Deep Cuts',{critDmg:8}],
+[-16,-259,0,'Thickened Ward',{esPct:5}],
+[44,-216,0,'Practised Evasion',{evasionPct:8}],
+[36,-151,0,'Swelling Vigour',{lifePct:5}],
+[76,-143,1,'Man\'s',{critDmg:20,dmgPct:11}],
+[115,-133,0,'Reinforced Plating',{armourPct:11}],
+[50,-114,0,'Even Hand',{allAttr:3}],
+[63,-181,0,'Presence',{spirit:4}],
+[72,-244,1,'Land',{lifePct:12}],
+[204,-65,0,'Expanded Reservoir',{manaPct:6}],
+[93,-59,0,'Cruelty',{critDmg:11}],
+[154,-123,0,'Vital Strike',{critDmg:9}],
+[150,-163,1,'Borderstone',{manaPct:17}],
+[117,-27,0,'Violence',{dmgPct:8}],
+[131,62,0,'Harm',{dmgPct:9}],
+[63,99,0,'Quick Casting',{cspd:6}],
+[64,22,0,'Four Wards',{resAll:7}],
+[-1,-5,1,'Marchwarden',{allAttr:14}],
+[14,154,0,'Fluent Tongue',{cspd:4}],
+[-26,71,0,'Wholeness',{allAttr:6}],
+[14,69,0,'Escalation',{dmgPct:9}],
+[53,60,1,'Frontier',{resAll:17}],
+[-85,17,0,'Loose Grip',{aspd:5}],
+[-55,43,0,'Greater Vitality',{lifePct:8}],
+[-83,71,0,'Snap Incant',{cspd:5}],
+[-133,123,1,'Watchtower',{resAll:14}],
+[-115,-10,0,'Fast Hands',{aspd:4}],
+[-87,-84,0,'Abundant Blood',{lifePct:8}],
+[-68,-33,0,'Killing Blow',{critDmg:11}],
+[-10,-72,1,'Toll',{resAll:13}],
+[9,-113,0,'Deep Cuts',{critDmg:10}],
+[30,-79,0,'Force',{dmgPct:9}],
+[-50,-69,0,'Violence',{dmgPct:7}],
+[-44,-151,0,'Cruelty',{critDmg:11}],
+[-63,-186,1,'Gate',{lifePct:19}],
+[55,-48,0,'Balance',{allAttr:4}],
+[87,-99,0,'Vital Strike',{critDmg:12}],
+[143,-58,0,'Prismatic Skin',{resAll:7}],
+[79,-16,0,'Harm',{dmgPct:7}],
+[108,14,1,'Hollow',{lifePct:15}],
+[2,-511,2,'Long Road',0],
+[-30,-420,2,'Long Road',0],
+[3,-331,2,'Deep Road',0],
+[-3,-221,2,'Descent',0],
+[438,-253,2,'Long Road',0],
+[354,-227,2,'Long Road',0],
+[272,-148,2,'Deep Road',0],
+[191,-139,2,'Descent',0],
+[450,247,2,'Long Road',0],
+[371,188,2,'Long Road',0],
+[275,164,2,'Deep Road',0],
+[182,114,2,'Descent',0],
+[4,511,2,'Long Road',0],
+[23,411,2,'Long Road',0],
+[2,349,2,'Deep Road',0],
+[-1,232,2,'Descent',0],
+[-445,273,2,'Long Road',0],
+[-339,233,2,'Long Road',0],
+[-285,162,2,'Deep Road',0],
+[-198,103,2,'Descent',0],
+[-449,-257,2,'Long Road',0],
+[-378,-170,2,'Long Road',0],
+[-275,-156,2,'Deep Road',0],
+[-200,-107,2,'Descent',0],
+[119,-239,2,'Contested Pass',0],
+[292,-14,2,'Contested Pass',0],
+[110,234,2,'Contested Pass',0],
+[-113,228,2,'Contested Pass',0],
+[-264,10,2,'Contested Pass',0],
+[-120,-237,2,'Contested Pass',0],
+[102,89,2,'Inner Gate',0],
+[-14,121,2,'Inner Gate',0],
+[-115,44,2,'Inner Gate',0],
+[-127,-82,2,'Inner Gate',0],
+[-4,-151,2,'Inner Gate',0],
+[127,-94,2,'Inner Gate',0],
+[110,-388,3,'Resolute Technique',0,'resolute'],
+[298,-282,3,'Blood Magic',0,'blood_magic'],
+[304,300,3,'Iron Reflexes',0,'iron_reflexes'],
+[99,415,3,'Elemental Overload',0,'ele_overload'],
+[-398,90,3,'Avatar of Fire',0,'avatar_fire'],
+[-398,-92,3,'Hollow Bones',0,'hollow_bones'],
+[197,-314,3,'Unwavering Stance',0,'unwavering'],
+[371,-7,3,'Crimson Dance',0,'crimson_dance'],
+[165,320,3,'Glass Cannon',0,'glass_cannon'],
+[-163,321,3,'Chaos Inoculation',0,'chaos_inoc'],
+[-381,-16,3,'Eldritch Battery',0,'eldritch'],
+[-186,-324,3,'Acrobatics',0,'acrobatics'],
+[252,-20,3,'Point Blank',0,'point_blank'],
+[124,168,3,'Vaal Pact',0,'vaal_pact'],
+[-104,189,3,'Mind over Matter',0,'mind_matter'],
+[-218,-17,3,'Perfect Agony',0,'perfect_agony'],
+[-150,-211,3,'Conduit',0,'conduit'],
+[132,-201,3,'Frostbound',0,'frostbound'],
+[24,28,3,'Berserker’s Fury',0,'berserk'],
+[-16,32,3,'Iron Grip',0,'iron_grip'],
+[-48,2,3,'Runic Skin',0,'runic_skin'],
+[-28,-34,3,'Wicked Ward',0,'wicked_ward'],
+[16,-41,3,'Ancestral Bond',0,'ancestral'],
+[39,-9,3,'Shatterborn',0,'shatterborn']
+];
+/* ids, positionally matched to TREE_NODES; saved allocations key off these */
+const TREE_IDS = ['start_str','start_strdex','start_dex','start_dexint','start_int','start_strint','n1','n2','n3','n4','n5','n6','n7','n8','n9','n10','n11','n12','n13','n14','n15','n16','n17','n18','n19','n20','n21','n22','n23','n24','n25','n26','n27','n28','n29','n30','n31','n32','n33','n34','n35','n36','n37','n38','n39','n40','n41','n42','n43','n44','n45','n46','n47','n48','n49','n50','n51','n52','n53','n54','n55','n56','n57','n58','n59','n60','n61','n62','n63','n64','n65','n66','n67','n68','n69','n70','n71','n72','n73','n74','n75','n76','n77','n78','n79','n80','n81','n82','n83','n84','n85','n86','n87','n88','n89','n90','n91','n92','n93','n94','n95','n96','n97','n98','n99','n100','n101','n102','n103','n104','n105','n106','n107','n108','n109','n110','n111','n112','n113','n114','n115','n116','n117','n118','n119','n120','n121','n122','n123','n124','n125','n126','n127','n128','n129','n130','n131','n132','n133','n134','n135','n136','n137','n138','n139','n140','n141','n142','n143','n144','n145','n146','n147','n148','n149','n150','n151','n152','n153','n154','n155','n156','n157','n158','n159','n160','n161','n162','n163','n164','n165','n166','n167','n168','n169','n170','n171','n172','n173','n174','n175','n176','n177','n178','n179','n180','n181','n182','n183','n184','n185','n186','n187','n188','n189','n190','n191','n192','n193','n194','n195','n196','n197','n198','n199','n200','n201','n202','n203','n204','n205','n206','n207','n208','n209','n210','n211','n212','n213','n214','n215','n216','n217','n218','n219','n220','n221','n222','n223','n224','n225','n226','n227','n228','n229','n230','n231','n232','n233','n234','n235','n236','n237','n238','n239','n240','n241','n242','n243','n244','n245','n246','n247','n248','n249','n250','n251','n252','n253','n254','n255','n256','n257','n258','n259','n260','n261','n262','n263','n264','n265','n266','n267','n268','n269','n270','n271','n272','n273','n274','n275','n276','n277','n278','n279','n280','n281','n282','n283','n284','n285','n286','n287','n288','n289','n290','n291','n292','n293','n294','n295','n296','n297','n298','n299','n300','n301','n302','n303','n304','n305','n306','n307','n308','n309','n310','n311','n312','n313','n314','n315','n316','n317','n318','n319','n320','n321','n322','n323','n324','n325','n326','n327','n328','n329','n330','n331','n332','n333','n334','n335','n336','n337','n338','n339','n340','n341','n342','n343','n344','n345','n346','n347','n348','n349','n350','n351','n352','n353','n354','n355','n356','n357','n358','n359','n360','n361','n362','n363','n364','n365','n366','n367','n368','n369','n370','n371','n372','n373','n374','n375','n376','n377','n378','n379','n380','n381','n382','n383','n384','n385','n386','n387','n388','n389','n390','n391','n392','n393','n394','n395','n396','n397','n398','n399','n400','n401','n402','n403','n404','n405','n406','n407','n408','n409','n410','n411','n412','n413','n414','n415','n416','n417','n418','n419','n420','n421','n422','n423','n424','n425','n426','n427','n428','n429','n430','n431','n432','n433','n434','n435','n436','n437','n438','n439','n440','n441','n442','n443','n444','n445','n446','n447','n448','n449','n450','n451','n452','n453','n454','n455','n456','n457','n458','n459','n460','n461','n462','n463','n464','n465','n466','n467','n468','n469','n470','n471','n472','n473','n474','n475','n476','n477','n478','n479','n480','n481','n482','n483','n484','n485','n486','n487','n488','n489','n490','n491','n492','n493','n494','n495','n496','n497','n498','n499','n500','n501','n502','n503','n504','n505','n506','n507','n508','n509','n510','n511','n512','n513','n514','n515','n516','n517','n518','n519','n520','n521','n522','n523','n524','n525','n526','n527','n528','n529','n530','n531','n532','n533','n534','n535','n536','n537','n538','n539','n540','n541','n542','n543','n544','n545','n546','n547','n548','n549','n550','n551','n552','n553','n554','n555','n556','n557','n558','n559','n560','n561','n562','n563','n564','n565','n566','n567','n568','n569','n570','n571','n572','n573','n574','n575','n576','n577','n578','n579','n580','n581','n582','n583','n584','n585','n586','n587','n588','n589','n590','n591','n592','n593','n594','n595','n596','n597','n598','n599','n600'];
+/* edges as flat index pairs into TREE_NODES */
+const TREE_EDGES = [6,0,6,7,6,10,6,455,7,8,8,9,9,546,10,0,10,11,10,14,11,12,12,13,14,0,15,14,15,16,16,17,17,546,18,19,18,22,18,459,19,20,20,21,21,455,21,547,22,13,22,23,22,26,22,546,23,24,24,25,25,547,26,27,26,28,26,32,26,546,27,28,28,29,29,30,30,31,31,44,31,547,32,33,32,394,33,34,34,35,35,390,35,547,36,37,36,40,37,38,38,39,39,464,39,548,40,41,40,44,40,547,41,42,42,43,43,548,43,582,44,45,44,48,44,547,45,46,46,47,47,548,47,582,48,49,49,50,50,51,51,548,52,53,52,54,52,58,52,548,53,54,54,55,55,56,56,57,57,549,58,59,58,60,58,63,58,548,59,60,60,61,61,62,63,64,64,65,65,66,67,1,67,68,67,71,68,69,69,70,71,1,71,72,71,73,71,77,72,73,73,74,74,75,75,76,76,87,77,1,77,78,78,79,79,80,81,82,81,83,81,87,82,83,83,84,84,85,85,86,87,88,87,89,87,92,88,89,89,90,90,91,92,93,92,94,92,97,93,94,94,95,95,96,97,98,98,99,99,100,101,102,102,103,103,104,105,101,105,106,105,107,105,110,105,551,106,107,107,108,108,109,109,552,109,583,110,96,110,111,110,112,110,116,110,551,111,112,112,113,113,114,114,115,115,552,115,583,116,117,116,118,117,118,118,119,119,120,120,410,120,552,121,122,121,125,121,552,122,123,123,124,124,553,125,126,125,129,125,552,126,127,127,128,128,553,129,130,129,552,130,131,131,132,132,553,133,2,133,134,133,137,133,402,134,135,135,136,136,554,137,2,137,138,137,139,137,143,138,139,139,140,140,141,141,142,142,151,142,554,143,2,143,144,143,414,144,145,145,146,146,554,147,148,147,151,147,406,148,149,149,150,150,402,150,555,151,152,151,155,151,554,152,153,153,154,154,555,155,156,155,159,155,554,156,157,157,158,158,174,158,555,159,160,159,419,160,161,161,162,162,414,162,555,163,164,163,167,164,165,165,166,166,410,166,556,167,168,167,170,167,174,167,555,168,169,169,170,170,171,171,172,171,173,172,173,173,556,173,584,174,175,174,176,174,180,174,555,175,176,176,177,177,178,178,179,179,556,179,584,180,181,181,182,182,183,183,423,183,556,184,185,184,186,184,189,184,556,185,186,186,187,187,188,188,557,189,190,189,191,189,194,189,556,190,191,191,192,192,193,193,557,194,195,194,196,194,556,195,196,196,197,197,198,198,557,199,3,199,200,199,201,199,204,199,414,200,201,201,202,202,203,203,558,204,3,204,205,204,206,204,209,205,206,206,207,207,208,208,217,208,558,209,3,209,210,209,427,210,211,211,212,212,558,213,214,213,217,213,419,214,215,215,216,216,414,216,559,217,218,217,221,217,558,218,219,219,220,220,559,221,222,221,225,221,558,222,223,223,224,224,237,224,559,225,226,225,432,226,227,227,228,228,427,228,559,229,230,229,233,230,231,231,232,232,423,232,560,233,234,233,237,233,559,234,235,235,236,236,560,236,585,237,238,237,241,237,559,238,239,239,240,240,560,240,585,241,242,242,243,243,244,244,438,244,560,245,246,245,247,245,251,245,560,246,247,247,248,248,249,249,250,250,561,251,252,251,253,251,256,251,560,252,253,253,254,254,255,255,561,256,257,256,258,256,560,257,258,258,259,259,260,260,261,261,561,262,4,262,263,262,264,262,267,262,427,263,264,264,265,265,266,266,562,267,4,267,268,267,269,267,272,268,269,269,270,270,271,271,285,271,562,272,4,272,273,272,274,272,442,273,274,274,275,275,276,276,277,277,562,278,279,278,281,278,285,278,432,279,280,280,281,281,282,282,283,282,284,283,284,284,427,284,563,285,286,285,289,285,562,286,287,287,288,288,563,289,290,289,291,289,294,289,562,290,291,291,292,292,293,293,306,293,563,294,295,294,447,295,296,296,297,297,442,297,563,298,299,298,302,299,300,300,301,301,438,301,564,302,303,302,306,302,563,303,304,304,305,305,564,305,586,306,307,306,310,306,563,307,308,308,309,309,564,309,586,310,311,311,312,312,313,313,451,313,564,314,315,314,316,314,319,314,564,315,316,316,317,317,318,318,565,319,320,319,321,319,325,319,564,320,321,321,322,322,323,323,324,324,565,325,326,325,564,326,327,327,328,328,565,329,5,329,330,329,331,329,334,329,442,330,331,331,332,332,333,333,566,334,5,334,335,334,336,334,340,335,336,336,337,337,338,338,339,339,348,339,566,340,5,340,341,340,455,341,342,342,343,343,566,344,345,344,348,344,447,345,346,346,347,347,442,347,567,348,349,348,352,348,566,349,350,350,351,351,567,352,353,352,354,352,357,352,566,353,354,354,355,355,356,356,369,356,567,357,358,357,459,358,359,359,360,360,455,360,567,361,362,361,365,362,363,363,364,364,451,364,568,365,366,365,369,365,567,366,367,367,368,368,568,368,587,369,370,369,373,369,567,370,371,371,372,372,568,372,587,373,374,374,375,375,376,376,464,376,568,377,378,377,379,377,382,377,568,378,379,379,380,380,381,381,569,382,383,382,386,382,568,383,384,384,385,385,569,386,387,386,568,387,388,388,389,389,569,390,14,390,67,390,86,390,391,391,392,392,393,393,394,394,81,394,395,395,396,396,397,397,398,397,588,398,51,398,104,398,399,399,400,400,401,401,570,402,77,402,100,402,403,403,404,404,405,405,406,406,97,406,407,407,408,408,409,409,410,409,589,410,411,411,412,412,413,413,571,414,415,414,416,415,416,416,417,417,418,418,419,419,420,420,421,421,422,422,423,422,590,423,424,424,425,425,426,426,572,427,428,427,429,428,429,429,430,430,431,431,432,432,433,432,434,433,434,434,435,435,436,436,437,437,438,437,591,438,439,439,440,440,441,441,573,442,443,442,444,443,444,444,445,445,446,446,447,447,448,448,449,449,450,450,451,450,592,451,452,452,453,453,454,454,574,455,456,456,457,457,458,458,459,459,460,459,461,460,461,461,462,462,463,463,464,463,593,464,465,465,466,466,467,467,575,468,469,468,470,468,473,468,515,468,518,468,553,468,557,468,571,469,470,470,471,471,472,472,473,472,576,472,581,472,594,473,474,473,477,473,557,474,475,475,476,476,477,476,576,477,478,477,481,477,557,477,561,477,572,478,479,479,480,480,481,480,576,480,577,480,595,481,482,481,485,481,561,482,483,483,484,484,485,484,577,485,486,485,489,485,561,485,565,485,573,486,487,487,488,488,489,488,577,488,578,488,596,489,490,489,493,489,565,490,491,491,492,492,493,492,578,493,494,493,497,493,565,493,569,493,574,494,495,495,496,496,497,496,578,496,579,496,597,497,498,497,501,497,569,498,499,499,500,500,501,500,579,501,502,501,505,501,549,501,569,501,575,502,503,503,504,504,505,504,579,504,580,504,598,505,506,505,507,505,511,505,549,506,507,507,508,508,509,509,510,510,511,510,580,511,512,511,515,511,549,511,553,511,570,512,513,513,514,514,515,514,580,514,581,514,599,515,516,515,553,516,517,517,518,518,581,519,520,519,521,519,524,519,541,519,576,520,521,521,522,522,523,523,600,524,525,524,528,524,577,525,526,526,527,527,601,528,529,528,532,528,578,529,530,530,531,531,602,532,533,532,536,532,579,533,534,534,535,535,603,536,537,536,538,536,541,536,580,537,538,538,539,539,540,540,604,541,542,541,543,541,581,542,543,543,544,544,545,545,605,546,13,548,63,549,62,549,66,550,70,550,76,550,80,550,87,550,92,551,86,551,91,551,96,551,100,552,104];
+
 const START_LABEL = {str:'Strength',strdex:'Strength / Dexterity',dex:'Dexterity',
   dexint:'Dexterity / Intelligence',int:'Intelligence',strint:'Strength / Intelligence'};
-const R_START = 620, R_STEP = 74;
-
-const TREE_BRANCHES = [
-  /* ---- Strength (Marauder) ---- */
-  {id:'st_a',from:{start:'str'},da:-5,dr:-1,nodes:[
-    ['m','Strong Arm',{meleePct:8}],['m','Thick Hide',{life:10}],
-    ['n','Butchery',{meleePct:16,stunBuild:25},'Heavy swings put things down before they answer.'],
-    ['m','Blunt Force',{physPct:10}],['m','Sinew',{str:8}],
-    ['n','Unyielding',{life:24,armour:40},'You are simply harder to finish than the room expects.']]},
-  {id:'st_b',from:{start:'str'},da:5,dr:-1,nodes:[
-    ['m','Iron Skin',{armour:26}],['m','Endurance',{lifePct:5}],
-    ['n','Bulwark',{armourPct:24,resAll:6},'Plate, and the patience to stand in it.'],
-    ['m','Weight of Iron',{armour:34}],['m','Broad Shoulders',{str:6,life:8}],
-    ['n','Immovable',{lifePct:8,stunBuild:-30},'Nothing that hits you gets the reaction it wanted.']]},
-  {id:'st_c',from:{node:'st_a_2'},da:-9,dr:-1,nodes:[
-    ['m','Crushing Blows',{stunBuild:20}],['m','Wide Arc',{areaSize:10}],
-    ['n','Earthbreaker',{areaPct:20,areaSize:14},'The swing is wider than the weapon has any right to be.'],
-    ['m','Overkill',{meleePct:10}],
-    ['k','iron_reflexes',{keystone:'iron_reflexes'}]]},
-  {id:'st_rim',from:{start:'str'},da:11,dr:0,nodes:[
-    ['m','Vitality',{life:12}],['m','Vigour',{lifeRegen:2}],
-    ['n','Second Skin',{lifePct:6,lifeRegen:3},'The bleeding stops sooner than it used to.'],
-    ['m','Hardy',{life:12}]]},
-
-  /* ---- Strength / Dexterity (Duelist) ---- */
-  {id:'sd_a',from:{start:'strdex'},da:-5,dr:-1,nodes:[
-    ['m','Duellist’s Stance',{aspd:5}],['m','Precision',{accuracy:80}],
-    ['n','Opening',{critChance:30,critDmg:12},'You are only interested in the half-second they leave open.'],
-    ['m','Quick Grip',{aspd:5}],['m','Balance',{str:5,dex:5}],
-    ['n','Exsanguinate',{physPct:20,bleedBuild:30},'Cuts placed where movement keeps them working.']]},
-  {id:'sd_b',from:{start:'strdex'},da:5,dr:-1,nodes:[
-    ['m','Bladework',{physPct:9}],['m','Footwork',{moveSpeed:3}],
-    ['n','Riposte',{aspd:9,critChance:24},'Their commitment is the whole opportunity.'],
-    ['m','Sharpened',{critChance:20}],['m','Tempered Edge',{physPct:10}],
-    ['n','Executioner',{critDmg:24},'The second hit is the one that is worth anything.']]},
-  {id:'sd_c',from:{node:'sd_b_2'},da:9,dr:-1,nodes:[
-    ['m','Leeching Strikes',{leech:1}],['m','Blood Drinker',{leech:1,life:10}],
-    ['n','Vampirism',{leech:2},'What you take back is not politely asked for.'],
-    ['m','Killer’s Instinct',{critDmg:14}],
-    ['k','resolute',{keystone:'resolute'}]]},
-  {id:'sd_rim',from:{start:'strdex'},da:11,dr:0,nodes:[
-    ['m','Agile Frame',{evasion:40}],['m','Lean',{dex:6}],
-    ['n','Dancer',{moveSpeed:6,evasionPct:14},'Distance kept on purpose rather than by luck.'],
-    ['m','Reflexes',{evasion:44}]]},
-
-  /* ---- Dexterity (Ranger) ---- */
-  {id:'dx_a',from:{start:'dex'},da:-5,dr:-1,nodes:[
-    ['m','Steady Hand',{projPct:8}],['m','Fleet',{evasion:36}],
-    ['n','Barrage',{projPct:18,projSpeed:20},'Everything leaves the string a little faster than it should.'],
-    ['m','Keen Eye',{accuracy:100}],['m','Sure Shot',{projPct:9}],
-    ['n','Far Shot',{projPct:22,areaSize:-10},'Distance stops being a penalty and starts being the point.']]},
-  {id:'dx_b',from:{start:'dex'},da:5,dr:-1,nodes:[
-    ['m','Evasive',{evasionPct:8}],['m','Light Step',{moveSpeed:3}],
-    ['n','Phase Step',{evasionPct:20,moveSpeed:5},'You are somewhere adjacent to where they aimed.'],
-    ['m','Wiry',{dex:8}],['m','Cat’s Footing',{evasion:48}],
-    ['n','Untouched',{evasionPct:22,resAll:5},'Being missed is a form of armour, if you commit to it.']]},
-  {id:'dx_c',from:{node:'dx_a_2'},da:-9,dr:-1,nodes:[
-    ['m','Cold Steel',{coldPct:10}],['m','Frostbite',{freezeBuild:25}],
-    ['n','Hypothermia',{coldPct:20,freezeBuild:30},'Cold accumulates in things that keep moving.'],
-    ['m','Splinter',{critChance:24}],
-    ['k','ele_overload',{keystone:'ele_overload'}]]},
-  {id:'dx_rim',from:{start:'dex'},da:11,dr:0,nodes:[
-    ['m','Swift Hands',{aspd:6}],['m','Quiver Discipline',{projPct:8}],
-    ['n','Volley',{projPct:16,aspd:6},'The rhythm matters more than any single arrow.'],
-    ['m','Poise',{dex:7}]]},
-
-  /* ---- Dexterity / Intelligence (Shadow) ---- */
-  {id:'di_a',from:{start:'dexint'},da:-5,dr:-1,nodes:[
-    ['m','Toxins',{chaosPct:9}],['m','Venom',{poisonBuild:22}],
-    ['n','Plague Bearer',{chaosPct:18,poisonBuild:30},'Nothing you do looks fatal at the time.'],
-    ['m','Rot',{dotPct:12}],['m','Slow Death',{dotPct:12}],
-    ['n','Wither',{dotPct:22,chaosPct:12},'The wound gets worse for as long as it is ignored.']]},
-  {id:'di_b',from:{start:'dexint'},da:5,dr:-1,nodes:[
-    ['m','Shadowed',{es:22}],['m','Nimble',{evasion:34}],
-    ['n','Ghost Dance',{evasionPct:16,esPct:14},'Half armour, half absence.'],
-    ['m','Cruel Blade',{critDmg:12}],['m','Assassinate',{critChance:26}],
-    ['n','Ambush',{critDmg:26,critChance:20},'The first strike is worth all the others put together.']]},
-  {id:'di_c',from:{node:'di_b_2'},da:9,dr:-1,nodes:[
-    ['m','Mind Over Matter',{mana:24}],['m','Focus',{esPct:10}],
-    ['n','Clarity of Purpose',{manaRegen:3,spirit:15},'Room enough in your head for one more permanent thing.'],
-    ['m','Discipline',{es:34}],
-    ['k','blood_magic',{keystone:'blood_magic'}]]},
-  {id:'di_rim',from:{start:'dexint'},da:11,dr:0,nodes:[
-    ['m','Quick Fingers',{aspd:5,cspd:5}],['m','Sleight',{critChance:20}],
-    ['n','Perfect Crime',{critChance:28,critDmg:14},'Neatly done, and nobody standing to describe it.'],
-    ['m','Deft',{dex:5,int:5}]]},
-
-  /* ---- Intelligence (Witch) ---- */
-  {id:'in_a',from:{start:'int'},da:-5,dr:-1,nodes:[
-    ['m','Arcane Study',{spellPct:9}],['m','Deep Thought',{mana:22}],
-    ['n','Conflagration',{firePct:20,igniteBuild:30},'Fire that is not in a hurry to go out.'],
-    ['m','Kindling',{firePct:10}],['m','Insight',{int:8}],
-    ['n','Pyromancer',{firePct:24,areaPct:12},'The room takes the damage on the target’s behalf.']]},
-  {id:'in_b',from:{start:'int'},da:5,dr:-1,nodes:[
-    ['m','Static',{lightPct:10}],['m','Conductivity',{shockBuild:25}],
-    ['n','Overcharge',{lightPct:20,shockBuild:30},'Everything nearby becomes a slightly better conductor.'],
-    ['m','Energy Shield',{es:26}],['m','Ward',{esPct:9}],
-    ['n','Aegis',{esPct:22,resAll:6},'A shell that fills back in when nobody is looking at it.']]},
-  {id:'in_c',from:{node:'in_a_2'},da:-9,dr:-1,nodes:[
-    ['m','Quick Recitation',{cspd:7}],['m','Elemental Study',{elePct:9}],
-    ['n','Elementalist',{elePct:20,resAll:8},'All three at once, none of them favoured.'],
-    ['m','Spell Echo',{cspd:9}],
-    ['n','Wide Casting',{areaSize:18,areaPct:14},'What you cast arrives across a wider piece of floor.']]},
-  {id:'in_rim',from:{start:'int'},da:11,dr:0,nodes:[
-    ['m','Mana Flow',{manaRegen:2}],['m','Reservoir',{manaPct:8}],
-    ['n','Deep Well',{manaPct:14,spirit:15},'There is more room in you than there was.'],
-    ['m','Scholar',{int:7}]]},
-
-  /* ---- Strength / Intelligence (Templar) ---- */
-  {id:'si_a',from:{start:'strint'},da:-5,dr:-1,nodes:[
-    ['m','Zeal',{meleePct:8}],['m','Devotion',{spellPct:8}],
-    ['n','Consecrate',{firePct:18,meleePct:12},'The swing and the fire arrive a half-beat apart.'],
-    ['m','Hymn',{life:10,mana:12}],['m','Faith',{str:5,int:5}],
-    ['n','Templar’s Resolve',{lifePct:6,esPct:12},'Two kinds of protection, neither of them subtle.']]},
-  {id:'si_b',from:{start:'strint'},da:5,dr:-1,nodes:[
-    ['m','Warded Plate',{resAll:5}],['m','Sanctified',{armour:28}],
-    ['n','Purity',{resAll:10},'Whatever they throw arrives thinner than it left.'],
-    ['m','Chastening',{elePct:10}],['m','Anointed',{spirit:12}],
-    ['n','Reservation',{spirit:25},'Room for one more standing miracle.']]},
-  {id:'si_c',from:{node:'si_b_2'},da:9,dr:-1,nodes:[
-    ['m','Retribution',{critDmg:12}],['m','Judgement',{elePct:10}],
-    ['n','Inquisitor',{elePct:22,critChance:24},'Certainty, applied at speed.'],
-    ['m','Reliquary',{es:30}],
-    ['n','Chaos Innoculation',{resChaos:22},'The chaos finds nothing in you that it recognises.']]},
-  {id:'si_rim',from:{start:'strint'},da:11,dr:0,nodes:[
-    ['m','Blessing',{lifeRegen:2}],['m','Vestments',{armour:24}],
-    ['n','Sacred Ground',{lifeRegen:4,resAll:5},'The floor you stand on is on your side.'],
-    ['m','Ordained',{int:5,str:5}]]},
-
-  /* ---- inner ring: shared, expensive, and worth walking to ---- */
-  {id:'core_n',from:{node:'st_c_4'},da:0,dr:-1,nodes:[
-    ['m','Core Fortitude',{lifePct:5}],
-    ['n','Heart of the Rift',{lifePct:10,resAll:6},'Something down here agrees to keep you alive a while longer.']]},
-  {id:'core_e',from:{node:'sd_c_4'},da:0,dr:-1,nodes:[
-    ['m','Core Precision',{critDmg:12}],
-    ['n','Perfect Form',{aspd:8,cspd:8,critDmg:14},'Everything you do arrives on time.']]},
-  {id:'core_s',from:{node:'di_c_4'},da:0,dr:-1,nodes:[
-    ['m','Core Patience',{dotPct:12}],
-    ['n','Long Game',{dotPct:24,chaosPct:12},'You have stopped needing the kill to be immediate.']]},
-  {id:'core_w',from:{node:'in_c_4'},da:0,dr:-1,nodes:[
-    ['m','Core Focus',{elePct:10}],
-    ['n','Unbound Element',{elePct:22,areaSize:12},'The element stops asking where the edges are.']]},
-  /* ---- second layer: filler spokes and outer arcs, mostly minor ---- */
-  {id:'st_d',from:{start:'str'},da:-11,dr:-1,nodes:[
-    ['m','Callused',{life:9}],['m','Heaving',{meleePct:7}],['m','Stone Grip',{armour:24}],
-    ['n','Titan\u2019s Bearing',{lifePct:7,armourPct:14},'Everything about you is load-bearing.'],
-    ['m','Bracing',{str:6}],['k','unwavering',{keystone:'unwavering'}]]},
-  {id:'st_rim2',from:{node:'st_rim_2'},da:9,dr:0,nodes:[
-    ['m','Field Dressing',{lifeRegen:1}],['m','Old Scars',{life:10}],
-    ['m','Deep Breath',{lifePct:4}],['m','Stubborn',{stunBuild:-15}],['m','Weathered',{resAll:4}]]},
-  {id:'sd_d',from:{start:'strdex'},da:-11,dr:-1,nodes:[
-    ['m','Lunge',{aspd:4}],['m','Feint',{critChance:18}],['m','Whipcord',{physPct:8}],
-    ['n','Duellist\u2019s Grace',{aspd:8,evasionPct:12},'You never stand where the last exchange ended.'],
-    ['m','Wristwork',{aspd:4}],['k','crimson_dance',{keystone:'crimson_dance'}]]},
-  {id:'sd_rim2',from:{node:'sd_rim_2'},da:9,dr:0,nodes:[
-    ['m','Sidestep',{evasion:34}],['m','Loose Guard',{moveSpeed:2}],
-    ['m','Trained',{dex:5}],['m','Read the Room',{accuracy:70}],['m','Second Nature',{aspd:4}]]},
-  {id:'dx_d',from:{start:'dex'},da:-11,dr:-1,nodes:[
-    ['m','Fletching',{projPct:7}],['m','Draw Weight',{physPct:8}],['m','Long Sight',{accuracy:80}],
-    ['n','Ranger\u2019s Patience',{projPct:16,critDmg:12},'One arrow, placed, beats six thrown.'],
-    ['m','Windage',{projSpeed:14}],['k','avatar_fire',{keystone:'avatar_fire'}]]},
-  {id:'dx_rim2',from:{node:'dx_rim_2'},da:9,dr:0,nodes:[
-    ['m','Light Frame',{evasion:32}],['m','Roadworn',{moveSpeed:2}],
-    ['m','Lithe',{dex:5}],['m','Hunter\u2019s Eye',{critChance:16}],['m','Endless March',{lifeRegen:1}]]},
-  {id:'di_d',from:{start:'dexint'},da:-11,dr:-1,nodes:[
-    ['m','Brew',{chaosPct:8}],['m','Sap',{dotPct:9}],['m','Numbing Cut',{poisonBuild:18}],
-    ['n','Apothecary',{dotPct:18,poisonBuild:20},'Measured out, and measured badly on purpose.'],
-    ['m','Thin Blade',{critChance:16}],['k','hollow_bones',{keystone:'hollow_bones'}]]},
-  {id:'di_rim2',from:{node:'di_rim_2'},da:9,dr:0,nodes:[
-    ['m','Shroud',{es:20}],['m','Unlit',{evasion:30}],
-    ['m','Whisper',{cspd:4}],['m','Cold Hands',{critDmg:10}],['m','Quiet Mind',{mana:18}]]},
-  {id:'in_d',from:{start:'int'},da:-11,dr:-1,nodes:[
-    ['m','Recitation',{spellPct:8}],['m','Chalk Circle',{areaSize:8}],['m','Ledger',{mana:20}],
-    ['n','Grimoire',{spellPct:18,cspd:6},'Somebody else did the difficult thinking already.'],
-    ['m','Marginalia',{int:6}],['n','Void Battery',{manaPct:16,spellPct:12},'Power kept where your reserves used to be.']]},
-  {id:'in_rim2',from:{node:'in_rim_2'},da:9,dr:0,nodes:[
-    ['m','Trance',{cspd:4}],['m','Steady Chant',{manaRegen:1}],
-    ['m','Ink',{spellPct:7}],['m','Cold Reading',{coldPct:8}],['m','Charged',{lightPct:8}]]},
-  {id:'si_d',from:{start:'strint'},da:-11,dr:-1,nodes:[
-    ['m','Litany',{spellPct:7}],['m','Censer',{firePct:8}],['m','Mail Coif',{armour:22}],
-    ['n','Crusader',{meleePct:14,resAll:6},'Armoured conviction, swung on the beat.'],
-    ['m','Tithe',{spirit:10}],['n','Divine Favour',{spirit:20,lifeRegen:2},'Something is keeping an eye on you.']]},
-  {id:'si_rim2',from:{node:'si_rim_2'},da:9,dr:0,nodes:[
-    ['m','Plated',{armour:22}],['m','Anointment',{resFire:6}],
-    ['m','Cold Iron',{resCold:6}],['m','Grounded',{resLight:6}],['m','Warded',{resChaos:5}]]}
-
-];
-/* rim connections, so neighbouring class areas are walkable between */
-const TREE_LINKS = [
-  /* each class's rim arc runs round to the next class's start, so the whole
-     outer edge is walkable in both directions */
-  ['st_rim_4','start_strdex'],['sd_rim_4','start_dex'],['dx_rim_4','start_dexint'],
-  ['di_rim_4','start_int'],['in_rim_4','start_strint'],['si_rim_4','start_str'],
-  ['st_rim2_5','start_strdex'],['sd_rim2_5','start_dex'],['dx_rim2_5','start_dexint'],
-  ['di_rim2_5','start_int'],['in_rim2_5','start_strint'],['si_rim2_5','start_str'],
-  ['core_n_2','core_e_2'],['core_e_2','core_s_2'],['core_s_2','core_w_2'],['core_w_2','core_n_2']
-];
-
-const TREE = {nodes:{}, list:[]};
+const TREE = {nodes:{}, list:[], links:[]};
 (function buildTree(){
-  function add(id,x,y,type,name,st,desc){
-    const n={id:id,x:x,y:y,type:type,name:name,st:st||{},desc:desc||'',adj:[]};
-    TREE.nodes[id]=n; TREE.list.push(n);
-    return n;
+  const KIND=['minor','notable','travel','keystone','start'];
+  for(let i=0;i<TREE_NODES.length;i++){
+    const r=TREE_NODES[i];
+    const n={id:TREE_IDS[i], x:r[0], y:r[1], type:KIND[r[2]], name:r[3],
+      st:r[4]?r[4]:{}, desc:'', adj:[]};
+    if(r[5]){ n.st=Object.assign({keystone:r[5]},n.st); n.desc=KEYSTONES[r[5]].text; }
+    else if(n.type==='start') n.desc='Where this class begins on the tree.';
+    else if(n.type==='travel') n.desc='A stretch of road. It grants nothing; it only costs a point to pass.';
+    TREE.nodes[n.id]=n; TREE.list.push(n);
   }
-  function link(a,b){
-    const A=TREE.nodes[a], B=TREE.nodes[b];
-    if(!A||!B) return;
-    if(A.adj.indexOf(b)<0) A.adj.push(b);
-    if(B.adj.indexOf(a)<0) B.adj.push(a);
+  for(let i=0;i<TREE_EDGES.length;i+=2){
+    const A=TREE.list[TREE_EDGES[i]], B=TREE.list[TREE_EDGES[i+1]];
+    A.adj.push(B.id); B.adj.push(A.id);
+    TREE.links.push([A,B]);
   }
-  /* class start nodes around the rim */
-  for(const k in TREE_STARTS){
-    const a=TREE_STARTS[k]*Math.PI/180;
-    add('start_'+k, Math.cos(a)*R_START, Math.sin(a)*R_START, 'start',
-        START_LABEL[k]+' Start', {}, 'Where this class begins on the tree.');
-  }
-  for(const br of TREE_BRANCHES){
-    let px,py,pid,baseA,baseR;
-    if(br.from.start){
-      pid='start_'+br.from.start;
-      baseA=TREE_STARTS[br.from.start];
-      baseR=R_START;
-    } else {
-      pid=br.from.node;
-      const pn=TREE.nodes[pid];
-      if(!pn) continue;
-      baseA=Math.atan2(pn.y,pn.x)*180/Math.PI;
-      baseR=Math.hypot(pn.x,pn.y);
-    }
-    px=pid;
-    br.nodes.forEach((spec,i)=>{
-      const step=i+1;
-      const ang=(baseA + (br.da||0)*step)*Math.PI/180;
-      const rad=baseR + (br.dr||0)*R_STEP*step;
-      const id=br.id+'_'+step;
-      const type= spec[0]==='k'?'keystone': spec[0]==='n'?'notable':'minor';
-      let name=spec[1], st=spec[2]||{}, desc=spec[3]||'';
-      if(type==='keystone'){ const ks=KEYSTONES[spec[1]]; name=ks.name; desc=ks.text; }
-      add(id, Math.cos(ang)*rad, Math.sin(ang)*rad, type, name, st, desc);
-      link(px,id);
-      px=id;
-    });
-  }
-  for(const [a,b] of TREE_LINKS) link(a,b);
-
-  /* Relaxation: the authored branches are polar walks, so inward spokes
-     crowd near the middle. Push overlapping nodes apart and keep everything
-     off the very centre. Class starts stay pinned to the rim. */
-  /* Overlap resolution through a spatial grid rather than every pair, and it
-     stops the moment nothing moves. Boot must not stall on this. */
-  const MIN=46, CELL=46;
-  const buckets=new Map();
-  const bkey=(x,y)=>((y/CELL)|0)*100000+((x/CELL)|0);
-  for(let pass=0;pass<90;pass++){
-    buckets.clear();
-    for(const n of TREE.list){
-      const k=bkey(n.x,n.y);
-      let arr=buckets.get(k);
-      if(!arr){ arr=[]; buckets.set(k,arr); }
-      arr.push(n);
-    }
-    let moved=0;
-    for(const a of TREE.list){
-      const cx=(a.x/CELL)|0, cy=(a.y/CELL)|0;
-      for(let oy=-1;oy<=1;oy++) for(let ox=-1;ox<=1;ox++){
-        const near=buckets.get((cy+oy)*100000+(cx+ox));
-        if(!near) continue;
-        for(const b of near){
-          if(b===a) continue;
-          let dx=b.x-a.x, dy=b.y-a.y;
-          let d=Math.hypot(dx,dy);
-          if(d>=MIN) continue;
-          if(d<0.01){ dx=Math.cos(a.x*2.4); dy=Math.sin(a.y*2.4); d=1; }
-          const push=(MIN-d)/2;
-          const ux=dx/d, uy=dy/d;
-          if(a.type!=='start'){ a.x-=ux*push; a.y-=uy*push; }
-          if(b.type!=='start'){ b.x+=ux*push; b.y+=uy*push; }
-          moved++;
-        }
-      }
-    }
-    for(const n of TREE.list){
-      if(n.type==='start') continue;
-      const r=Math.hypot(n.x,n.y);
-      if(r<120){ const k=120/(r||1); n.x*=k; n.y*=k; }
-      if(r>R_START+40){ const k=(R_START+40)/r; n.x*=k; n.y*=k; }
-    }
-    if(!moved) break;
-  }
-  /* the link list never changes: build it once instead of every frame */
-  TREE.links=[];
-  const seenL={};
-  for(const n of TREE.list) for(const id of n.adj){
-    const k=n.id<id?n.id+'|'+id:id+'|'+n.id;
-    if(seenL[k]) continue;
-    seenL[k]=1;
-    TREE.links.push([n,TREE.nodes[id]]);
+  /* A bucket grid so hit-testing a pointer against 606 nodes is a handful of
+     distance checks rather than all of them, on every pointermove. */
+  TREE.cell=64;
+  TREE.grid=new Map();
+  for(const n of TREE.list){
+    const k=Math.floor(n.y/TREE.cell)*100000+Math.floor(n.x/TREE.cell);
+    let a=TREE.grid.get(k);
+    if(!a){ a=[]; TREE.grid.set(k,a); }
+    a.push(n);
   }
 })();
+
 
 /* -------------------------------------------------------------------- bases
    Bases carry an implicit mod and the core defence or damage numbers.
@@ -1583,7 +1980,15 @@ const AIL_COLOR = {stun:'#e8d8a0',freeze:'#8fd0e8',ignite:'#e07a3c',shock:'#e8d8
   poison:'#8fc060',bleed:'#c04040'};
 
 /* XP required to advance from the given level */
-function xpForLevel(lv){ return Math.round(38*Math.pow(lv,1.62) + 22*lv); }
+/* Act 1 is eight zones capped at monster level 16. A full clear of all eight
+   used to carry a character to level 22 in about an hour — ten times too
+   fast, and it left the tree arriving faster than it could be read.
+   This curve is steep enough that one clean pass through the act ends around
+   level 13, two around 16, and the zone level pulls ahead of the character
+   from the fifth zone on, so the player is always a little under-levelled.
+   The shallow first term keeps the opening levels quick. */
+const MAX_LEVEL = 60;
+function xpForLevel(lv){ return Math.round(130*Math.pow(lv,1.20) + 40*Math.pow(lv,2.10)); }
 
 /* ==========================================================================
    GLOBAL RUNTIME STATE
@@ -1701,10 +2106,11 @@ function newCharacter(name,clsKey){
   G.ch=prev;
   return ch;
 }
-const BOSS_POINTS = 3;
+const BOSS_POINTS = 6;
 function clearedCount(ch){ return ch.zonesCleared?Object.keys(ch.zonesCleared).length:0; }
-/* one point per level plus three for the first kill of each zone's master:
-   39 from levels and 24 from the eight masters */
+/* One point per level, plus six for the first kill of each zone's master.
+   A character who has finished Act 1 twice over holds roughly 63: a real
+   route through the tree rather than a handful of adjacent picks. */
 function charPoints(ch){ return (ch.level-1) + clearedCount(ch)*BOSS_POINTS; }
 function pointsSpent(ch){ return Object.keys(ch.passives).length; }
 
@@ -1998,22 +2404,29 @@ function recalc(){
   life *= 1+(S.lifePct||0)/100;
   if(flags.lifePctMult) life *= 1+flags.lifePctMult/100;
   if(keys.hollow_bones) life *= 0.7;
+  if(keys.glass_cannon) life *= 0.55;
+  if(keys.chaos_inoc) life = 1;
   st.maxLife=Math.max(1,Math.round(life));
 
   let mana = 20 + cls.mana + ch.level*5 + int*2 + (S.mana||0);
   mana *= 1+(S.manaPct||0)/100;
   if(flags.manaPctMult) mana *= 1+flags.manaPctMult/100;
   if(keys.blood_magic) mana=0;
-  st.maxMana=Math.max(0,Math.round(mana));
 
   let es = (S.es||0) + Math.floor(int*0.5);
   es *= 1+(S.esPct||0)/100;
   if(flags.esZero) es=0;
+  if(keys.acrobatics) es *= 0.5;
+  /* Eldritch Battery folds the whole shield into the mana pool */
+  if(keys.eldritch){ mana += es; es = 0; }
+  st.maxMana=Math.max(0,Math.round(mana));
   st.maxES=Math.max(0,Math.round(es));
 
   /* defences */
   let armour=(S.armour||0)*(1+(S.armourPct||0)/100);
   let evasion=(35+dex*2+(S.evasion||0))*(1+(S.evasionPct||0)/100);
+  if(keys.acrobatics){ evasion*=1.45; armour*=0.5; }
+  if(keys.runic_skin) armour*=0.65;
   if(keys.iron_reflexes){ armour+=evasion; evasion=0; }
   if(keys.unwavering) evasion=0;
   st.armour=Math.round(armour);
@@ -2025,7 +2438,7 @@ function recalc(){
     fire:clamp((S.resFire||0)+(S.resAll||0)+zoneRes,-100,RES_CAP),
     cold:clamp((S.resCold||0)+(S.resAll||0)+zoneRes,-100,RES_CAP),
     lightning:clamp((S.resLight||0)+(S.resAll||0)+zoneRes,-100,RES_CAP),
-    chaos:clamp((S.resChaos||0)+Math.floor(zoneRes/2),-100,RES_CAP)
+    chaos:keys.chaos_inoc?100:clamp((S.resChaos||0)+Math.floor(zoneRes/2),-100,RES_CAP)
   };
   st.resRaw={fire:(S.resFire||0)+(S.resAll||0),cold:(S.resCold||0)+(S.resAll||0),
     lightning:(S.resLight||0)+(S.resAll||0),chaos:(S.resChaos||0)};
@@ -2039,12 +2452,21 @@ function recalc(){
   if(keys.resolute){ st.critChance=0; }
   if(keys.ele_overload){ st.critDmg=0; }
   st.accuracy=200+dex*3+(S.accuracy||0);
-  st.aspd=w.aspd*(1+(S.aspd||0)/100+dex*0.0015);
+  st.aspd=w.aspd*(1+(S.aspd||0)/100+dex*0.0015)*(keys.berserk?1.3:1);
   st.cspd=1*(1+(S.cspd||0)/100);
   st.moveSpeed=200*(1+(S.moveSpeed||0)/100);
-  st.leech=(S.leech||0);
-  st.lifeRegen=flags.noRegen?0:(1+ch.level*0.12+(S.lifeRegen||0));
-  st.manaRegen=(1.4+ch.level*0.16+(S.manaRegen||0));
+  st.leech=(S.leech||0)*(keys.vaal_pact?1.6:1);
+  st.lifeRegen=(flags.noRegen||keys.vaal_pact)?0:(1+ch.level*0.12+(S.lifeRegen||0));
+  st.manaRegen=(1.4+ch.level*0.16+(S.manaRegen||0))*(keys.mind_matter?0.5:1);
+  /* Mind over Matter shunts part of every hit into the mana pool */
+  st.mindMatter=keys.mind_matter?0.30:0;
+  /* Berserker buys its speed and damage with everything landing harder */
+  st.dmgTaken=keys.berserk?1.3:1;
+  /* Runic Skin lets armour work against elemental hits too */
+  st.armourAllTypes=!!keys.runic_skin;
+  /* Wicked Ward never breaks the recharge, but starts it far later */
+  st.wardUninterrupted=!!keys.wicked_ward;
+  st.esDelayMult=keys.wicked_ward?2.6:1;
   st.spiritMax=cls.spirit+30+(S.spirit||0);
   st.spiritUsed=spiritUsed;
   st.spiritBreak=spiritBreak;
@@ -2056,17 +2478,28 @@ function recalc(){
     phys:1+(S.physPct||0)/100, fire:1+(S.firePct||0)/100, cold:1+(S.coldPct||0)/100,
     lightning:1+(S.lightPct||0)/100, chaos:1+(S.chaosPct||0)/100,
     ele:1+(S.elePct||0)/100+(keys.ele_overload?0.4:0),
-    melee:1+(S.meleePct||0)/100+str*0.006, proj:1+(S.projPct||0)/100+dex*0.005,
+    melee:1+(S.meleePct||0)/100+str*0.006,
+    proj:1+(S.projPct||0)/100+dex*0.005+(keys.iron_grip?str*0.006:0),
     spell:1+(S.spellPct||0)/100+int*0.006+(keys.hollow_bones?0.4:0), area:1+(S.areaPct||0)/100,
-    dot:1+(S.dotPct||0)/100, all:1+(S.dmgPct||0)/100
+    dot:1+(S.dotPct||0)/100,
+    all:(1+(S.dmgPct||0)/100)*(keys.glass_cannon?1.55:1)*(keys.berserk?1.3:1)
+        *(keys.ancestral?0.65:1)
   };
+  /* Ancestral Bond hands your damage to what you put on the ground */
+  st.totemMult=keys.ancestral?1.8:1;
   st.added={fire:S.addFire||0,cold:S.addCold||0,lightning:S.addLight||0,physical:S.addPhys||0};
   st.areaSize=1+(S.areaSize||0)/100;
   st.projSpeed=1+(S.projSpeed||0)/100;
-  st.build={stun:1+(S.stunBuild||0)/100,freeze:1+(S.freezeBuild||0)/100,
+  st.build={stun:(1+(S.stunBuild||0)/100),
+    freeze:(1+(S.freezeBuild||0)/100)*(keys.frostbound?1.7:1),
     ignite:1+(S.igniteBuild||0)/100,shock:1+(S.shockBuild||0)/100,
     poison:1+(S.poisonBuild||0)/100+(flags.poisonMore||0)/100,bleed:1+(S.bleedBuild||0)/100};
   st.stunTaken=1-((flags.stunResist||0)/100);
+  /* what the player can no longer inflict */
+  st.noStun=!!keys.frostbound;
+  st.noIgnite=!!keys.conduit;
+  st.noBossFreeze=!!keys.shatterborn;
+  st.shockMult=keys.conduit?1.6:1;
   st.raw=S;
   G.st=st;
   /* every resolved skill reads from st, so they are all stale now */
@@ -2171,7 +2604,7 @@ function skillStats(g,idx){
   const spdMod=1+((isAttack?(mods.aspd||0):(mods.cspd||0))/100);
   const cd=(def.cd||0)/Math.max(0.25,speedStat*spdMod);
 
-  let mana=Math.round((def.mana||0)*manaMult*(flags.manaCostMult||1));
+  let mana=Math.round((def.mana||0)*manaMult*(flags.manaCostMult||1)*(st.keys.eldritch?0.75:1));
   const radius=(def.radius||0)*st.areaSize*(1+(mods.radiusPct||0)/100);
   const count=(def.count||1)+(isProj?(mods.projAdd||0):0);
 
@@ -2200,7 +2633,8 @@ function skillStats(g,idx){
     dmg:dmg, addFire:addFire, addCold:addCold, addLight:addLight,
     count:count, radius:radius, range:(def.range||0), speed:(def.speed||0)*st.projSpeed,
     arc:def.arc||0, cd:cd, mana:mana, duration:def.duration||0, interval:def.interval||0,
-    chains:(def.chains||0)+(mods.chainAdd||0), pierce:(def.pierce||0)+(mods.pierceAdd||0),
+    chains:(def.chains||0)+(mods.chainAdd||0)+((st.keys.conduit&&(def.chains||0))?1:0),
+    pierce:(def.pierce||0)+(mods.pierceAdd||0),
     crit:st.critChance*(1+(mods.critChance||0)/100), critDmg:st.critDmg,
     leech:st.leech+(mods.leechPct||0), noAilment:!!mods.noAilment,
     ailment:def.ailment||null, combo:def.combo||null, spirit:def.spirit||0,
@@ -3025,6 +3459,10 @@ function ailmentActive(e,type){ return e.ailT[type]>0; }
 function addBuildup(e,type,amount,hitDmg){
   if(!amount||amount<=0) return;
   const st=G.st;
+  /* keystones that take an ailment away from you entirely */
+  if(type==='stun'&&st.noStun) return;
+  if(type==='ignite'&&st.noIgnite) return;
+  if(type==='freeze'&&st.noBossFreeze&&e.boss) return;
   e.ail[type]=(e.ail[type]||0)+amount*(st.build[type]||1);
   if(e.ail[type]<e.threshold) return;
   e.ail[type]=0;
@@ -3196,7 +3634,14 @@ function monsterTakeDamage(e,base,dtype,crit,sk,kx,ky){
     else if(ailmentActive(e,'ignite')){ dmg*=1.4; comboed='detonate'; }
   }
   if(G.st.flags.shatterCrit && crit && ailmentActive(e,'freeze')) dmg*=1.4;
-  if(e.ailT.shock>0) dmg*=1+(e.shockMag||0.2);
+  /* Perfect Agony trades hit damage for ailment magnitude on every crit */
+  if(crit && G.st.keys.perfect_agony) dmg*=0.65;
+  /* Point Blank reads the distance the hit actually travelled */
+  if(G.st.keys.point_blank && sk && !sk.isSpell && sk.speed>0){
+    const d=dist(G.player.x,G.player.y,e.x,e.y);
+    if(d<200) dmg*=1.45; else if(d>500) dmg*=0.65;
+  }
+  if(e.ailT.shock>0) dmg*=1+(e.shockMag||0.2)*(G.st.shockMult||1);
   if(e.shieldMax>0&&e.shield>0){
     dmg*=0.45;
     e.shield-=dmg;
@@ -3234,11 +3679,12 @@ function monsterTakeDamage(e,base,dtype,crit,sk,kx,ky){
   }
   /* ailment buildup from this hit */
   if(sk && !sk.noAilment){
-    if(sk.ailment) addBuildup(e,sk.ailment,dmg*(sk.ailment==='bleed'?sk.bleedMult:sk.ailment==='poison'?sk.poisonMult:1),dmg);
-    if(dtype==='physical') addBuildup(e,'stun',dmg*0.55*(sk.stunMult||1),dmg);
-    else if(dtype==='fire'&&!sk.ailment) addBuildup(e,'ignite',dmg*0.3,dmg);
-    else if(dtype==='cold'&&!sk.ailment) addBuildup(e,'freeze',dmg*0.35,dmg);
-    else if(dtype==='lightning'&&!sk.ailment) addBuildup(e,'shock',dmg*0.3,dmg);
+    const ag=(crit&&G.st.keys.perfect_agony)?1.6:1;
+    if(sk.ailment) addBuildup(e,sk.ailment,dmg*ag*(sk.ailment==='bleed'?sk.bleedMult:sk.ailment==='poison'?sk.poisonMult:1),dmg);
+    if(dtype==='physical') addBuildup(e,'stun',dmg*0.55*ag*(sk.stunMult||1),dmg);
+    else if(dtype==='fire'&&!sk.ailment) addBuildup(e,'ignite',dmg*0.3*ag,dmg);
+    else if(dtype==='cold'&&!sk.ailment) addBuildup(e,'freeze',dmg*0.35*ag,dmg);
+    else if(dtype==='lightning'&&!sk.ailment) addBuildup(e,'shock',dmg*0.3*ag,dmg);
   }
   /* leech and meta triggers */
   if(sk&&sk.leech>0) healPlayer(dmg*sk.leech/100,true);
@@ -3317,7 +3763,21 @@ function damagePlayer(amount,dtype,src){
     dmg*=1-r/100;
   }
   dmg=Math.max(1,dmg);
+  if(st.armourAllTypes&&dtype!=='physical'&&dtype!=='chaos'){
+    /* Runic Skin: armour applies in full to elemental hits as well */
+    const red=st.armour/(st.armour+10*Math.max(1,dmg));
+    dmg*=1-clamp(red,0,0.85);
+  }
   if(p.ailT.shock>0) dmg*=1+(p.shockMag||0.15);
+  dmg*=st.dmgTaken||1;
+  /* Mind over Matter takes its share out of mana, and stops when mana runs
+     out rather than silently going back to life */
+  if(st.mindMatter>0&&p.mana>0){
+    const want=dmg*st.mindMatter;
+    const paid=Math.min(p.mana,want);
+    p.mana-=paid; dmg-=paid;
+    if(paid>0) burst(p.x,p.y,6,'#6a9fd8',150,2.4,.3,true);
+  }
   /* whatever the attacker is enchanted with builds on the player */
   if(src){
     if(src.ailment) addPlayerBuildup(src.ailment,dmg*1.1,dmg);
@@ -3330,10 +3790,10 @@ function damagePlayer(amount,dtype,src){
   if(p.es>0){
     const absorb=Math.min(p.es,dmg);
     p.es-=absorb; dmg-=absorb;
-    p.esDelay=2.4;
+    if(!st.wardUninterrupted) p.esDelay=2.4*(st.esDelayMult||1);
     burst(p.x,p.y,8,'#96c8e6',170,2.8,.35,true);
   }
-  if(dmg>0){ p.life-=dmg; p.esDelay=2.4; }
+  if(dmg>0){ p.life-=dmg; if(!st.wardUninterrupted) p.esDelay=2.4*(st.esDelayMult||1); }
   p.iframe=0.34;
   G.flash=Math.min(1,0.3+ (amount/Math.max(1,st.maxLife))*2.2);
   dmgNumber(p.x,p.y-p.r-6,amount,false,dtype);
@@ -3392,7 +3852,7 @@ function gainXp(v){
   const ch=G.ch;
   ch.xp+=v;
   let leveled=0;
-  while(ch.xp>=xpForLevel(ch.level) && ch.level<40){
+  while(ch.xp>=xpForLevel(ch.level) && ch.level<MAX_LEVEL){
     ch.xp-=xpForLevel(ch.level);
     ch.level++;
     leveled++;
@@ -3658,6 +4118,7 @@ function executeSkill(sk,ang,fromTouch){
     let tx=p.x+Math.cos(ang)*Math.max(40,md*0.6), ty=p.y+Math.sin(ang)*Math.max(40,md*0.6);
     if(!canStand(tx,ty,14)){ tx=p.x; ty=p.y; }
     G.totems.push({x:tx,y:ty,r:14,t:sk.duration||8,max:sk.duration||8,cd:0,sk:sk,
+      mult:G.st.totemMult||1,
       color:col,rot:0,spirit:sk.spirit||0});
     recalc();
     burst(tx,ty,14,col,150,3,.5,true);
@@ -4416,7 +4877,7 @@ function updateTotems(dt){
         const crit=rollCrit(t.sk);
         spawnShot({x:t.x+Math.cos(a)*12,y:t.y+Math.sin(a)*12,
           vx:Math.cos(a)*420,vy:Math.sin(a)*420,
-          dmg:critDamage(t.sk,t.sk.dmg*0.6,crit),dtype:t.sk.dtype,color:t.color,
+          dmg:critDamage(t.sk,t.sk.dmg*0.6*(t.mult||1),crit),dtype:t.sk.dtype,color:t.color,
           from:'player',r:6,life:1.6,crit:crit,sk:t.sk});
       } else t.cd=0.3;
     }
@@ -4521,7 +4982,9 @@ function loop(ts){
   } else if(G.running){
     visualUpdate(Math.min(dt,0.02));
   }
-  if(G.running){ render(); updateHUD(); }
+  /* every panel covers the screen, so the world behind it is wasted work */
+  if(G.running&&!G.panel){ render(); updateHUD(); }
+  else if(G.running&&G.panel==='death') { render(); updateHUD(); }
   if(G.panel==='tree') renderTree();
   if(G.panel==='map') renderMapOverlay();
 }
@@ -5602,6 +6065,7 @@ function equipWhyNot(it,slotKey){
   if(!it.idf) return 'Identify it first.';
   if(itemLevelReq(it)>ch.level) return 'Requires level '+itemLevelReq(it)+'.';
   if(slotKey==='offhand'&&twoHandEquipped()) return 'Both hands are on your weapon.';
+  if(slotKey==='offhand'&&G.st&&G.st.keys&&G.st.keys.iron_grip) return 'Iron Grip leaves no hand for an offhand.';
   return '';
 }
 function canGroundDrop(list){
@@ -6488,6 +6952,13 @@ function canAllocate(id){
   }
   return false;
 }
+/* Allocation without the UI side effects: used by the mirror's refund maths
+   and by anything that needs to walk a route. */
+function allocateSilent(id){
+  if(!canAllocate(id)) return false;
+  G.ch.passives[id]=G.tree.set;
+  return true;
+}
 function allocate(id){
   const ch=G.ch;
   if(!canAllocate(id)){
@@ -6552,10 +7023,16 @@ function screenToTree(sx,sy){
 }
 function nodeAtScreen(sx,sy){
   const p=screenToTree(sx,sy);
+  /* the nine buckets around the pointer, not all 606 nodes */
+  const cx=Math.floor(p.x/TREE.cell), cy=Math.floor(p.y/TREE.cell);
   let best=null,bd=1e9;
-  for(const n of TREE.list){
-    const d=d2(p.x,p.y,n.x,n.y);
-    if(d<bd){bd=d;best=n;}
+  for(let oy=-1;oy<=1;oy++) for(let ox=-1;ox<=1;ox++){
+    const arr=TREE.grid.get((cy+oy)*100000+(cx+ox));
+    if(!arr) continue;
+    for(const n of arr){
+      const d=d2(p.x,p.y,n.x,n.y);
+      if(d<bd){bd=d;best=n;}
+    }
   }
   const rr=(best&&best.type==='keystone')?30:best&&best.type==='notable'?22:16;
   return bd<=(rr+10)*(rr+10)?best:null;
@@ -6590,7 +7067,7 @@ function renderTree(){
     const otherSet=alloc&&setTag&&setTag!==(ch.activeSet+1);
     if(otherSet&&t.filterSet) continue;
     const mine=start&&isStartNode(n.id);
-    let r = n.type==='keystone'?15:n.type==='notable'?11:7;
+    let r = n.type==='keystone'?15:n.type==='notable'?11:n.type==='travel'?5:7;
     if(start) r=17;
     r*=t.z;
     const match=search&&(n.name.toLowerCase().indexOf(search)>=0||
@@ -7112,6 +7589,16 @@ function migrateCharacter(ch){
   ch.flasks=ch.flasks||{life:3,mana:3};
   ch.zonesCleared=ch.zonesCleared||{};
   ch.seenGems=ch.seenGems||[];
+  /* The passive tree was rebuilt from six radial spokes into a 600-node web,
+     so no saved allocation points at a node that still exists. Refund the lot
+     rather than silently dropping the stats: the points come back, and the
+     player re-spends them on the new tree. */
+  let staleTree=false;
+  for(const id in ch.passives){ if(!TREE.nodes[id]){ staleTree=true; break; } }
+  if(staleTree){
+    ch.passives={};
+    ch.treeRefunded=true;
+  }
   if(!ch.loadout) ch.loadout=[[null,null,null,null,null],[null,null,null,null,null]];
   if(!ch.sets) ch.sets=[{weapon:null,offhand:null},{weapon:null,offhand:null}];
   if(ch.waypoints.indexOf('hideout')<0) ch.waypoints.unshift('hideout');
@@ -7163,6 +7650,11 @@ function startCharacter(slot){
   enterZone(ch.zone&&ZONES[ch.zone]?ch.zone:'town');
   closePanel();
   toast('Welcome back, '+ch.name+'.');
+  if(ch.treeRefunded){
+    ch.treeRefunded=false;
+    markDirty();
+    setTimeout(()=>toast('The passive tree has been rebuilt. All your points were refunded.'),2600);
+  }
 }
 
 /* ==========================================================================
