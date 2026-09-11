@@ -146,6 +146,13 @@ input{font-family:'Crimson Pro',Georgia,serif}
   position:relative;overflow:hidden}
 #bossbar .bar i{display:block;height:100%;background:linear-gradient(90deg,#7d2420,#c8483a);width:100%}
 #bossbar .ph{position:absolute;top:0;bottom:0;width:1px;background:rgba(0,0,0,.65)}
+/* the armour strip under the life bar: it empties as you break it, and turns
+   red across its whole width once the boss is Fully Broken */
+#bossbar .armour{height:4px;margin-top:3px;background:rgba(20,16,10,.8);
+  border:1px solid rgba(206,192,164,.2);border-radius:2px;overflow:hidden}
+#bossbar .armour i{display:block;height:100%;width:100%;background:#cec0a4;transition:width .12s linear}
+#bossbar .armour.broke{border-color:rgba(214,72,58,.6)}
+#bossbar .armour.broke i{background:#d6483a}
 #pointhint{position:absolute;top:calc(46px + env(safe-area-inset-top));left:50%;
   transform:translateX(-50%);font-family:'Cinzel',serif;font-size:calc(10px * var(--hud));
   letter-spacing:.16em;color:var(--gold);background:rgba(200,169,110,.1);
@@ -442,7 +449,8 @@ body.touch #spiritbar{left:50%;right:auto;transform:translateX(-50%);text-align:
     <div id="zoneinfo"><div class="zn" id="zone-nm">—</div><div class="zl" id="zone-lv">—</div></div>
     <div id="minimap-wrap"><canvas id="minimap" width="118" height="118"></canvas></div>
     <div id="bossbar"><div class="nm" id="boss-nm"></div><div class="bar"><i id="boss-fill"></i>
-      <div class="ph" style="left:33.3%"></div><div class="ph" style="left:66.6%"></div></div></div>
+      <div class="ph" style="left:33.3%"></div><div class="ph" style="left:66.6%"></div></div>
+      <div class="armour" id="boss-armour"><i id="boss-armour-fill"></i></div></div>
     <div class="orb" id="orb-life"><div class="fill" id="life-fill"></div><div class="es" id="es-fill"></div>
       <div class="txt" id="life-txt"></div></div>
     <div class="orb" id="orb-mana"><div class="fill" id="mana-fill"></div><div class="txt" id="mana-txt"></div></div>
@@ -566,23 +574,28 @@ const WEAPON_KINDS = {
 /* -------------------------------------------------------------- active gems
    sockets: gem levels at which each of the 5 support sockets unlocks.
    Attacks deal a multiplier of weapon damage; spells deal their own base.
-   combo: 'enabler' primes an ailment, 'finisher' pays off a primed target. */
+   Combos are states, not damage bonuses: `applies` names what a skill puts
+   on a target, `consumes`/`shatter`/`detonates` name what it takes off, and
+   `flammable` marks ground that fire turns into a burning field. */
 const SOCK_LADDER = [1,4,8,13,18];
 const GEMS = {
   ground_slam:{name:'Ground Slam',type:'melee_arc',tags:['attack','melee','area'],dtype:'physical',
     attr:'str',req:16,lvlReq:1,mana:7,cd:0.75,dmgMult:1.4,arc:1.5,range:165,stunMult:2.2,
-    wep:['mace','axe','staff'],combo:'finisher',
-    mech:'Slams a 165-unit fan in front of you for 140% of weapon damage, with heavy stun buildup. As a combo finisher it deals 45% more damage to a stunned target, 60% more to a frozen one.',
+    wep:['mace','axe','staff'],breakMult:1.6,
+    applies:'Armour Break, Stun',
+    mech:'Slams a 165-unit fan in front of you for 140% of weapon damage, stripping armour 60% faster than an ordinary hit and building heavy stun across everything in the fan.',
     desc:'A shockwave hammered out of the floor in a wide fan. Staggered things come apart under it.'},
   heavy_strike:{name:'Heavy Strike',type:'melee_arc',tags:['attack','melee'],dtype:'physical',
     attr:'str',req:16,lvlReq:1,mana:6,cd:0.7,dmgMult:1.85,arc:0.75,range:120,stunMult:3.4,
-    wep:['mace','axe','sword'],combo:'enabler',ailment:'stun',
-    mech:'One narrow swing for 185% of weapon damage with the highest stun buildup of any skill. Primes targets for finishers.',
+    wep:['mace','axe','sword'],ailment:'stun',breakMult:2.4,
+    applies:'Armour Break, Stun',
+    mech:'One narrow swing for 185% of weapon damage. Strips armour two and a half times as fast as an ordinary physical hit, and builds stun harder than any other skill.',
     desc:'One committed swing at one target. It is mostly used to make things stop moving.'},
   cleave:{name:'Cleave',type:'melee_arc',tags:['attack','melee','area'],dtype:'physical',
     attr:'str',req:20,lvlReq:4,mana:8,cd:0.62,dmgMult:1.15,arc:2.5,range:140,stunMult:1.4,
-    wep:['axe','sword','mace'],
-    mech:'A wide 2.5-radian sweep for 115% of weapon damage. Built for crowds, not single targets.',
+    wep:['axe','sword','mace'],breakMult:1.3,
+    applies:'Armour Break',
+    mech:'A wide 2.5-radian sweep for 115% of weapon damage, stripping armour from everything it touches. Built for breaking a crowd open, not for single targets.',
     desc:'A flat sweep at hip height, meant for crowds rather than for anything important.'},
   leap_slam:{name:'Leap Slam',type:'dash',tags:['attack','melee','area','movement'],dtype:'physical',
     attr:'str',req:22,lvlReq:6,mana:14,cd:3.4,dmgMult:1.5,radius:120,range:330,stunMult:2.6,
@@ -591,8 +604,9 @@ const GEMS = {
     desc:'You leave the ground entirely and arrive badly, on purpose, on someone.'},
   sunder:{name:'Sunder',type:'nova',tags:['attack','melee','area'],dtype:'physical',
     attr:'str',req:30,lvlReq:12,mana:16,cd:2.1,dmgMult:1.25,count:9,radius:110,speed:420,range:420,stunMult:1.8,
-    wep:['mace','axe','staff'],
-    mech:'Sends 9 shockwaves outward in every direction, each dealing 125% of weapon damage.',
+    wep:['mace','axe','staff'],consumes:'broken',breakFlat:40,
+    applies:'Armour Break', consumesLabel:'Fully Broken',
+    mech:'Nine shockwaves outward, each 125% of weapon damage. Against a Fully Broken target it is a guaranteed critical strike \u2014 and consuming the break puts the armour back on, so you have to earn it again.',
     desc:'The ground splits away from you in every direction at once and does not close again.'},
   split_arrow:{name:'Split Arrow',type:'projectile',tags:['attack','projectile'],dtype:'physical',
     attr:'dex',req:16,lvlReq:1,mana:7,cd:0.5,dmgMult:0.78,count:3,speed:620,range:480,spread:0.34,
@@ -601,8 +615,9 @@ const GEMS = {
     desc:'Three arrows leave together and arrive apart. None of them is aimed at you.'},
   puncture:{name:'Puncture',type:'projectile',tags:['attack','projectile'],dtype:'physical',
     attr:'dex',req:18,lvlReq:3,mana:8,cd:0.75,dmgMult:1.2,count:1,speed:660,range:500,
-    wep:['bow','dagger','claw'],combo:'enabler',ailment:'bleed',bleedMult:2.4,
-    mech:'A single arrow for 120% of weapon damage that applies bleed buildup at 2.4x rate. Bleeding targets take double damage while moving.',
+    wep:['bow','dagger','claw'],ailment:'bleed',bleedMult:2.4,consumes:'broken',
+    applies:'Bleed', consumesLabel:'Fully Broken',
+    mech:'A single arrow for 120% of weapon damage, applying bleed at 2.4x rate; bleeding targets take double damage while moving. Against a Fully Broken target it is a guaranteed critical strike, and restores the armour.',
     desc:'A wound shaped so that walking reopens it. Runners bleed out faster than the patient.'},
   rain_of_arrows:{name:'Rain of Arrows',type:'aoe',tags:['attack','projectile','area'],dtype:'physical',
     attr:'dex',req:26,lvlReq:9,mana:17,cd:2.4,dmgMult:1.35,radius:155,range:430,delay:0.55,
@@ -616,53 +631,73 @@ const GEMS = {
     desc:'You travel through a line of people rather than around them.'},
   lightning_strike:{name:'Lightning Strike',type:'projectile',tags:['attack','melee','projectile'],dtype:'lightning',
     attr:'dex',req:24,lvlReq:7,mana:9,cd:0.55,dmgMult:0.9,count:3,speed:560,range:330,spread:0.5,
-    wep:['sword','dagger','claw','axe'],combo:'enabler',ailment:'shock',
+    wep:['sword','dagger','claw','axe'],ailment:'shock',applies:'Shock',
     mech:'Strikes for 90% of weapon damage as lightning, then throws 3 shards onward. Builds shock.',
     desc:'The strike lands and then leaves the weapon in pieces of light, looking for a second target.'},
   fireball:{name:'Fireball',type:'projectile',tags:['spell','projectile','area','fire'],dtype:'fire',
     attr:'int',req:16,lvlReq:1,mana:9,cd:0.65,base:16,perLvl:5.4,count:1,speed:470,range:520,radius:70,
-    combo:'enabler',ailment:'ignite',
-    mech:'A slow projectile dealing its own fire damage in a 70-unit burst. Builds ignite.',
+    ailment:'ignite',detonates:1,
+    applies:'Ignite', consumesLabel:'Burning ground',
+    mech:'A slow projectile dealing its own fire damage in a 70-unit burst. Builds ignite, and lights any flammable ground it lands in.',
     desc:'It is not fast. It does not need to be, and it leaves the floor burning behind it.'},
   frost_bolt:{name:'Frost Bolt',type:'projectile',tags:['spell','projectile','cold'],dtype:'cold',
     attr:'int',req:16,lvlReq:1,mana:7,cd:0.5,base:12,perLvl:4.1,count:1,speed:380,range:560,pierce:1,
-    combo:'enabler',ailment:'freeze',
-    mech:'A slow shard that pierces one enemy and builds freeze heavily.',
+    ailment:'freeze',
+    applies:'Freeze',
+    mech:'A slow shard that pierces one enemy and builds freeze heavily. Freeze is what a shatter skill consumes.',
     desc:'A slow shard that takes the heat out of everything it passes through.'},
   ice_nova:{name:'Ice Nova',type:'nova',tags:['spell','area','cold'],dtype:'cold',
     attr:'int',req:24,lvlReq:8,mana:19,cd:1.9,base:30,perLvl:9.5,count:12,speed:430,range:340,radius:130,
-    combo:'finisher',
-    mech:'A ring of 12 cold projectiles. As a combo finisher it deals 60% more damage to frozen enemies and shatters them.',
+    shatter:1,
+    consumesLabel:'Frozen',
+    mech:'A ring of 12 cold projectiles. Hitting a frozen target SHATTERS it: the freeze is consumed and the body comes apart, dealing area damage to everything within 150 units and building freeze on all of them.',
     desc:'A ring of cold thrown outward at ankle height. Frozen things do not survive the pressure change.'},
   spark:{name:'Spark',type:'projectile',tags:['spell','projectile','lightning'],dtype:'lightning',
     attr:'int',req:18,lvlReq:2,mana:8,cd:0.45,base:9,perLvl:3.4,count:4,speed:520,range:400,spread:1.5,erratic:1,
-    combo:'enabler',ailment:'shock',
-    mech:'Fires 4 erratic bolts that wander the room. Builds shock on every hit.',
+    ailment:'shock',
+    applies:'Shock',
+    mech:'Fires 4 erratic bolts that wander the room, building shock on every hit. Shock is what a chain skill reaches for.',
     desc:'Loose current that wanders the room until it finds something conductive.'},
   arc:{name:'Arc',type:'chain',tags:['spell','lightning','chain'],dtype:'lightning',
     attr:'int',req:22,lvlReq:5,mana:13,cd:0.9,base:22,perLvl:7.2,chains:3,range:330,
-    combo:'enabler',ailment:'shock',
-    mech:'Jumps to the 3 nearest enemies in turn, losing 15% damage per jump. Builds shock.',
+    ailment:'shock',
+    applies:'Shock', consumesLabel:'Shock',
+    mech:'Jumps to the 3 nearest enemies in turn, losing 15% damage per jump. It reaches half again as far to find a SHOCKED body and arrives 45% harder when it does, and every shocked body it passes through buys it another jump.',
     desc:'It picks the shortest path between bodies, and keeps picking until it runs out.'},
   flame_wall:{name:'Flame Wall',type:'dot_cloud',tags:['spell','area','fire','duration'],dtype:'fire',
     attr:'int',req:20,lvlReq:4,mana:16,cd:4.5,base:11,perLvl:3.6,radius:82,duration:4.5,range:300,
-    combo:'enabler',ailment:'ignite',
-    mech:'Leaves a burning patch for 4.5s that ticks fire damage and builds ignite on anything standing in it.',
+    ailment:'ignite',
+    applies:'Ignite, burning ground',
+    mech:'Leaves a burning patch for 4.5s that ticks fire damage and builds ignite on anything standing in it. It also sets alight any flammable ground it overlaps.',
     desc:'A standing sheet of fire. Things walk into it more often than you would expect.'},
   detonate:{name:'Detonate',type:'aoe',tags:['spell','area','fire'],dtype:'fire',
     attr:'int',req:28,lvlReq:10,mana:22,cd:3.2,base:26,perLvl:8.6,radius:150,range:360,
-    combo:'finisher',
-    mech:'Bursts a 150-unit area. As a combo finisher against an ignited target it consumes the ignite and deals its remaining damage to everything nearby.',
+    detonates:1,
+    consumesLabel:'Ignite, burning ground',
+    mech:'Bursts a 150-unit area. Consumes an ignite on anything it hits, dealing the burn\u2019s whole remaining damage to everything nearby, and sets alight any flammable ground in range.',
     desc:'Whatever is already burning is asked to give all of it back at once.'},
   holy_flame:{name:'Holy Flame',type:'melee_arc',tags:['attack','melee','area','fire'],dtype:'fire',
     attr:'strint',req:18,lvlReq:1,mana:8,cd:0.7,dmgMult:1.1,arc:1.3,range:145,addBase:9,addPerLvl:3.1,
-    wep:['sceptre','staff','mace','sword'],combo:'enabler',ailment:'ignite',
+    wep:['sceptre','staff','mace','sword'],ailment:'ignite',applies:'Ignite',
     mech:'A 145-unit arc for 110% of weapon damage plus its own fire damage. Builds ignite.',
     desc:'The swing is ordinary. What follows the swing is not, and it clings.'},
+  oil_slick:{name:'Oil Slick',type:'dot_cloud',tags:['spell','area','duration'],dtype:'physical',
+    attr:'dex',req:18,lvlReq:3,mana:10,cd:5.0,base:2,perLvl:0.5,radius:96,duration:9,range:330,
+    flammable:1,burnMult:14,burnTime:9,
+    applies:'Flammable ground',
+    mech:'Throws a slick of oil that lasts 9s and barely hurts anything by itself. Put fire into it \u2014 a fire hit, an ignite, a Flame Wall \u2014 and it becomes a burning field for 9s at fourteen times the damage. It is half of a combo, not a skill.',
+    desc:'A flask of lamp oil, thrown low. On its own it is a nuisance. It is not meant to be on its own.'},
+  caustic_cloud:{name:'Caustic Cloud',type:'dot_cloud',tags:['spell','area','chaos','duration'],dtype:'chaos',
+    attr:'dexint',req:22,lvlReq:6,mana:15,cd:5.5,base:8,perLvl:2.6,radius:104,duration:7,range:320,
+    flammable:1,burnMult:5,burnTime:8,ailment:'poison',
+    applies:'Poison, flammable ground',
+    mech:'A cloud of caustic vapour for 7s, poisoning anything inside it. The vapour is flammable: set it alight and it burns for 8s at five times the damage as fire instead of chaos.',
+    desc:'It sits low and does not drift. Whoever mixed it was not thinking about what happens near a torch.'},
   viper_strike:{name:'Viper Strike',type:'melee_arc',tags:['attack','melee','chaos'],dtype:'chaos',
     attr:'dexint',req:17,lvlReq:1,mana:7,cd:0.6,dmgMult:1.15,arc:0.9,range:125,
-    wep:['dagger','claw','sword'],combo:'enabler',ailment:'poison',poisonMult:2.6,
-    mech:'A short arc for 115% of weapon damage as chaos, applying poison buildup at 2.6x rate. Poison stacks.',
+    wep:['dagger','claw','sword'],ailment:'poison',poisonMult:2.6,
+    applies:'Poison',
+    mech:'A short arc for 115% of weapon damage as chaos, applying poison at 2.6x rate. Poison stacks feed each other: every stack already on a target makes the next 18% stronger, up to eight.',
     desc:'A shallow cut, twice, and then a long wait while it does the rest.'},
   lightning_totem:{name:'Lightning Totem',type:'totem',tags:['spell','totem','lightning','duration'],dtype:'lightning',
     attr:'int',req:26,lvlReq:9,mana:24,cd:6,base:14,perLvl:4.6,duration:9,range:340,interval:0.7,
@@ -718,6 +753,9 @@ const SUPPORTS = {
     desc:'32% increased area of effect, 8% less damage.'},
   multiple_proj:{name:'Multiple Projectiles',allow:'projectile',manaMult:1.3,mods:{projAdd:2,dmgPct:-22},
     desc:'Fires 2 additional projectiles, 22% less damage each.'},
+  armour_explosion:{name:'Armour Explosion',allow:'attack',manaMult:1.25,
+    mods:{},flags:{breakBoom:1},
+    desc:'Fully breaking a target\u2019s armour detonates it for fire damage in a 150-unit radius, igniting everything caught.'},
   life_leech:{name:'Life Leech',allow:'any',manaMult:1.3,mods:{leechPct:4},
     desc:'Leeches 4% of damage dealt as life.'},
   inc_crit:{name:'Increased Critical Strikes',allow:'any',manaMult:1.2,mods:{critChance:80},
@@ -2543,6 +2581,7 @@ function skillStats(g,idx){
   const lvl=gemLevelFor(g,def);
   const mods={}; let manaMult=1;
   const sups=[];
+  const supFlags={};
   const nSock=socketsUnlocked(lvl);
   for(let i=0;i<g.sockets.length;i++){
     const s=g.sockets[i];
@@ -2552,6 +2591,8 @@ function skillStats(g,idx){
     sups.push(s);
     manaMult*=sup.manaMult;
     for(const k in sup.mods) mods[k]=(mods[k]||0)+sup.mods[k];
+    /* a support can change what the skill DOES, not just its numbers */
+    if(sup.flags) for(const k in sup.flags) supFlags[k]=(supFlags[k]||0)+sup.flags[k];
   }
   const tags=def.tags;
   const isAttack=tags.indexOf('attack')>=0;
@@ -2574,6 +2615,8 @@ function skillStats(g,idx){
   if(st.keys.avatar_fire) dtype='fire';
   if(flags.allChaos) dtype='chaos';
   if(mods.noEle && dtype!=='physical' && dtype!=='chaos') dtype='physical';
+  /* Armour Explosion converts the physical damage it detonates into fire */
+  if(supFlags.breakBoom && dtype==='physical') dtype='fire';
 
   /* multipliers */
   let mult=st.m.all;
@@ -2637,10 +2680,15 @@ function skillStats(g,idx){
     pierce:(def.pierce||0)+(mods.pierceAdd||0),
     crit:st.critChance*(1+(mods.critChance||0)/100), critDmg:st.critDmg,
     leech:st.leech+(mods.leechPct||0), noAilment:!!mods.noAilment,
-    ailment:def.ailment||null, combo:def.combo||null, spirit:def.spirit||0,
+    ailment:def.ailment||null, spirit:def.spirit||0,
     stunMult:def.stunMult||1, isAttack:isAttack, isSpell:isSpell, isArea:isArea,
     delay:def.delay||0, spread:def.spread||0, erratic:def.erratic||0,
     usable:usable, reason:reason, sups:sups, nSock:socketsUnlocked(lvl),
+    /* combo semantics: what this skill puts on, and what it takes off */
+    breakMult:def.breakMult||1, breakFlat:def.breakFlat||0,
+    shatter:!!def.shatter, detonates:!!def.detonates, consumes:def.consumes||null,
+    flammable:!!def.flammable, burnMult:def.burnMult||3.2, burnTime:def.burnTime||6,
+    flags:supFlags,
     bleedMult:def.bleedMult||1, poisonMult:def.poisonMult||1,
     trigger:def.trigger||null, energyMax:def.energyMax||0, energyPer:def.energyPer||0
   };
@@ -3288,7 +3336,9 @@ function makeEnemy(defKey,x,y,forceRarity){
     tele:0,teleMax:0,aim:0,knock:{x:0,y:0},fuse:0,
     ail:{stun:0,freeze:0,ignite:0,shock:0,poison:0,bleed:0},
     ailT:{stun:0,freeze:0,ignite:0,shock:0,poison:0,bleed:0},
-    dots:[],threshold:0
+    dots:[],threshold:0,
+    /* armour soaks physical damage until it is broken off */
+    armourMax:0,armour:0,broken:0,poisonStacks:0
   };
   e.hp=e.maxHp;
   /* rarity: magic gets 1-2 mods, rare gets 3-4 and a name */
@@ -3317,7 +3367,65 @@ function makeEnemy(defKey,x,y,forceRarity){
   /* ailment meters scale with the monster's FINAL life, after rarity and
      modifiers, or Extra Life monsters would freeze faster than normal ones */
   e.threshold=Math.max(18,e.maxHp*0.55);
+  /* Armour, likewise sized off the final life total. Full armour soaks 35%
+     of physical damage; at zero the monster is Fully Broken and takes 20%
+     more instead, so breaking it is worth better than half its physical
+     mitigation. */
+  e.armourMax=Math.round(e.maxHp*0.45*(a.kind==='melee'?1.25:1));
+  e.armour=e.armourMax;
   return e;
+}
+/* ==========================================================================
+   ARMOUR BREAK
+   Physical damage strips armour. Players strip it three times as fast from
+   normal monsters and twice as fast from magic ones, so trash breaks in a
+   swing or two and a boss takes real commitment.
+   ========================================================================== */
+const BROKEN_TIME = 12;
+function breakScale(e){
+  if(e.boss) return 1;
+  return e.rarity===0?3 : e.rarity===1?2 : 1.35;
+}
+function armourFrac(e){ return e.armourMax>0? clamp(e.armour/e.armourMax,0,1) : 0; }
+/* How much of a physical hit the remaining armour soaks. */
+function armourSoak(e){
+  if(e.broken>0) return -0.20;            /* Fully Broken: takes more, not less */
+  return 0.35*armourFrac(e);
+}
+function breakArmour(e,amount,sk){
+  if(e.armourMax<=0||e.broken>0||amount<=0) return;
+  e.armour-=amount*breakScale(e)*(sk&&sk.breakMult?sk.breakMult:1);
+  if(e.armour>0){
+    if(Math.random()<0.5) spawnPart(e.x+rnd(-e.r,e.r),e.y+rnd(-e.r,e.r),rnd(-30,30),rnd(-60,-20),.5,2.2,'#cbbfa4',.92,false);
+    return;
+  }
+  e.armour=0;
+  e.broken=BROKEN_TIME;
+  burst(e.x,e.y,20,'#e0a070',240,3.6,.55,true);
+  spawnFx({type:'shock',x:e.x,y:e.y,r:0,max:e.r*3.4,life:.34,maxLife:.34,color:'#e0a070'});
+  dmgNumber(e.x,e.y-e.r-16,0,false,'physical','BROKEN');
+  sfx('crit');
+  /* Armour Explosion turns the break itself into a fire detonation */
+  if(sk&&sk.flags&&sk.flags.breakBoom){
+    const boom=e.maxHp*0.10+20;
+    spawnFx({type:'shock',x:e.x,y:e.y,r:0,max:150,life:.42,maxLife:.42,color:'#e07a3c'});
+    for(const o of nearbyEnemies(e.x,e.y,150)){
+      if(o.dead||o.dying) continue;
+      o.hp-=boom; o.hurt=.12;
+      dmgNumber(o.x,o.y-o.r,boom,false,'fire');
+      addBuildup(o,'ignite',boom*0.4,boom);
+      if(o.hp<=0) killEnemy(o);
+    }
+  }
+}
+/* A consumer cashes the Fully Broken state in: guaranteed critical strike,
+   and the armour goes straight back on. */
+function consumeBroken(e){
+  if(e.broken<=0) return false;
+  e.broken=0;
+  e.armour=e.armourMax;
+  burst(e.x,e.y,22,'#f0d0a0',260,3.8,.5,true);
+  return true;
 }
 function spawnEnemies(){
   G.enemies=[];
@@ -3378,6 +3486,12 @@ function makeBoss(){
   };
   b.hp=b.maxHp;
   b.threshold=b.maxHp*0.42;
+  /* A share of boss life would be unbreakable; a flat curve makes it about
+     ten committed swings, and breakScale gives the player no bonus here. */
+  b.armourMax=Math.round(320+z.level*75);
+  b.armour=b.armourMax;
+  b.broken=0;
+  b.poisonStacks=0;
   for(const p of def.patterns) b.cds[p]=rnd(1.5,4);
   G.boss=b;
   return b;
@@ -3497,7 +3611,10 @@ function addBuildup(e,type,amount,hitDmg){
         ((st.flags.shockDouble)?2:1);
       break;
     case 'poison':
-      addDot(e,'poison',hitDmg*0.32*st.m.dot,
+      /* Chaos theme: poison stacks feed off each other. Each stack already on
+         the target makes the next one 18% stronger, up to eight. */
+      e.poisonStacks=Math.min(8,(e.poisonStacks||0)+1);
+      addDot(e,'poison',hitDmg*0.32*st.m.dot*(1+(e.poisonStacks-1)*0.18),
         (G.st.flags.poisonShort?3:6),'chaos',true);
       break;
     case 'bleed':
@@ -3626,14 +3743,27 @@ function playerStunned(){
 function monsterTakeDamage(e,base,dtype,crit,sk,kx,ky){
   if(e.dead||e.dying) return 0;
   let dmg=base;
-  /* combo payoff: a finisher lands harder on a primed target */
+  /* ----------------------------------------------------------------- combos
+     A combo is a state one skill puts on, that another skill takes off. The
+     payoff is never "more damage on this target" — it is a guaranteed crit,
+     an explosion, or a field that keeps burning. */
   let comboed=null;
-  if(sk&&sk.combo==='finisher'){
-    if(ailmentActive(e,'freeze')){ dmg*=1.6; comboed='shatter'; }
-    else if(ailmentActive(e,'stun')){ dmg*=1.45; comboed='stun'; }
-    else if(ailmentActive(e,'ignite')){ dmg*=1.4; comboed='detonate'; }
+  /* SHATTER: a shatter skill consumes the frozen state and blows the target
+     apart, hurting everything standing near it. */
+  if(sk&&sk.shatter&&ailmentActive(e,'freeze')){
+    e.ailT.freeze=0;
+    comboed='shatter';
   }
-  if(G.st.flags.shatterCrit && crit && ailmentActive(e,'freeze')) dmg*=1.4;
+  /* CONSUME FULLY BROKEN: a guaranteed critical strike, and the armour goes
+     back on so you have to break it again. */
+  if(sk&&sk.consumes==='broken'&&e.broken>0){
+    consumeBroken(e);
+    crit=true;
+    comboed=comboed||'broken';
+  }
+  /* DETONATE: a fire skill cashes in an ignite as an explosion. */
+  if(sk&&sk.detonates&&e.dots.some(d=>d.kind==='ignite')) comboed=comboed||'detonate';
+  if(G.st.flags.shatterCrit && crit && ailmentActive(e,'freeze')) crit=true;
   /* Perfect Agony trades hit damage for ailment magnitude on every crit */
   if(crit && G.st.keys.perfect_agony) dmg*=0.65;
   /* Point Blank reads the distance the hit actually travelled */
@@ -3647,6 +3777,15 @@ function monsterTakeDamage(e,base,dtype,crit,sk,kx,ky){
     e.shield-=dmg;
     if(e.shield<=0){ e.shield=0; burst(e.x,e.y,14,'#cfe0ff',210,3.4,.5,true); }
   }
+  /* Armour stands in front of physical damage; once broken it lets more in */
+  if(dtype==='physical'&&e.armourMax>0) dmg*=1-armourSoak(e);
+  /* Every physical hit strips armour. So does a hit that used to be physical
+     before a support converted it, which is the whole point of pairing
+     Armour Explosion with a physical attack. */
+  const consumedBreak=(comboed==='broken');
+  const strips=!consumedBreak&&((dtype==='physical')||(sk&&sk.flags&&sk.flags.breakBoom&&sk.isAttack));
+  if(strips) breakArmour(e,base*0.55,sk);
+  if(strips&&sk&&sk.breakFlat) breakArmour(e,sk.breakFlat,sk);
   e.hp-=dmg;
   e.hurt=0.12;
   if(kx||ky){ e.knock.x+=kx; e.knock.y+=ky; }
@@ -3656,10 +3795,27 @@ function monsterTakeDamage(e,base,dtype,crit,sk,kx,ky){
   shakeCam(crit?5:1.6);
   sfx(crit?'crit':'hit');
   if(comboed==='shatter'){
-    burst(e.x,e.y,26,'#a8e0f0',300,4,.6,true);
-    e.ailT.freeze=0;
-    spawnFx({type:'shock',x:e.x,y:e.y,r:0,max:90,life:.35,maxLife:.35,color:'#a8e0f0'});
-  } else if(comboed==='detonate'){
+    /* the frozen body comes apart: area damage to everything nearby, not a
+       bonus on the one target */
+    const rad=150*(G.st.areaSize||1);
+    const boom=dmg*1.1*(G.st.keys.shatterborn?1.5:1);
+    burst(e.x,e.y,30,'#a8e0f0',320,4.4,.65,true);
+    spawnFx({type:'shock',x:e.x,y:e.y,r:0,max:rad,life:.4,maxLife:.4,color:'#a8e0f0'});
+    shakeCam(7); setHitStop(0.09); sfx('crit');
+    dmgNumber(e.x,e.y-e.r-16,0,false,'cold','SHATTER');
+    for(const o of nearbyEnemies(e.x,e.y,rad)){
+      if(o===e||o.dead||o.dying) continue;
+      o.hp-=boom; o.hurt=.12;
+      dmgNumber(o.x,o.y-o.r,boom,false,'cold');
+      addBuildup(o,'freeze',boom*0.45,boom);
+      if(o.hp<=0) killEnemy(o);
+    }
+  }
+  if(comboed==='broken'){
+    dmgNumber(e.x,e.y-e.r-16,0,false,'physical','SUNDERED');
+    shakeCam(8); setHitStop(0.1);
+  }
+  if(comboed==='detonate'){
     const d=e.dots.find(x=>x.kind==='ignite');
     if(d){
       const boom=d.dps*d.t*0.8;
@@ -3674,16 +3830,18 @@ function monsterTakeDamage(e,base,dtype,crit,sk,kx,ky){
       e.hp-=boom;
       dmgNumber(e.x,e.y-e.r-14,boom,false,'fire');
     }
-  } else if(comboed==='stun'){
-    shakeCam(6); setHitStop(0.09);
+    /* fire also sets alight any flammable ground the target is standing in */
+    igniteGroundAt(e.x,e.y,150);
   }
+  /* every fire hit can light flammable ground under the target */
+  if(dtype==='fire') igniteGroundAt(e.x,e.y,e.r+30);
   /* ailment buildup from this hit */
   if(sk && !sk.noAilment){
     const ag=(crit&&G.st.keys.perfect_agony)?1.6:1;
     if(sk.ailment) addBuildup(e,sk.ailment,dmg*ag*(sk.ailment==='bleed'?sk.bleedMult:sk.ailment==='poison'?sk.poisonMult:1),dmg);
-    if(dtype==='physical') addBuildup(e,'stun',dmg*0.55*ag*(sk.stunMult||1),dmg);
+    if(dtype==='physical') addBuildup(e,'stun',dmg*0.55*ag*(sk.stunMult||1)*(e.broken>0?2.5:1),dmg);
     else if(dtype==='fire'&&!sk.ailment) addBuildup(e,'ignite',dmg*0.3*ag,dmg);
-    else if(dtype==='cold'&&!sk.ailment) addBuildup(e,'freeze',dmg*0.35*ag,dmg);
+    else if(dtype==='cold'&&!sk.ailment&&comboed!=='shatter') addBuildup(e,'freeze',dmg*0.35*ag,dmg);
     else if(dtype==='lightning'&&!sk.ailment) addBuildup(e,'shock',dmg*0.3*ag,dmg);
   }
   /* leech and meta triggers */
@@ -4086,20 +4244,36 @@ function executeSkill(sk,ang,fromTouch){
       shakeCam(7);
     }
   } else if(type==='chain'){
-    /* hops from body to body, never revisiting one */
+    /* Lightning theme: a chain reaches half again as far to find a SHOCKED
+       body, and arrives 45% harder when it does. Shock is the enabler; the
+       chain is what cashes it in, and a shocked pack carries the bolt
+       through itself. */
     let src={x:p.x,y:p.y};
     const hitList=[];
     let hops=Math.max(1,sk.chains);
+    const base=sk.range||300;
     for(let h=0;h<hops;h++){
-      let best=null,bd=(sk.range||300)*(sk.range||300);
-      for(const e of nearbyEnemies(src.x,src.y,sk.range||300)){
+      const reach=base*1.5;
+      let best=null,bs=-1;
+      for(const e of nearbyEnemies(src.x,src.y,reach)){
         if(e.dead||e.dying||hitList.indexOf(e)>=0) continue;
-        const d=d2(src.x,src.y,e.x,e.y);
-        if(d<bd){bd=d;best=e;}
+        const d=Math.sqrt(d2(src.x,src.y,e.x,e.y));
+        const shocked=e.ailT.shock>0;
+        if(d>(shocked?reach:base)) continue;
+        /* closest wins, but a shocked target counts as much nearer */
+        const score=(shocked?reach:base)-d+(shocked?260:0);
+        if(score>bs){bs=score;best=e;}
       }
       if(!best) break;
-      spawnFx({type:'bolt',x1:src.x,y1:src.y,x2:best.x,y2:best.y,life:.22,maxLife:.22,color:col});
-      hitTarget(sk,best,Math.atan2(best.y-src.y,best.x-src.x),40,Math.pow(0.85,h));
+      const shocked=best.ailT.shock>0;
+      spawnFx({type:'bolt',x1:src.x,y1:src.y,x2:best.x,y2:best.y,life:.22,maxLife:.22,
+        color:shocked?'#fff2a0':col});
+      hitTarget(sk,best,Math.atan2(best.y-src.y,best.x-src.x),40,
+        Math.pow(0.85,h)*(shocked?1.45:1));
+      if(shocked){
+        burst(best.x,best.y,10,'#fff2a0',220,3,.4,true);
+        hops=Math.min(hops+1,(sk.chains||1)+3);   /* a shocked body passes it on */
+      }
       hitList.push(best);
       src={x:best.x,y:best.y};
     }
@@ -4112,7 +4286,11 @@ function executeSkill(sk,ang,fromTouch){
     let tx=p.x+Math.cos(ang)*md, ty=p.y+Math.sin(ang)*md;
     if(!walkable(tx,ty)){ tx=p.x+Math.cos(ang)*40; ty=p.y+Math.sin(ang)*40; }
     G.clouds.push({x:tx,y:ty,r:sk.radius||80,t:sk.duration||4,max:sk.duration||4,
-      dps:sk.dmg,dtype:sk.dtype,color:col,tick:0,sk:sk});
+      dps:sk.dmg,dtype:sk.dtype,color:col,tick:0,sk:sk,
+      flammable:!!sk.flammable,burnMult:sk.burnMult||3.2,burnTime:sk.burnTime||6,
+      ignited:false});
+    /* dropped into fire that is already burning? it catches at once */
+    if(sk.flammable) for(const c of G.clouds){ if(c.ignited&&d2(c.x,c.y,tx,ty)<(c.r+40)*(c.r+40)) igniteGroundAt(tx,ty,10); }
   } else if(type==='totem'){
     const md=Math.min(sk.range||200,dist(p.x,p.y,G.mouse.wx,G.mouse.wy));
     let tx=p.x+Math.cos(ang)*Math.max(40,md*0.6), ty=p.y+Math.sin(ang)*Math.max(40,md*0.6);
@@ -4432,6 +4610,11 @@ function updateEnemies(dt){
       if(Math.abs(e.knock.y)<2) e.knock.y=0;
     }
     e.moving=false;
+    if(e.broken>0) e.broken-=dt;
+    else if(e.armourMax>0&&e.armour<e.armourMax){
+      /* armour knits back slowly once the pressure comes off */
+      e.armour=Math.min(e.armourMax,e.armour+e.armourMax*0.09*dt);
+    }
     if(e.ailT.freeze>0||e.ailT.stun>0) continue;   /* frozen solid or staggered */
     const d=dist(e.x,e.y,p.x,p.y);
     if(d>1400) continue;
@@ -4573,6 +4756,8 @@ function updateBoss(dt){
   if(b.dead) return;
   b.rot+=dt*0.7;
   if(b.hurt>0) b.hurt-=dt;
+  if(b.broken>0) b.broken-=dt;
+  else if(b.armourMax>0&&b.armour<b.armourMax) b.armour=Math.min(b.armourMax,b.armour+b.armourMax*0.05*dt);
   tickAilments(b,dt);
   tickDots(b,dt);
   if(b.dead||b.dying) return;
@@ -4857,12 +5042,37 @@ function updateClouds(dt){
         }
       }
     }
-    if(Math.random()<dt*22){
+    if(Math.random()<dt*(c.ignited?46:22)){
       const a=rnd(0,TAU),rr=Math.random()*c.r;
       spawnPart(c.x+Math.cos(a)*rr,c.y+Math.sin(a)*rr,rnd(-8,8),rnd(-26,-8),.6,rnd(1.6,3.4),c.color,.94,true);
     }
     if(c.t<=0) G.clouds.splice(i,1);
   }
+}
+/* ==========================================================================
+   GROUND EFFECTS AND IGNITION
+   Some skills leave a field on the floor. A flammable field does very little
+   on its own; put fire into it and it becomes a burning area that lasts far
+   longer and hurts far more. Two skills, one result neither gives alone.
+   ========================================================================== */
+function igniteGroundAt(x,y,r){
+  let lit=0;
+  for(const c of G.clouds){
+    if(c.hostile||!c.flammable||c.ignited) continue;
+    if(d2(x,y,c.x,c.y)>(c.r+r)*(c.r+r)) continue;
+    c.ignited=true;
+    c.dtype='fire';
+    c.dps*=c.burnMult||3.2;
+    c.t=Math.max(c.t,c.burnTime||6);
+    c.max=c.t;
+    c.color='#e07a3c';
+    c.tick=0;
+    burst(c.x,c.y,24,'#f0a050',260,4,.6,true);
+    spawnFx({type:'shock',x:c.x,y:c.y,r:0,max:c.r*1.3,life:.4,maxLife:.4,color:'#f0a050'});
+    sfx('cast');
+    lit++;
+  }
+  return lit;
 }
 function updateTotems(dt){
   for(let i=G.totems.length-1;i>=0;i--){
@@ -5051,6 +5261,56 @@ function drawAilmentMeters(e){
     y-=4;
   }
 }
+/* Armour reads as pips under the life bar, one per fifth. They go red and
+   hollow the moment the target is Fully Broken. */
+function drawArmourPips(e){
+  if(e.armourMax<=0) return;
+  const broke=e.broken>0;
+  const frac=armourFrac(e);
+  const N=5, pw=6, gap=2;
+  const total=N*pw+(N-1)*gap;
+  const x0=e.x-total/2;
+  const y=e.y-e.r-(e.rarity>0||e.boss?5:7);
+  for(let i=0;i<N;i++){
+    const on=!broke && frac>i/N;
+    ctx.fillStyle = broke? 'rgba(214,72,58,.85)' : on? 'rgba(206,192,164,.9)' : 'rgba(255,255,255,.13)';
+    ctx.fillRect(x0+i*(pw+gap),y,pw,2.5);
+  }
+  if(broke){
+    ctx.strokeStyle='rgba(224,104,88,'+(0.4+0.35*Math.sin(e.pulse*3))+')';
+    ctx.lineWidth=1.4;
+    ctx.beginPath(); ctx.arc(e.x,e.y,e.r+5,0,TAU); ctx.stroke();
+  }
+}
+/* Shock arcs and a poison stack count, so both states read on the body. */
+function drawStateMarks(e){
+  if(e.ailT.shock>0){
+    ctx.strokeStyle='rgba(232,216,96,.8)';
+    ctx.lineWidth=1.4;
+    for(let i=0;i<3;i++){
+      const a=e.pulse*2.4+i*TAU/3;
+      const r1=e.r+3, r2=e.r+10;
+      ctx.beginPath();
+      ctx.moveTo(e.x+Math.cos(a)*r1,e.y+Math.sin(a)*r1);
+      ctx.lineTo(e.x+Math.cos(a+0.28)*r2,e.y+Math.sin(a+0.28)*r2);
+      ctx.lineTo(e.x+Math.cos(a+0.52)*r1,e.y+Math.sin(a+0.52)*r1);
+      ctx.stroke();
+    }
+  }
+  if(e.dots.some(d=>d.kind==='ignite')){
+    const f=0.6+0.4*Math.sin(e.pulse*5);
+    ctx.globalAlpha=f;
+    ctx.drawImage(glowSprite('#e07a3c'),e.x-e.r*1.1,e.y-e.r*2.2,e.r*2.2,e.r*2.2);
+    ctx.globalAlpha=1;
+  }
+  if(e.poisonStacks>0&&e.dots.some(d=>d.kind==='poison')){
+    ctx.fillStyle='rgba(176,112,200,.95)';
+    ctx.font='9px Cinzel, serif';
+    ctx.textAlign='left'; ctx.textBaseline='middle';
+    ctx.fillText('\u2716'+e.poisonStacks,e.x+e.r+4,e.y-e.r);
+    ctx.textAlign='center'; ctx.textBaseline='alphabetic';
+  }
+}
 function drawEnemy(e){
   const a=Math.atan2(G.player.y-e.y,G.player.x-e.x);
   let scale=1,alpha=1;
@@ -5120,6 +5380,8 @@ function drawEnemy(e){
   }
   if(e.dying<=0){
     if(e.rarity>0) bar(e.x,e.y-e.r-11,36,3,e.hp/e.maxHp,e.rarity===2?'#c87838':'#6a8fc8');
+    drawArmourPips(e);
+    drawStateMarks(e);
     drawAilmentMeters(e);
   }
 }
@@ -5173,7 +5435,7 @@ function drawBoss(){
     }
     ctx.restore();
   }
-  if(b.dying<=0) drawAilmentMeters(b);
+  if(b.dying<=0){ drawArmourPips(b); drawStateMarks(b); drawAilmentMeters(b); }
 }
 function drawPlayer(){
   const p=G.player,st=G.st;
@@ -5707,6 +5969,9 @@ function updateHUD(){
   if(b&&b.awake&&!b.dead){
     setElClass($('bossbar'),'on',true);
     setStyle('boss-fill','width',(Math.round(clamp(b.hp/b.maxHp,0,1)*1000)/10)+'%');
+    const broke=b.broken>0;
+    setStyle('boss-armour-fill','width',broke?'100%':(Math.round(armourFrac(b)*1000)/10)+'%');
+    setElClass($('boss-armour'),'broke',broke);
     setText('boss-nm',b.name+'  ·  PHASE '+b.phase);
   } else setElClass($('bossbar'),'on',false);
 }
@@ -5840,6 +6105,16 @@ function showTip(it,x,y,extra){
 function hideTip(){ $('tooltip').classList.remove('on'); }
 
 /* ---- tooltip bodies for everything that is not an item ---- */
+/* The combo line: what this skill puts on a target, and what it takes off.
+   It is the first thing a player needs and it used to be nowhere. */
+function comboLines(def){
+  let h='';
+  if(def.applies) h+='<div class="up">Applies: '+esc(def.applies)+'</div>';
+  if(def.consumesLabel) h+='<div class="rune">Consumes: '+esc(def.consumesLabel)+'</div>';
+  if(!def.applies&&!def.consumesLabel&&def.type!=='aura'&&def.type!=='meta')
+    h+='<div class="hint">No state applied or consumed.</div>';
+  return h;
+}
 function gemTipHtml(g,idx){
   const ch=G.ch, def=GEMS[g.gem];
   const sk=skillStats(g,idx);
@@ -5854,7 +6129,7 @@ function gemTipHtml(g,idx){
   h+='<div class="mod">Requires '+def.req+' '+esc(attrName)+'</div>';
   if(def.wep) h+='<div class="mod">Weapon: '+esc(def.wep.map(k=>WEAPON_KINDS[k].name.toLowerCase()).join(', '))+'</div>';
   if(def.spirit) h+='<div class="rune">Reserves '+def.spirit+' spirit while active</div>';
-  if(def.combo) h+='<div class="up">Combo '+esc(def.combo)+(def.ailment?'  ·  builds '+esc(def.ailment):'')+'</div>';
+  h+=comboLines(def);
   const sups=g.sockets.filter(Boolean);
   if(sups.length){
     h+='<div class="cmp"><div style="color:#5f5b53;margin-bottom:3px">Supports</div>';
@@ -5870,6 +6145,7 @@ function gemDefTipHtml(key){
   let h='<div class="tnm" style="color:#e3d6b8">'+esc(def.name)+'</div>';
   h+='<div class="tb2">'+esc(def.type.replace('_',' '))+'  ·  unlocks at level '+def.lvlReq+'</div>';
   h+='<div class="mod">'+esc(def.mech||'')+'</div>';
+  h+=comboLines(def);
   h+='<div class="imp">'+esc(gemSummary(def))+'</div>';
   if(def.spirit) h+='<div class="rune">Reserves '+def.spirit+' spirit while active</div>';
   h+='<div class="hint">'+esc(def.desc)+'</div>';
