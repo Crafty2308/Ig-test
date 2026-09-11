@@ -3873,9 +3873,13 @@ function monsterTakeDamage(e,base,dtype,crit,sk,kx,ky){
     comboed='shatter';
   }
   /* CONSUME FULLY BROKEN: a guaranteed critical strike, and the armour goes
-     back on so you have to break it again. */
+     back on so you have to break it again. The crit multiplier is normally
+     applied upstream by critDamage(), so a hit promoted to a crit here has
+     to pay it in: without this the "guaranteed crit" was a label on a
+     non-crit hit. */
   if(sk&&sk.consumes==='broken'&&e.broken>0){
     consumeBroken(e);
+    if(!crit) dmg*=1+(sk.critDmg||0)/100;
     crit=true;
     comboed=comboed||'broken';
   }
