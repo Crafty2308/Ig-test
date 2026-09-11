@@ -112,6 +112,21 @@ input{font-family:'Crimson Pro',Georgia,serif}
 
 #spiritbar .bar{height:calc(5px * var(--hud));background:rgba(255,255,255,.07);border-radius:2px;margin-top:3px;overflow:hidden}
 #spiritbar .bar i{display:block;height:100%;background:linear-gradient(90deg,#5b4d86,#9a86d4)}
+/* A trigger gem with no charge meter is a gem you cannot plan around, so
+   each armed one gets a row above the spirit bar. */
+#metabar{position:absolute;bottom:calc(102px * var(--hud) + 52px);
+  right:calc(12px + env(safe-area-inset-right));width:calc(142px * var(--hud));
+  font-size:calc(8px * var(--hud));color:var(--dim);letter-spacing:.1em;text-align:right;display:none}
+#metabar.on{display:block}
+#metabar .mg{margin-bottom:3px}
+#metabar .mg b{color:#b8a8dc;font-weight:400;font-family:'Cinzel',serif}
+#metabar .mb{height:calc(3.5px * var(--hud));background:rgba(255,255,255,.07);border-radius:2px;
+  margin-top:2px;overflow:hidden}
+#metabar .mb i{display:block;height:100%;background:linear-gradient(90deg,#6a4f9a,#c0a0e8)}
+#metabar .mg.ready .mb i{background:#f0dca8}
+#metabar .mg.ready b{color:#f0dca8}
+body.touch #metabar{left:calc(12px + env(safe-area-inset-left));right:auto;text-align:left;
+  bottom:calc(102px * var(--hud) + 78px)}
 #slots{position:absolute;bottom:calc(16px + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);
   display:flex;gap:8px}
 .sl{width:calc(54px * var(--hud));height:calc(54px * var(--hud));background:rgba(10,10,14,.66);
@@ -475,6 +490,7 @@ body.touch #spiritbar{left:50%;right:auto;transform:translateX(-50%);text-align:
     <div class="flasks" id="flask-mana"></div>
     <div id="pail"></div>
     <div id="spiritbar"><span id="spirit-lb">SPIRIT</span><div class="bar"><i id="spirit-fill"></i></div></div>
+    <div id="metabar"></div>
     <div id="slots"></div>
     <div id="setind">SET <b id="set-nm">I</b></div>
     <div id="pointhint"></div>
@@ -618,8 +634,9 @@ const GEMS = {
     desc:'A flat sweep at hip height, meant for crowds rather than for anything important.'},
   leap_slam:{name:'Leap Slam',type:'dash',tags:['attack','melee','area','movement'],dtype:'physical',
     attr:'str',req:22,lvlReq:6,mana:14,cd:3.4,dmgMult:1.5,radius:120,range:330,stunMult:2.6,
-    wep:['mace','axe','sword','staff'],
-    mech:'Leaps up to 330 units and lands for 150% of weapon damage in a 120-unit burst. Travels over nothing: walls still stop you.',
+    wep:['mace','axe','sword','staff'],breakMult:2.0,
+    applies:'Armour Break, Stun (to the whole landing radius)',
+    mech:'Leaps up to 330 units and lands for 150% of weapon damage in a 120-unit burst, stripping armour twice as fast from everything inside it. Heavy Strike breaks one target; this breaks a pack, from across the room.',
     desc:'You leave the ground entirely and arrive badly, on purpose, on someone.'},
   sunder:{name:'Sunder',type:'nova',tags:['attack','melee','area'],dtype:'physical',
     attr:'str',req:30,lvlReq:12,mana:16,cd:2.1,dmgMult:1.25,count:9,radius:110,speed:420,range:420,stunMult:1.8,
@@ -629,8 +646,9 @@ const GEMS = {
     desc:'The ground splits away from you in every direction at once and does not close again.'},
   split_arrow:{name:'Split Arrow',type:'projectile',tags:['attack','projectile'],dtype:'physical',
     attr:'dex',req:16,lvlReq:1,mana:7,cd:0.5,dmgMult:0.78,count:3,speed:620,range:480,spread:0.34,
-    wep:['bow'],
-    mech:'Fires 3 arrows in a spread, each for 78% of weapon damage. Bow only.',
+    wep:['bow'],breakMult:1.5,
+    applies:'Armour Break (to every target the spread reaches)',
+    mech:'Fires 3 arrows in a spread, each for 78% of weapon damage and each stripping armour half again as fast. It is how a bow opens a scattered pack before a consumer lands.',
     desc:'Three arrows leave together and arrive apart. None of them is aimed at you.'},
   puncture:{name:'Puncture',type:'projectile',tags:['attack','projectile'],dtype:'physical',
     attr:'dex',req:18,lvlReq:3,mana:8,cd:0.75,dmgMult:1.2,count:1,speed:660,range:500,
@@ -640,13 +658,15 @@ const GEMS = {
     desc:'A wound shaped so that walking reopens it. Runners bleed out faster than the patient.'},
   rain_of_arrows:{name:'Rain of Arrows',type:'aoe',tags:['attack','projectile','area'],dtype:'physical',
     attr:'dex',req:26,lvlReq:9,mana:17,cd:2.4,dmgMult:1.35,radius:155,range:430,delay:0.55,
-    wep:['bow'],
-    mech:'After a 0.55s delay, arrows land in a 155-unit circle at the aimed point for 135% of weapon damage.',
+    wep:['bow'],ailment:'bleed',bleedMult:1.4,breakFlat:18,
+    applies:'Bleed (across the whole area), Armour Break',
+    mech:'After a 0.55s delay, arrows land in a 155-unit circle for 135% of weapon damage, bleeding everything caught and stripping some armour off all of it. Puncture bleeds one target hard; this bleeds a whole area, and the delay means you place it where things are going to be.',
     desc:'Everything you have, straight up, and a short quiet while it comes back down.'},
   whirling_blades:{name:'Whirling Blades',type:'dash',tags:['attack','melee','movement'],dtype:'physical',
     attr:'dex',req:16,lvlReq:1,mana:11,cd:2.2,dmgMult:1.05,radius:52,range:310,
-    wep:['sword','dagger','claw'],
-    mech:'Travels 310 units through everything in the way, dealing 105% of weapon damage along the path.',
+    wep:['sword','dagger','claw'],consumes:'broken',
+    consumesLabel:'Fully Broken (on every target along the path)',
+    mech:'Travels 310 units through everything in the way for 105% of weapon damage. Every Fully Broken target on the path is consumed for a guaranteed critical strike \u2014 the only skill that cashes in a break on several targets in one movement.',
     desc:'You travel through a line of people rather than around them.'},
   lightning_strike:{name:'Lightning Strike',type:'projectile',tags:['attack','melee','projectile'],dtype:'lightning',
     attr:'dex',req:24,lvlReq:7,mana:9,cd:0.55,dmgMult:0.9,count:3,speed:560,range:330,spread:0.5,
@@ -721,7 +741,8 @@ const GEMS = {
   lightning_totem:{name:'Lightning Totem',type:'totem',tags:['spell','totem','lightning','duration'],dtype:'lightning',
     attr:'int',req:26,lvlReq:9,mana:24,cd:6,base:14,perLvl:4.6,duration:9,range:340,interval:0.7,
     spirit:15,
-    mech:'Plants a totem for 9s that fires at the nearest enemy every 0.7s. Reserves 15 spirit while it stands.',
+    applies:'Shock (continuously, while it stands)',
+    mech:'Plants a totem for 9s that fires lightning at the nearest enemy every 0.7s, shocking as it goes. Reserves 15 spirit while it stands. It is the only skill that keeps applying a state while you are busy doing something else, which is what makes it the partner for a chain skill.',
     desc:'It stands where you put it and does the tedious part of the fight for you.'},
   vitality:{name:'Vitality',type:'aura',tags:['spell','aura','persistent'],dtype:'physical',
     attr:'str',req:20,lvlReq:4,mana:0,spirit:20,grants:{lifeRegen:6},
@@ -749,11 +770,51 @@ const GEMS = {
     desc:'A held breath, kept in the shape of a shell.'},
   cast_on_crit:{name:'Cast on Critical',type:'meta',tags:['meta','persistent'],dtype:'physical',
     attr:'dexint',req:24,lvlReq:8,mana:0,spirit:25,trigger:'crit',energyMax:100,energyPer:34,
-    mech:'Persistent. Reserves 25 spirit. Builds 34 energy per critical strike and casts its linked skill for free at 100.',
+    applies:'Triggered cast',
+    mech:'Persistent. Reserves 25 spirit. Builds 34 charge per critical strike and casts its socketed skill for free at 100. Supports in this gem apply to the skill it casts.',
     desc:'A held spell that spends itself the moment your weapon finds a seam.'},
+  cast_on_kill:{name:'Cast on Kill',type:'meta',tags:['meta','persistent'],dtype:'physical',
+    attr:'str',req:22,lvlReq:7,mana:0,spirit:20,trigger:'kill',energyMax:100,energyPer:26,
+    applies:'Triggered cast',
+    mech:'Persistent. Reserves 20 spirit. Builds 26 charge per kill and casts its socketed skill for free at 100. Four bodies buys one cast, so it pays off in a crowd and does nothing against one target.',
+    desc:'Something has to die first. After that it is only arithmetic.'},
+  cast_when_hit:{name:'Cast when Hit',type:'meta',tags:['meta','persistent'],dtype:'physical',
+    attr:'strint',req:24,lvlReq:8,mana:0,spirit:30,trigger:'hit',energyMax:100,energyPer:0,
+    applies:'Triggered cast',
+    mech:'Persistent. Reserves 30 spirit. Charges off how hard you are hit rather than how often: a hit for a fifth of your life fills it half way. A defensive engine \u2014 it rewards standing in the wrong place.',
+    desc:'It is charged by being wrong about where to stand.'},
+  cast_on_break:{name:'Cast on Armour Break',type:'meta',tags:['meta','persistent'],dtype:'physical',
+    attr:'str',req:26,lvlReq:9,mana:0,spirit:25,trigger:'break',energyMax:100,energyPer:50,
+    applies:'Triggered cast', consumesLabel:'(charges on Fully Broken)',
+    mech:'Persistent. Reserves 25 spirit. Builds 50 charge each time you fully break a target\u2019s armour, so two breaks is one cast. Pairs with Heavy Strike and Cleave.',
+    desc:'The sound of plate giving way, used as a trigger.'},
+  cast_on_interval:{name:'Cast on Interval',type:'meta',tags:['meta','persistent'],dtype:'physical',
+    attr:'int',req:20,lvlReq:6,mana:0,spirit:35,trigger:'interval',energyMax:100,energyPer:31,
+    applies:'Triggered cast',
+    mech:'Persistent. Reserves 35 spirit \u2014 the most of any trigger, because it asks nothing of you. Builds 31 charge a second and casts its socketed skill for free at 100, about every 3.2 seconds, whatever else you are doing.',
+    desc:'It keeps its own time and does not consult you.'},
+  doppelganger:{name:'Doppelganger',type:'meta',tags:['meta','persistent'],dtype:'physical',
+    attr:'dexint',req:26,lvlReq:10,mana:0,spirit:30,trigger:'skilluse',energyMax:100,energyPer:22,
+    transform:'clone',
+    applies:'Triggered cast from a duplicate',
+    mech:'Persistent. Reserves 30 spirit. Builds 22 charge every time you use a skill. At 100 it leaves a duplicate of you standing where you were and the duplicate casts the socketed skill from there \u2014 so the skill comes from behind the target while you are in front of it.',
+    desc:'It stands where you were a moment ago and does what you were about to.'},
+  twinned_echo:{name:'Twinned Echo',type:'meta',tags:['meta','persistent'],dtype:'physical',
+    attr:'dex',req:26,lvlReq:10,mana:0,spirit:30,trigger:'crit',energyMax:100,energyPer:28,
+    transform:'twin',
+    applies:'Triggered cast, twice',
+    mech:'Persistent. Reserves 30 spirit. Builds 28 charge per critical strike. At 100 it casts the socketed skill TWICE, from two points flanking the target, each at 70% damage \u2014 more total damage than one cast, and from two angles, which matters for anything that fires in a line.',
+    desc:'Two of the same answer, arriving from either side.'},
+  prismatic_seal:{name:'Prismatic Seal',type:'meta',tags:['meta','persistent'],dtype:'physical',
+    attr:'int',req:24,lvlReq:9,mana:0,spirit:25,trigger:'shock',energyMax:100,energyPer:34,
+    transform:'convert',
+    applies:'Triggered cast, damage type converted',
+    mech:'Persistent. Reserves 25 spirit. Builds 34 charge each time you shock something. At 100 it casts the socketed skill with its damage type converted \u2014 rotating fire, then cold, then lightning \u2014 which lets one skill answer three resistances.',
+    desc:'The same spell, refracted. It never comes out the colour it went in.'},
   cast_on_freeze:{name:'Cast on Freeze',type:'meta',tags:['meta','persistent'],dtype:'physical',
     attr:'int',req:24,lvlReq:8,mana:0,spirit:25,trigger:'freeze',energyMax:100,energyPer:50,
-    mech:'Persistent. Reserves 25 spirit. Builds 50 energy each time you freeze something and casts its linked skill for free at 100.',
+    applies:'Triggered cast',
+    mech:'Persistent. Reserves 25 spirit. Builds 50 charge each time you freeze something, so two freezes is one cast. Supports in this gem apply to the skill it casts.',
     desc:'It waits for something to go still, and answers on your behalf.'}
 };
 const GEM_KEYS = Object.keys(GEMS);
@@ -785,6 +846,21 @@ const SUPPORTS = {
     desc:'Projectiles chain 2 additional times, 25% less damage.'},
   pierce_sup:{name:'Pierce',allow:'projectile',manaMult:1.15,mods:{pierceAdd:3},
     desc:'Projectiles pierce 3 additional enemies.'},
+  /* These four exist to make the one-use-per-build rule bite. Each is the
+     best support for two or three different skills at once, so socketing it
+     is a decision about which skill gets to be good. */
+  deadly_ailments:{name:'Deadly Ailments',allow:'any',manaMult:1.3,
+    mods:{dotPct:55,dmgPct:-28},
+    desc:'55% increased damage over time, 28% less hit damage. Every bleed, poison and ignite skill in the build wants this, and only one of them can have it.'},
+  hypothermia:{name:'Hypothermia',allow:'any',manaMult:1.25,
+    mods:{coldPct:38,freezeBuild:45},
+    desc:'38% increased cold damage and 45% increased freeze buildup. The freezer and the shatterer both want it. Pick one.'},
+  unbound_ailments:{name:'Unbound Ailments',allow:'any',manaMult:1.25,
+    mods:{stunBuild:50,bleedBuild:40,poisonBuild:40,dmgPct:-14},
+    desc:'50% increased stun buildup, 40% increased bleed and poison buildup, 14% less damage. Every enabler you own is competing for this one socket.'},
+  ruthless:{name:'Ruthless',allow:'attack',manaMult:1.35,
+    mods:{physPct:34,critDmg:26,aspd:-16},
+    desc:'34% increased physical damage and +26% critical damage, 16% less attack speed. It is the best support for a breaker and the best for a consumer, and it can only sit in one of them.'},
   ele_focus:{name:'Elemental Focus',allow:'any',manaMult:1.3,mods:{elePct:34,noAilment:1},
     desc:'34% more elemental damage, but the skill can no longer build ailments.'},
   brutality:{name:'Brutality',allow:'attack',manaMult:1.3,mods:{physPct:40,noEle:1},
@@ -2071,7 +2147,7 @@ const G = {
   view:{w:0,h:0,dpr:1}, dprCap:2, slowT:0,
   panel:null, tree:{x:0,y:0,z:0.62,drag:false,sel:null,set:0,search:''},
   tip:null, toastT:0, prompt:null,
-  explored:null, kills:0
+  explored:null, kills:0, mirrors:[]
 };
 window.G=G;
 
@@ -2595,18 +2671,22 @@ function supportUsedBy(ch,supId){
     if(ch.gems[i].sockets.indexOf(supId)>=0) return i;
   return -1;
 }
-function skillStats(g,idx){
+/* `extraSups` is how a trigger gem lends its own supports to the skill it
+   casts: the triggered skill is resolved with both sets socketed. */
+function skillStats(g,idx,extraSups){
   const def=GEMS[g.gem], st=G.st, ch=G.ch;
   const lvl=gemLevelFor(g,def);
   const mods={}; let manaMult=1;
   const sups=[];
   const supFlags={};
   const nSock=socketsUnlocked(lvl);
-  for(let i=0;i<g.sockets.length;i++){
-    const s=g.sockets[i];
-    if(!s || i>=nSock) continue;
+  const own=g.sockets.slice(0,nSock);
+  const all=extraSups&&extraSups.length? own.concat(extraSups) : own;
+  for(let i=0;i<all.length;i++){
+    const s=all[i];
+    if(!s) continue;
     const sup=SUPPORTS[s];
-    if(!sup) continue;
+    if(!sup||sups.indexOf(s)>=0) continue;
     sups.push(s);
     manaMult*=sup.manaMult;
     for(const k in sup.mods) mods[k]=(mods[k]||0)+sup.mods[k];
@@ -3422,6 +3502,7 @@ function breakArmour(e,amount,sk){
   }
   e.armour=0;
   e.broken=BROKEN_TIME;
+  metaTrigger('break');
   burst(e.x,e.y,20,'#e0a070',240,3.6,.55,true);
   spawnFx({type:'shock',x:e.x,y:e.y,r:0,max:e.r*3.4,life:.34,maxLife:.34,color:'#e0a070'});
   dmgNumber(e.x,e.y-e.r-16,0,false,'physical','BROKEN');
@@ -3558,6 +3639,7 @@ function enterZone(zoneKey){
   const reachedOrder=ZONE_ORDER.indexOf(ch.reached||'drowned_shore');
   if(order>reachedOrder) ch.reached=zoneKey;
   G.shots=[]; G.fx=[]; G.clouds=[]; G.totems=[]; G.pickups=[]; G.enemies=[]; G.boss=null;
+  G.mirrors=[];
   G.hitStop=0; G.flash=0; G.dead=false;
   if(G.player){
     G.player.dots.length=0;
@@ -3627,6 +3709,7 @@ function addBuildup(e,type,amount,hitDmg){
       addDot(e,'ignite',hitDmg*0.5*(st.build.ignite||1)*st.m.dot,4,'fire');
       break;
     case 'shock':
+      metaTrigger('shock');
       e.ailT.shock=4;
       e.shockMag=clamp(0.15+hitDmg/Math.max(1,e.maxHp)*0.9,0.1,0.5)*
         ((st.flags.shockDouble)?2:1);
@@ -3662,7 +3745,7 @@ function onFreeze(e){
   const ch=G.ch;
   ch.gems.forEach((g,i)=>{
     const def=GEMS[g.gem];
-    if(def && def.trigger==='freeze' && ch.auras[i]) addEnergy(i,def);
+    if(def && def.trigger==='freeze' && ch.auras[i]) addEnergy(i,def);   /* legacy path */
   });
   if(G.st.flags.freezeAura){
     for(const o of nearbyEnemies(e.x,e.y,150)){
@@ -3671,12 +3754,26 @@ function onFreeze(e){
     }
   }
 }
-function addEnergy(gemIdx,def){
+function addEnergy(gemIdx,def,amount){
   const p=G.player;
-  p.energy[gemIdx]=(p.energy[gemIdx]||0)+def.energyPer;
+  p.energy[gemIdx]=(p.energy[gemIdx]||0)+(amount==null?def.energyPer:amount);
   if(p.energy[gemIdx]>=def.energyMax){
     p.energy[gemIdx]=0;
     fireMetaGem(gemIdx);
+  }
+}
+/* Every trigger condition funnels through here, so adding one is a matter of
+   naming it and calling this from wherever it happens. `amount` overrides
+   the gem's fixed charge per event, which is how Cast when Hit charges off
+   the size of the hit rather than the count. */
+function metaTrigger(kind,amount,dt){
+  const ch=G.ch, p=G.player;
+  if(!ch||!p||G.dead) return;
+  for(let i=0;i<ch.gems.length;i++){
+    const def=GEMS[ch.gems[i].gem];
+    if(!def||def.trigger!==kind) continue;
+    if(!ch.auras[i]) continue;
+    addEnergy(i,def,dt!=null?def.energyPer*dt:amount);
   }
 }
 
@@ -3867,13 +3964,7 @@ function monsterTakeDamage(e,base,dtype,crit,sk,kx,ky){
   }
   /* leech and meta triggers */
   if(sk&&sk.leech>0) healPlayer(dmg*sk.leech/100,true);
-  if(crit){
-    const ch=G.ch;
-    ch.gems.forEach((g,i)=>{
-      const def=GEMS[g.gem];
-      if(def&&def.trigger==='crit'&&ch.auras[i]) addEnergy(i,def);
-    });
-  }
+  if(crit) metaTrigger('crit');
   gainFlaskCharge(dmg);
   if(e.hp<=0) killEnemy(e);
   return dmg;
@@ -3885,6 +3976,7 @@ function killEnemy(e){
   burst(e.x,e.y,e.boss?70:(e.rarity===2?26:14),e.color,e.boss?420:240,e.boss?6:3.4,.7,true);
   if(e.boss){ shakeCam(24); setHitStop(0.12); return; }
   G.kills++; G.ch.kills++;
+  metaTrigger('kill');
   gainXp(e.xp);
   gainFlaskCharge(60);
   dropLoot(e);
@@ -3984,6 +4076,8 @@ function damagePlayer(amount,dtype,src,heavy){
      heavy hits stagger and chip damage does not */
   const share=dmg/Math.max(1,st.maxLife);
   if(share>0.045) addPlayerBuildup('stun',dmg*(0.6+share*5),dmg);
+  /* Cast when Hit charges off how hard the hit was, not how often */
+  metaTrigger('hit',clamp(share*220,2,100));
   G.flash=Math.min(1,0.3+ (amount/Math.max(1,st.maxLife))*2.2);
   dmgNumber(p.x,p.y-p.r-6,amount,false,dtype);
   burst(p.x,p.y,11,'#c0402f',210,3.2,.42,true);
@@ -4417,14 +4511,69 @@ function toggleAura(gemIdx){
   markDirty();
   buildSlotUI();
 }
+/* Casts from somewhere other than where the player is standing.
+   executeSkill() reads the player's position throughout, so the position is
+   lent to it and handed straight back. Movement skills are refused rather
+   than teleporting the player to the duplicate. */
+function castFrom(x,y,sk,ang){
+  const p=G.player;
+  if(sk.type==='dash') return false;
+  const sx=p.x, sy=p.y, sf=p.face;
+  p.x=x; p.y=y;
+  try{ executeSkill(sk,ang,true); }
+  finally{ p.x=sx; p.y=sy; p.face=sf; }
+  return true;
+}
+const CONVERT_CYCLE=['fire','cold','lightning'];
+let convertIdx=0;
 function fireMetaGem(gemIdx){
   const ch=G.ch, g=ch.gems[gemIdx];
+  const mdef=GEMS[g.gem];
   if(g.link==null||!ch.gems[g.link]) return;
-  const sk=skillStats(ch.gems[g.link],g.link);
+  /* the trigger gem's own supports ride along on the skill it casts */
+  const lent=g.sockets.filter(Boolean);
+  const sk=skillStats(ch.gems[g.link],g.link,lent);
   if(!sk.usable) return;
   const p=G.player;
   const t=nearestEnemy(p.x,p.y,700);
   const ang=t?Math.atan2(t.y-p.y,t.x-p.x):p.face;
+  const transform=mdef&&mdef.transform;
+  if(transform==='clone'&&sk.type!=='dash'){
+    /* a duplicate of you, standing where you were, casting from there */
+    const back=p.lastX!=null?{x:p.lastX,y:p.lastY}:{x:p.x-Math.cos(ang)*70,y:p.y-Math.sin(ang)*70};
+    const cx=canStand(back.x,back.y,10)?back.x:p.x;
+    const cy=canStand(back.x,back.y,10)?back.y:p.y;
+    const ca=t?Math.atan2(t.y-cy,t.x-cx):ang;
+    G.mirrors.push({x:cx,y:cy,t:0.55,max:0.55,a:ca});
+    castFrom(cx,cy,sk,ca);
+    spawnFx({type:'shock',x:cx,y:cy,r:0,max:80,life:.3,maxLife:.3,color:'#b090d8'});
+    return;
+  }
+  if(transform==='twin'&&t){
+    /* twice, from two points flanking the target, at 70% each */
+    const half=Object.assign({},sk,{dmg:sk.dmg*0.7});
+    const perp=ang+Math.PI/2;
+    const off=86;
+    for(const sgn of [1,-1]){
+      const cx=t.x-Math.cos(ang)*150+Math.cos(perp)*off*sgn;
+      const cy=t.y-Math.sin(ang)*150+Math.sin(perp)*off*sgn;
+      const ok=canStand(cx,cy,10);
+      const fx=ok?cx:p.x, fy=ok?cy:p.y;
+      const fa=Math.atan2(t.y-fy,t.x-fx);
+      G.mirrors.push({x:fx,y:fy,t:0.4,max:0.4,a:fa});
+      castFrom(fx,fy,half,fa);
+    }
+    spawnFx({type:'shock',x:t.x,y:t.y,r:0,max:120,life:.3,maxLife:.3,color:'#9fd8ee'});
+    return;
+  }
+  if(transform==='convert'){
+    /* the same skill, answering a different resistance each time */
+    const dt=CONVERT_CYCLE[convertIdx++%CONVERT_CYCLE.length];
+    const conv=Object.assign({},sk,{dtype:dt,addFire:0,addCold:0,addLight:0});
+    executeSkill(conv,ang,true);
+    spawnFx({type:'shock',x:p.x,y:p.y,r:0,max:90,life:.3,maxLife:.3,color:DCOLOR[dt]});
+    return;
+  }
   /* triggered casts are free and ignore their own cooldown */
   executeSkill(sk,ang,true);
   spawnFx({type:'shock',x:p.x,y:p.y,r:0,max:70,life:.28,maxLife:.28,color:'#c8a96e'});
@@ -4445,6 +4594,7 @@ function useSkill(slot,fromTouch){
   }
   if(!sk.usable){ toast(sk.reason); return; }
   if(p.cds[slot]>0) return;
+  metaTrigger('skilluse');
   const costLife=!!st.keys.blood_magic;
   if(costLife){
     if(p.life<=sk.mana+1){ toast('Not enough life.'); return; }
@@ -4997,6 +5147,11 @@ function updatePlayer(dt){
   }
   for(let i=0;i<5;i++) if(p.cds[i]>0) p.cds[i]-=dt;
   if(p.iframe>0) p.iframe-=dt;
+  /* Cast on Interval keeps its own clock */
+  metaTrigger('interval',null,dt);
+  /* Doppelganger needs to know where you were a moment ago to stand there */
+  p.trackT=(p.trackT||0)-dt;
+  if(p.trackT<=0){ p.trackT=0.3; p.lastX=p.x; p.lastY=p.y; }
   /* energy shield recharges only after a quiet spell */
   if(p.esDelay>0) p.esDelay-=dt;
   else if(p.es<st.maxES) p.es=Math.min(st.maxES,p.es+st.maxES*0.28*dt);
@@ -5194,6 +5349,30 @@ function igniteGroundAt(x,y,r){
   }
   return lit;
 }
+/* Short-lived duplicates left behind by Doppelganger and Twinned Echo. They
+   are pure decoration: the cast already happened from their position. */
+function updateMirrors(dt){
+  for(let i=G.mirrors.length-1;i>=0;i--){
+    const m=G.mirrors[i];
+    m.t-=dt;
+    if(m.t<=0) G.mirrors.splice(i,1);
+  }
+}
+function drawMirrors(){
+  for(const m of G.mirrors){
+    if(!inView(m.x,m.y,40)) continue;
+    const f=m.t/m.max;
+    ctx.save();
+    ctx.globalAlpha=f*0.55;
+    ctx.drawImage(glowSprite('#b090d8'),m.x-26,m.y-26,52,52);
+    ctx.translate(m.x,m.y);
+    ctx.fillStyle='rgba(176,144,216,'+(f*0.75).toFixed(2)+')';
+    poly(0,0,13,3,m.a); ctx.fill();
+    ctx.strokeStyle='rgba(216,196,240,'+(f*0.8).toFixed(2)+')';
+    ctx.lineWidth=1.4; ctx.stroke();
+    ctx.restore();
+  }
+}
 function updateTotems(dt){
   for(let i=G.totems.length-1;i>=0;i--){
     const t=G.totems[i];
@@ -5285,6 +5464,7 @@ function update(dt){
   updateShots(dt);
   updateClouds(dt);
   updateTotems(dt);
+  updateMirrors(dt);
   updatePickups(dt);
 }
 function visualUpdate(dt){
@@ -5902,6 +6082,7 @@ function render(){
   drawFx();
   drawParts();
   drawTotems();
+  drawMirrors();
   drawShots();
   for(const e of G.enemies) if(inView(e.x,e.y,e.r+40)) drawEnemy(e);
   drawBoss();
@@ -5967,6 +6148,32 @@ function buildSlotUI(){
 /* one standing badge wherever the tree is reachable, while points are unspent */
 /* the player's own ailment buildup, mirroring the monster meters */
 let pailBuilt=false;
+let metaRows=null;
+function updateMetaBar(){
+  const ch=G.ch, p=G.player, host=$('metabar');
+  if(!host||!ch||!p) return;
+  const armed=[];
+  for(let i=0;i<ch.gems.length;i++){
+    const def=GEMS[ch.gems[i].gem];
+    if(def&&def.trigger&&ch.auras[i]) armed.push({i:i,def:def});
+  }
+  const sig=armed.map(a=>a.i).join(',');
+  if(metaRows!==sig){
+    metaRows=sig;
+    host.innerHTML=armed.map(a=>'<div class="mg" data-g="'+a.i+'"><b>'+esc(a.def.name)+
+      '</b><div class="mb"><i></i></div></div>').join('');
+  }
+  setElClass(host,'on',armed.length>0);
+  if(!armed.length) return;
+  for(const el of host.children){
+    const i=+el.dataset.g;
+    const def=GEMS[ch.gems[i].gem];
+    const v=clamp((p.energy[i]||0)/Math.max(1,def.energyMax),0,1);
+    const linked=ch.gems[i].link!=null&&ch.gems[i].link<ch.gems.length;
+    setElClass(el,'ready',v>=0.999||!linked);
+    setElStyle(el.lastElementChild.firstElementChild,'width',(Math.round(v*1000)/10)+'%');
+  }
+}
 function updateStunGauge(){
   const p=G.player;
   const el=$('stungauge');
@@ -5981,6 +6188,7 @@ function updatePlayerAilHud(){
   const host=$('pail'), p=G.player;
   if(!host||!p) return;
   updateStunGauge();
+  updateMetaBar();
   if(!pailBuilt){
     host.innerHTML=AILMENTS.map(k=>'<div class="m" data-a="'+k+'"><i></i><b>'+k.toUpperCase()+'</b></div>').join('');
     pailBuilt=true;
