@@ -208,9 +208,10 @@ button.slot,button.trial,button.spellrow,button.srow{display:grid;align-items:ce
 .stab{background:var(--panel)}
 .srow{display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--line);min-height:44px}
 .srow:active{background:var(--panel2)}
-.srow .k{flex:1;font-size:12.5px;color:var(--tx2);min-width:0}
-.srow .v{font-family:var(--fnum);font-size:14px;font-weight:600;text-align:right;white-space:nowrap}
-.srow .dlt{font-family:var(--fnum);font-size:12px;width:74px;text-align:right;white-space:nowrap}
+.srow .k{flex:1 1 auto;font-size:12.5px;color:var(--tx2);min-width:0;overflow:hidden;text-overflow:ellipsis}
+.srow .v{font-family:var(--fnum);font-size:13.5px;font-weight:600;text-align:right;white-space:nowrap;flex:0 0 auto}
+.srow .dlt{font-family:var(--fnum);font-size:11px;flex:0 1 auto;min-width:0;text-align:right;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:52%}
 .srow .trace{font-size:14px;color:#39414f;width:14px;text-align:center}
 .pos{color:var(--good)} .neg{color:var(--bad)} .zero{color:var(--tx3)}
 .sgrp{padding:7px 12px 5px;font-size:9.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--tx3);
@@ -244,6 +245,10 @@ button.slot,button.trial,button.spellrow,button.srow{display:grid;align-items:ce
 
 /* ---------- diff block ---------- */
 .diffhead{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--line);border-bottom:1px solid var(--line2)}
+.diffhead.d4{grid-template-columns:repeat(4,1fr)}
+.diffhead.d4 .dh{padding:8px 3px}
+.diffhead.d4 .dh .k{font-size:8.5px;letter-spacing:.06em}
+.diffhead.d4 .dh .v{font-size:14px}
 .dh{background:#0a0d13;padding:8px 6px;text-align:center}
 .dh .k{font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--tx3)}
 .dh .v{font-family:var(--fnum);font-size:16px;font-weight:700;margin-top:2px}
@@ -425,7 +430,7 @@ const T_DMG    = [[20,1.20],[20,0.80],[30,0.50],[Infinity,0.25]];
 const T_STRIKE = [[20,0.70],[20,0.45],[30,0.30],[Infinity,0.15]];
 const T_CRIT   = [[20,0.22],[20,0.15],[30,0.10],[Infinity,0.05]];
 const T_COST   = [[20,0.35],[20,0.22],[30,0.12],[Infinity,0.05]];
-const T_HP     = [[20,4.00],[20,3.00],[30,2.00],[Infinity,1.00]];
+const T_HP     = [[20,9.00],[20,7.00],[30,4.00],[Infinity,2.00]];
 const T_DODGE  = [[20,0.35],[20,0.22],[30,0.12],[Infinity,0.05]];
 
 const ELEM_EFFECT = {
@@ -750,7 +755,7 @@ function simulate(ctx, enemy, opts){
   let acting = null, actEnds = 0, castCount = 0;
   let dealt = 0, dealtBy = {}, takenBy = {}, curve = [], manaCurve = [], hpSeries = [];
   let starvedTime = 0, strikeTime = 0, totalTime = 0, lastHitAt = -99;
-  let wardBreaks = 0, wardFails = 0, wardDealt = 0, wardNeeded = 0, bestWardPush = 0;
+  let wardBreaks = 0, wardFails = 0, wardDealt = 0, wardNeeded = 0, bestWardPush = 0, wardAbsorbed = 0, failPush = 0;
   let healedBack = 0, drained = 0, deathAt = -1, killAt = -1, secBucket = 0, secT = 0;
   const buffs = {}; const cds = {};
 
@@ -790,7 +795,7 @@ function simulate(ctx, enemy, opts){
     if(enemy.executeGate && enemyHp < enemy.hp*0.35) mul *= 1 + g(A,"execute")/100;
     const r = applyResist(a.res.buckets, enemy.res);
     let v = r.total * mul;
-    if(a.sp.aoe && enemy.adds) v *= 1 + enemy.adds*0.55*(1+g(A,"dmg.aoe")/100*0);
+    if(a.sp.aoe && enemy.adds) v *= 1 + enemy.adds*0.28;
     if(ctx.flags.ricochet && a.sp.kind==="spell" && enemy.adds) v *= 1.25;
     return v;
   }
@@ -823,6 +828,7 @@ function simulate(ctx, enemy, opts){
       if(ward>0 && t > wardDeadline){
         wardFails++; wardEndsAt = t; ward = 0;
         bestWardPush = Math.max(bestWardPush, wardDealt);
+        failPush = Math.max(failPush, wardDealt);
         const h = Math.min(enemy.ward.healOnFail, enemy.hp-enemyHp); enemyHp += h; healedBack += h;
         const inc = playerIncoming(ctx, enemy.ward.failDmg);
         for(const k in inc.buckets) takenBy[k]=(takenBy[k]||0)+inc.buckets[k];
@@ -843,7 +849,7 @@ function simulate(ctx, enemy, opts){
       const dmg = landed(a);
       dealt += dmg; dealtBy[a.sp.id] = (dealtBy[a.sp.id]||0) + dmg;
       secBucket += dmg;
-      if(ward>0){ const w = Math.min(ward, dmg); ward -= w; wardDealt += w; const over = dmg-w; enemyHp -= over;
+      if(ward>0){ const w = Math.min(ward, dmg); ward -= w; wardDealt += w; wardAbsorbed += w; const over = dmg-w; enemyHp -= over;
         if(ward<=0){ wardBreaks++; wardEndsAt = t; bestWardPush = Math.max(bestWardPush, enemy.ward.hp); } }
       else enemyHp -= dmg;
       if(a.sp.kind==="strike"){ mana = Math.min(ctx.maxMana, mana + manaSteal); if(!ctx.flags.noHeal) hp = Math.min(ctx.maxHp, hp+lifesteal); }
@@ -886,7 +892,8 @@ function simulate(ctx, enemy, opts){
     hpLeft:Math.max(0,hp), hpPct: Math.max(0,hp)/ctx.maxHp,
     enemyHpLeft: Math.max(0, enemyHp), enemyPct: 1 - Math.max(0,enemyHp)/enemy.hp,
     curve, manaCurve, hpSeries, starvedTime, strikeTime, totalTime, healedBack, drained,
-    wardBreaks, wardFails, wardNeeded, bestWardPush, enemy, ctx
+    wardBreaks, wardFails, wardNeeded, bestWardPush, failPush, wardAbsorbed,
+    effDps: Math.max(0, dealt - wardAbsorbed)/Math.max(0.05,dur), enemy, ctx
   };
 }
 
@@ -921,7 +928,7 @@ function burstWindow(ctx, seconds){
 
 /* the four headline stats */
 function headline(ctx){
-  if(!ctx.weapon || !ctx.allReqMet){
+  if(!ctx.weapon){
     return {dps:0, ehp:Math.round(effectiveHp(ctx,REF_PROFILE)), sustain:0, burst:0, broken:true};
   }
   pickPolicy(ctx);
@@ -962,14 +969,14 @@ function attributeDamage(state, baseDps){
     // subtract exactly this contribution and rebuild the derived layer
     ctx.agg.total[c.key] = (ctx.agg.total[c.key]||0) - c.src.val;
     rederive(ctx);
-    const d = ctx.weapon && ctx.allReqMet ? dummyRun(ctx).dps : 0;
+    const d = ctx.weapon ? dummyRun(ctx).dps : 0;
     const delta = baseDps - d;
     if(Math.abs(delta) < 0.01) continue;
     out.push({label:c.src.name, kind:c.src.kind, id:c.src.id, stat:c.key, value:c.src.val, delta});
   }
   /* the weapon's own base damage is not a "stat", but it is usually the
      single largest contributor in the build — it has to be traceable too. */
-  if(ctx0.weapon && ctx0.allReqMet){
+  if(ctx0.weapon){
     for(const bucket in ctx0.base){
       if(!ctx0.base[bucket]) continue;
       const ctx = buildContext(state);
@@ -1017,7 +1024,7 @@ function attributeBySource(state, baseDps){
 function diagnose(r){
   const e = r.enemy, ctx = r.ctx;
   const need = (e.hp + (e.regen||0)*e.timeLimit) / e.timeLimit;
-  const ratio = r.dps / Math.max(1, need);
+  const ratio = r.effDps / Math.max(1, need);
   const taken = r.taken || 1;
   const parts = Object.entries(r.takenBy).sort((a,b)=>b[1]-a[1]);
   const top = parts[0] || ["neutral",0];
@@ -1027,12 +1034,14 @@ function diagnose(r){
   const starvePct = Math.round(r.starvedTime / Math.max(0.1, r.totalTime) * 100);
   const facts = [];
 
-  facts.push(["Sustained DPS", fmt(r.dps) + " / " + fmt(need) + " needed", ratio>=1?"pos":"neg"]);
+  facts.push(["Sustained DPS", fmt(r.effDps) + " / " + fmt(need) + " needed", ratio>=1?"pos":"neg"]);
+  if(r.wardAbsorbed > 1) facts.push(["Swallowed by wards", fmt(r.wardAbsorbed) + " of your " + fmt(r.dealt) + " damage never reached it"]);
   facts.push(["Damage dealt", fmt(r.dealt) + " of " + fmt(e.hp) + " enemy HP" + (r.healedBack>1?" (+"+fmt(r.healedBack)+" healed back)":"")]);
   facts.push(["Damage taken", fmt(r.taken) + " against " + fmt(ctx.maxHp) + " max HP"]);
   if(taken>1) facts.push(["Biggest threat", topName + " — " + topPct + "% of incoming, your " + topName + " defence " + (myRes>=0?"+":"") + myRes + "%", myRes<0?"neg":""]);
   facts.push(["Time on basic attacks", Math.round(r.strikeTime/Math.max(.1,r.totalTime)*100) + "%" + (starvePct>3?" · "+starvePct+"% out of mana":"")]);
-  if(e.ward) facts.push(["Ward windows", r.wardBreaks + " broken / " + (r.wardBreaks+r.wardFails) + " — best push " + fmt(r.bestWardPush) + " of " + fmt(e.ward.hp), r.wardFails?"neg":"pos"]);
+  if(e.ward) facts.push(["Ward windows", r.wardBreaks + " broken of " + (r.wardBreaks+r.wardFails) +
+    (r.wardFails? " — best failed push " + fmt(r.failPush) + " of " + fmt(e.ward.hp) : " — all broken"), r.wardFails?"neg":"pos"]);
   if(e.drain) facts.push(["Mana drained", fmt(r.drained) + " over the fight, pool " + fmt(ctx.maxMana)]);
 
   let line;
@@ -1051,18 +1060,23 @@ function diagnose(r){
         + "% of everything that hit you was " + topName + " and your " + topName + " defence is " + (myRes>=0?"+":"") + myRes + "%";
     line = dmgClause + causeClause + ".";
   } else if(e.ward && r.wardFails > 0){
-    line = "Your " + e.ward.window.toFixed(1) + "s burst window delivered " + fmt(r.bestWardPush) + " of the "
+    /* report the window that actually failed, and never print a near miss
+       as two identical rounded numbers */
+    const pushTxt = fmt(r.failPush) === fmt(e.ward.hp)
+      ? (r.failPush/e.ward.hp*100).toFixed(1) + "% of the"
+      : fmt(r.failPush) + " of the";
+    line = "Your " + e.ward.window.toFixed(1) + "s burst window delivered " + pushTxt + " "
          + fmt(e.ward.hp) + " needed to break the ward — it resealed " + r.wardFails + " time" + (r.wardFails>1?"s":"")
          + " and healed back " + fmt(r.healedBack) + ".";
   } else if(starvePct > 25){
     line = "You ran dry and spent " + starvePct + "% of the fight on basic attacks — sustained DPS of "
-         + fmt(r.dps) + " against a " + fmt(need) + " check.";
+         + fmt(r.effDps) + " against a " + fmt(need) + " check.";
   } else if(e.regen && r.healedBack > r.dealt*0.25){
     line = "Its regeneration ate " + fmt(r.healedBack) + " of your " + fmt(r.dealt)
-         + " damage — you need " + fmt(need) + " sustained DPS and you do " + fmt(r.dps) + ".";
+         + " damage — you need " + fmt(need) + " sustained DPS and you do " + fmt(r.effDps) + ".";
   } else {
     line = "You survived the full " + e.timeLimit + "s but left it on " + Math.round((1-r.enemyPct)*100)
-         + "% health — your " + fmt(r.dps) + " DPS is " + Math.round(ratio*100) + "% of the " + fmt(need) + " this check wants.";
+         + "% health — your " + fmt(r.effDps) + " DPS is " + Math.round(ratio*100) + "% of the " + fmt(need) + " this check wants.";
   }
   return {line, facts, ratio, need};
 }
@@ -1085,7 +1099,7 @@ const CLASSES = {
   warden:{
     id:"warden", name:"Warden", weaponType:"maul", tagline:"Maul · Stone / Ember",
     blurb:"Slow, heavy, and built to be hit. Wardens turn incoming damage into a resource and their own health into a currency.",
-    hp:640, mana:90, manaRegen:4.2, crit:5, critMult:2.0,
+    hp:800, mana:108, manaRegen:5.4, crit:5, critMult:2.0,
     base:{"armor":5,"res.stone":5},
     spells:[
       {id:"rend",   name:"Rend",         cost:22, time:0.85, mult:1.75, flatScale:0.95, text:"A downward split that opens the target up."},
@@ -1097,7 +1111,7 @@ const CLASSES = {
   arcwright:{
     id:"arcwright", name:"Arcwright", weaponType:"rod", tagline:"Rod · Volt / Frost",
     blurb:"A fast, fragile caster whose damage arrives in a thousand small pieces — or in one, if you build for it.",
-    hp:430, mana:130, manaRegen:6.5, crit:5, critMult:2.0,
+    hp:540, mana:130, manaRegen:6.5, crit:5, critMult:2.0,
     base:{"res.volt":5},
     spells:[
       {id:"bolt",   name:"Arc Bolt",     cost:14, time:0.50, mult:1.20, flatScale:0.60, text:"Cheap, fast, and the backbone of every Arcwright rotation."},
@@ -1109,7 +1123,7 @@ const CLASSES = {
   tidecaller:{
     id:"tidecaller", name:"Tidecaller", weaponType:"censer", tagline:"Censer · Frost / Gale",
     blurb:"The mana class. Tidecallers do not run out; the question is what they buy with what they never stop having.",
-    hp:500, mana:145, manaRegen:7.2, crit:5, critMult:2.0,
+    hp:625, mana:145, manaRegen:7.2, crit:5, critMult:2.0,
     base:{"res.frost":5},
     spells:[
       {id:"lance",  name:"Rime Lance",      cost:18, time:0.70, mult:1.50, flatScale:0.80, text:"A thrown spar of black ice."},
@@ -1121,7 +1135,7 @@ const CLASSES = {
   shrike:{
     id:"shrike", name:"Shrike", weaponType:"daggers", tagline:"Daggers · Gale / Ember",
     blurb:"Almost no health and almost no mana, spending both faster than anything else in the game. Crit is not a bonus here; it is the plan.",
-    hp:400, mana:100, manaRegen:5.4, crit:8, critMult:2.0,
+    hp:500, mana:100, manaRegen:5.4, crit:8, critMult:2.0,
     base:{"dodge":4},
     spells:[
       {id:"lac",    name:"Lacerate",     cost:16, time:0.45, mult:1.05, flatScale:0.50, text:"Two cuts, close together."},
@@ -1159,18 +1173,18 @@ function I(o){ ITEMS[o.id] = o; return o; }
 
 /* ---- WEAPONS: Warden (maul, 1.25s) ---- */
 I({id:"w_wd1",name:"Splitlog Maul",slot:"weapon",cls:"warden",rarity:"common",lvl:1,speed:1.25,strikeName:"Crush",
-  dmgBase:{neutral:[16,26]},stats:{"hp":[10,20]},lore:"Site tool. Not intended for this."});
+  dmgBase:{neutral:[16,26]},stats:{"hp":[14,29]},lore:"Site tool. Not intended for this."});
 I({id:"w_wd2",name:"Terrace Hammer",slot:"weapon",cls:"warden",rarity:"uncommon",lvl:4,speed:1.25,strikeName:"Crush",
-  req:{stone:12},dmgBase:{neutral:[26,38],stone:[10,18]},stats:{"dmg.stone":[6,12],"hp":[30,55]},lore:"Quarry issue, third terrace."});
+  req:{stone:12},dmgBase:{neutral:[26,38],stone:[10,18]},stats:{"dmg.stone":[6,12],"hp":[44,80]},lore:"Quarry issue, third terrace."});
 I({id:"w_wd3",name:"Slagfall",slot:"weapon",cls:"warden",rarity:"rare",lvl:7,speed:1.25,strikeName:"Crush",
   req:{ember:20,stone:10},dmgBase:{neutral:[34,50],ember:[20,34]},
   stats:{"dmg.ember":[12,20],"flat.ember":[10,18],"res.frost":[-8,-3]},lore:"Still warm. It has been cold for nine years."});
 I({id:"w_wd4",name:"Gravebreaker",slot:"weapon",cls:"warden",rarity:"fabled",lvl:10,speed:1.25,strikeName:"Crush",
   req:{stone:30,ember:14},dmgBase:{neutral:[50,70],stone:[38,58]},
-  stats:{"flat.stone":[18,30],"mult.strike":[8,14],"hp":[90,150],"cost.all":[8,15]},lore:"Made for opening things that were closed on purpose."});
+  stats:{"flat.stone":[18,30],"mult.strike":[8,14],"hp":[130,218],"cost.all":[8,15]},lore:"Made for opening things that were closed on purpose."});
 I({id:"w_wd5",name:"Tectonic Verdict",slot:"weapon",cls:"warden",rarity:"mythic",lvl:13,speed:1.25,strikeName:"Crush",
   req:{stone:44,ember:18},dmgBase:{neutral:[74,104],stone:[66,98]},
-  stats:{"dmg.stone":[24,40],"mult.all":[6,11],"hp":[160,260],"cast":[-15,-8],"mana":[-30,-15]},
+  stats:{"dmg.stone":[24,40],"mult.all":[6,11],"hp":[232,377],"cast":[-15,-8],"mana":[-30,-15]},
   lore:"The ruling was handed down once and has not needed repeating."});
 /* ---- WEAPONS: Arcwright (rod, 0.8s) ---- */
 I({id:"w_ac1",name:"Copper Divining Rod",slot:"weapon",cls:"arcwright",rarity:"common",lvl:1,speed:0.80,strikeName:"Lash",
@@ -1218,17 +1232,17 @@ I({id:"w_sh5",name:"Two Minutes to Dusk",slot:"weapon",cls:"shrike",rarity:"myth
   lore:"You are not meant to still be holding these at dusk."});
 
 /* ---- HELMS ---- */
-I({id:"h_hodmask",name:"Hodsman's Mask",slot:"helm",rarity:"common",lvl:1,stats:{"hp":[15,30]}});
+I({id:"h_hodmask",name:"Hodsman's Mask",slot:"helm",rarity:"common",lvl:1,stats:{"hp":[22,44]}});
 I({id:"h_slagvisor",name:"Slag Visor",slot:"helm",rarity:"uncommon",lvl:3,req:{ember:8},
-  stats:{"dmg.ember":[6,11],"res.ember":[4,9],"hp":[20,40]}});
+  stats:{"dmg.ember":[6,11],"res.ember":[7,15],"hp":[29,58]}});
 I({id:"h_rimecrown",name:"Rimeglass Crown",slot:"helm",rarity:"rare",lvl:6,req:{frost:16},
   stats:{"dmg.frost":[10,18],"mana":[15,28],"manaRegen":[1,2.5],"hp":[-30,-10]}});
 I({id:"h_coilhelm",name:"Coil Helm",slot:"helm",rarity:"rare",lvl:6,req:{volt:18},
   stats:{"crit":[3,6],"dmg.volt":[9,16],"elem.volt":[2,4],"hp":[-20,-5]},lore:"Grounded, mostly."});
 I({id:"h_loamhood",name:"Loamweave Hood",slot:"helm",rarity:"legendary",lvl:9,req:{stone:22,gale:8},
-  stats:{"dmg.stone":[14,24],"flat.stone":[10,18],"hp":[55,95],"dodge":[3,6],"cost.all":[4,10]}});
+  stats:{"dmg.stone":[14,24],"flat.stone":[10,18],"hp":[80,138],"dodge":[3,6],"cost.all":[4,10]}});
 I({id:"h_ashsight",name:"Ashsight",slot:"helm",rarity:"fabled",lvl:11,req:{ember:30},major:"bloodrite",
-  stats:{"dmg.ember":[20,34],"res.ember":[10,18],"hp":[70,120],"hpRegen":[-10,-4]},
+  stats:{"dmg.ember":[20,34],"res.ember":[17,31],"hp":[102,174],"hpRegen":[-10,-4]},
   lore:"You see best through the part of the fire that is already over."});
 I({id:"h_stillcrown",name:"The Still Crown",slot:"helm",rarity:"fabled",lvl:12,req:{frost:30,gale:12},major:"lucid",
   stats:{"manaRegen":[3,6],"dmg.frost":[16,28],"mult.spell":[5,9],"hp":[-80,-40]}});
@@ -1237,68 +1251,68 @@ I({id:"h_nullhelm",name:"Nullhelm",slot:"helm",rarity:"mythic",lvl:14,req:{gale:
   lore:"Five colours went in. One came out."});
 
 /* ---- CHESTS ---- */
-I({id:"c_padded",name:"Padded Jerkin",slot:"chest",rarity:"common",lvl:1,stats:{"hp":[25,45]}});
+I({id:"c_padded",name:"Padded Jerkin",slot:"chest",rarity:"common",lvl:1,stats:{"hp":[36,65]}});
 I({id:"c_scoria",name:"Scoria Plate",slot:"chest",rarity:"uncommon",lvl:4,req:{ember:12},
-  stats:{"hp":[60,100],"res.ember":[8,14],"res.frost":[-8,-3],"dodge":[-4,-2]}});
+  stats:{"hp":[87,145],"res.ember":[14,24],"res.frost":[-8,-3],"dodge":[-4,-2]}});
 I({id:"c_tidecloth",name:"Tidecloth Wrap",slot:"chest",rarity:"rare",lvl:6,req:{frost:18},
   stats:{"mana":[25,45],"manaRegen":[2,4],"dmg.frost":[8,15],"hp":[-20,0]}});
 I({id:"c_briarmail",name:"Briar Mail",slot:"chest",rarity:"rare",lvl:7,req:{stone:20},
-  stats:{"hp":[90,150],"thorns":[8,15],"res.gale":[5,10],"speed":[-10,-4]}});
+  stats:{"hp":[130,218],"thorns":[8,15],"res.gale":[8,17],"speed":[-10,-4]}});
 I({id:"c_galevest",name:"Galewrought Vest",slot:"chest",rarity:"legendary",lvl:9,req:{gale:26},
   stats:{"dodge":[8,14],"dmg.gale":[14,24],"speed":[8,15],"hp":[-40,-10]}});
 I({id:"c_furnace",name:"Furnace Harness",slot:"chest",rarity:"fabled",lvl:11,req:{ember:28,stone:18},major:"thirst",
-  stats:{"hp":[140,230],"dmg.ember":[18,30],"hpRegen":[10,20],"mana":[-40,-20]},
+  stats:{"hp":[203,334],"dmg.ember":[18,30],"hpRegen":[10,20],"mana":[-40,-20]},
   lore:"The straps are on the inside."});
 I({id:"c_stormcarapace",name:"Storm Carapace",slot:"chest",rarity:"fabled",lvl:12,req:{volt:32},
-  stats:{"dmg.volt":[22,36],"crit":[5,9],"mult.spell":[6,11],"res.volt":[12,20],"hp":[-60,-20]}});
+  stats:{"dmg.volt":[22,36],"crit":[5,9],"mult.spell":[6,11],"res.volt":[20,34],"hp":[-60,-20]}});
 I({id:"c_gravebind",name:"Gravebind Cuirass",slot:"chest",rarity:"mythic",lvl:14,req:{stone:34,ember:22},major:"graveresolve",
-  stats:{"hp":[260,420],"res.all":[10,18],"thorns":[12,22],"dmg.all":[-10,-4],"speed":[-15,-8]}});
+  stats:{"hp":[377,609],"res.all":[17,31],"thorns":[12,22],"dmg.all":[-10,-4],"speed":[-15,-8]}});
 
 /* ---- LEGS ---- */
-I({id:"l_roughspun",name:"Roughspun Leggings",slot:"legs",rarity:"common",lvl:1,stats:{"hp":[12,24]}});
+I({id:"l_roughspun",name:"Roughspun Leggings",slot:"legs",rarity:"common",lvl:1,stats:{"hp":[17,35]}});
 I({id:"l_cinderchaps",name:"Cinder Chaps",slot:"legs",rarity:"uncommon",lvl:3,req:{ember:8},
-  stats:{"dmg.ember":[6,12],"hp":[20,36]}});
+  stats:{"dmg.ember":[6,12],"hp":[29,52]}});
 I({id:"l_stepwise",name:"Stepwise Greaves",slot:"legs",rarity:"rare",lvl:5,req:{gale:14},
-  stats:{"dodge":[4,8],"speed":[6,11],"hp":[15,35]}});
+  stats:{"dodge":[4,8],"speed":[6,11],"hp":[22,51]}});
 I({id:"l_conduit",name:"Conduit Skirt",slot:"legs",rarity:"rare",lvl:7,req:{volt:20,frost:10},
   stats:{"dmg.volt":[10,18],"manaRegen":[1.5,3],"flat.volt":[6,12],"hp":[-25,-8]}});
 I({id:"l_rootbound",name:"Rootbound Faulds",slot:"legs",rarity:"legendary",lvl:9,req:{stone:24},
-  stats:{"hp":[80,140],"dmg.stone":[12,20],"res.stone":[8,14],"dodge":[-6,-3]}});
+  stats:{"hp":[116,203],"dmg.stone":[12,20],"res.stone":[14,24],"dodge":[-6,-3]}});
 I({id:"l_frostlock",name:"Frostlock Legguards",slot:"legs",rarity:"fabled",lvl:11,req:{frost:30},
   stats:{"conv.neutral.frost":[25,40],"dmg.frost":[16,26],"mana":[30,55],"res.ember":[-14,-6]}});
 I({id:"l_wanderer",name:"Wanderer's Ruin",slot:"legs",rarity:"fabled",lvl:12,req:{gale:30,volt:14},major:"tempo",
   stats:{"dodge":[10,17],"speed":[10,18],"dmg.gale":[14,24],"hp":[-90,-40]}});
 I({id:"l_mantlebreak",name:"Mantlebreak Cuisses",slot:"legs",rarity:"mythic",lvl:13,req:{stone:38},
-  stats:{"flat.stone":[26,44],"mult.strike":[10,18],"hp":[150,250],"cost.all":[10,20],"cast":[-12,-6]}});
+  stats:{"flat.stone":[26,44],"mult.strike":[10,18],"hp":[218,362],"cost.all":[10,20],"cast":[-12,-6]}});
 
 /* ---- BOOTS ---- */
-I({id:"b_hobnail",name:"Hobnail Boots",slot:"boots",rarity:"common",lvl:1,stats:{"hp":[10,20]}});
+I({id:"b_hobnail",name:"Hobnail Boots",slot:"boots",rarity:"common",lvl:1,stats:{"hp":[14,29]}});
 I({id:"b_emberstep",name:"Emberstep",slot:"boots",rarity:"uncommon",lvl:4,req:{ember:10},
   stats:{"dmg.ember":[7,13],"speed":[4,8]}});
 I({id:"b_tidewalk",name:"Tidewalkers",slot:"boots",rarity:"rare",lvl:6,req:{frost:16},
-  stats:{"manaRegen":[2,4],"mana":[18,32],"res.frost":[6,11]}});
+  stats:{"manaRegen":[2,4],"mana":[18,32],"res.frost":[10,19]}});
 I({id:"b_stormheel",name:"Stormheel",slot:"boots",rarity:"rare",lvl:7,req:{volt:22},
   stats:{"crit":[4,8],"dmg.volt":[10,17],"speed":[6,12],"hp":[-20,-5]}});
 I({id:"b_gravetread",name:"Gravetread",slot:"boots",rarity:"legendary",lvl:9,req:{stone:22,ember:10},
-  stats:{"hp":[70,120],"thorns":[6,12],"res.all":[4,8],"speed":[-8,-3]}});
+  stats:{"hp":[102,174],"thorns":[6,12],"res.all":[7,14],"speed":[-8,-3]}});
 I({id:"b_zephyr",name:"Zephyrbind Sandals",slot:"boots",rarity:"fabled",lvl:11,req:{gale:32},
   stats:{"dodge":[12,20],"speed":[14,24],"dmg.gale":[16,26],"hp":[-70,-30]}});
 I({id:"b_quench",name:"Quenchstep",slot:"boots",rarity:"fabled",lvl:12,req:{frost:26,ember:18},major:"cauterize",
-  stats:{"res.ember":[14,24],"res.frost":[14,24],"hp":[110,180],"manaRegen":[-2,-0.5]}});
+  stats:{"res.ember":[24,41],"res.frost":[24,41],"hp":[160,261],"manaRegen":[-2,-0.5]}});
 I({id:"b_lastmile",name:"The Last Mile",slot:"boots",rarity:"mythic",lvl:14,req:{gale:28,volt:26},major:"sever",
   stats:{"crit":[10,18],"critMult":[30,55],"dodge":[8,15],"dmg.gale":[18,30],"hp":[-110,-50]}});
 
 /* ---- RINGS ---- */
-I({id:"r_tin",name:"Tin Band",slot:"ring",rarity:"common",lvl:1,stats:{"hp":[6,14]}});
+I({id:"r_tin",name:"Tin Band",slot:"ring",rarity:"common",lvl:1,stats:{"hp":[9,20]}});
 I({id:"r_sparkloop",name:"Spark Loop",slot:"ring",rarity:"common",lvl:2,stats:{"dmg.volt":[3,7]}});
 I({id:"r_seep",name:"Seepstone Ring",slot:"ring",rarity:"uncommon",lvl:3,req:{frost:6},stats:{"manaRegen":[0.8,1.8]}});
 I({id:"r_ashband",name:"Ashband",slot:"ring",rarity:"uncommon",lvl:3,req:{ember:6},stats:{"flat.ember":[4,9]}});
-I({id:"r_pebble",name:"Pebblecore Ring",slot:"ring",rarity:"uncommon",lvl:4,req:{stone:8},stats:{"hp":[25,45],"dmg.stone":[4,9]}});
+I({id:"r_pebble",name:"Pebblecore Ring",slot:"ring",rarity:"uncommon",lvl:4,req:{stone:8},stats:{"hp":[36,65],"dmg.stone":[4,9]}});
 I({id:"r_windeye",name:"Windeye",slot:"ring",rarity:"rare",lvl:5,req:{gale:12},stats:{"dodge":[3,6],"dmg.gale":[7,13]}});
 I({id:"r_voltaic",name:"Voltaic Signet",slot:"ring",rarity:"rare",lvl:6,req:{volt:14},stats:{"crit":[3,6],"flat.volt":[6,11]}});
 I({id:"r_saltring",name:"Saltglass Ring",slot:"ring",rarity:"rare",lvl:6,req:{frost:14},stats:{"mana":[20,36],"cost.all":[-6,-2]}});
 I({id:"r_ironpromise",name:"Iron Promise",slot:"ring",rarity:"rare",lvl:7,req:{stone:16},
-  stats:{"hp":[60,100],"hpRegen":[3,7],"dmg.all":[-4,-1]}});
+  stats:{"hp":[87,145],"hpRegen":[3,7],"dmg.all":[-4,-1]}});
 I({id:"r_emberoath",name:"Ember Oath",slot:"ring",rarity:"legendary",lvl:8,req:{ember:20},
   stats:{"dmg.ember":[12,20],"flat.ember":[10,17],"res.frost":[-10,-4]}});
 I({id:"r_chainlink",name:"Chainlink",slot:"ring",rarity:"legendary",lvl:9,req:{volt:22},
@@ -1312,10 +1326,10 @@ I({id:"r_widow",name:"Widow's Arithmetic",slot:"ring",rarity:"fabled",lvl:11,req
 I({id:"r_overspill",name:"Overspill",slot:"ring",rarity:"fabled",lvl:12,req:{frost:28},major:"overflow",
   stats:{"manaRegen":[4,8],"dmg.frost":[14,24]}});
 I({id:"r_sunkcost",name:"Sunk Cost",slot:"ring",rarity:"mythic",lvl:13,req:{ember:26,stone:26},
-  stats:{"mult.all":[8,14],"flat.ember":[20,34],"hp":[90,160],"cost.all":[14,26]}});
+  stats:{"mult.all":[8,14],"flat.ember":[20,34],"hp":[130,232],"cost.all":[14,26]}});
 
 /* ---- AMULETS ---- */
-I({id:"a_cord",name:"Braided Cord",slot:"amulet",rarity:"common",lvl:1,stats:{"hp":[10,18]}});
+I({id:"a_cord",name:"Braided Cord",slot:"amulet",rarity:"common",lvl:1,stats:{"hp":[14,26]}});
 I({id:"a_fetish",name:"Bone Fetish",slot:"amulet",rarity:"uncommon",lvl:3,stats:{"dmg.all":[4,8],"hp":[-10,0]}});
 I({id:"a_tidepearl",name:"Tidepearl",slot:"amulet",rarity:"rare",lvl:5,req:{frost:12},stats:{"mana":[25,45],"manaRegen":[1.5,3]}});
 I({id:"a_cinderlocket",name:"Cinder Locket",slot:"amulet",rarity:"rare",lvl:6,req:{ember:16},
@@ -1323,7 +1337,7 @@ I({id:"a_cinderlocket",name:"Cinder Locket",slot:"amulet",rarity:"rare",lvl:6,re
 I({id:"a_stormtooth",name:"Stormtooth",slot:"amulet",rarity:"rare",lvl:7,req:{volt:18,gale:8},
   stats:{"crit":[5,9],"critMult":[10,20]}});
 I({id:"a_earthheart",name:"Earthheart Pendant",slot:"amulet",rarity:"legendary",lvl:8,req:{stone:22},
-  stats:{"hp":[100,170],"dmg.stone":[10,18],"res.stone":[6,12],"speed":[-8,-3]}});
+  stats:{"hp":[145,246],"dmg.stone":[10,18],"res.stone":[10,20],"speed":[-8,-3]}});
 I({id:"a_leech",name:"Leechbone Torc",slot:"amulet",rarity:"legendary",lvl:9,req:{ember:18,stone:14},
   stats:{"lifesteal":[8,16],"spellLeech":[5,10],"dmg.all":[6,11]}});
 I({id:"a_prism",name:"Prism Collar",slot:"amulet",rarity:"legendary",lvl:10,req:{frost:18,volt:18,gale:12},
@@ -1331,7 +1345,7 @@ I({id:"a_prism",name:"Prism Collar",slot:"amulet",rarity:"legendary",lvl:10,req:
 I({id:"a_ricochet",name:"Ricochet Charm",slot:"amulet",rarity:"fabled",lvl:11,req:{volt:26,gale:16},major:"ricochet",
   stats:{"dmg.aoe":[18,30],"dmg.volt":[12,20]}});
 I({id:"a_deadweight",name:"Deadweight",slot:"amulet",rarity:"fabled",lvl:12,req:{stone:30,ember:14},major:"anchor",
-  stats:{"hp":[180,290],"flat.stone":[18,30],"speed":[-12,-5]}});
+  stats:{"hp":[261,420],"flat.stone":[18,30],"speed":[-12,-5]}});
 I({id:"a_manasplit",name:"Mana Split",slot:"amulet",rarity:"mythic",lvl:13,req:{frost:32,volt:20},
   stats:{"manaRegen":[6,11],"mana":[70,120],"mult.spell":[10,18],"dmg.strike":[-30,-15]}});
 I({id:"a_thornofnoon",name:"Thorn of Noon",slot:"amulet",rarity:"mythic",lvl:14,req:{ember:34,gale:20},
@@ -1357,7 +1371,9 @@ function rolledValues(inst){
     if(Array.isArray(s)){
       const q = inst.rolls[k] != null ? inst.rolls[k] : 0.5;
       let v = s[0] + q*(s[1]-s[0]);
-      v = (Math.abs(s[1]-s[0])<3 && Math.abs(s[1])<12) ? Math.round(v*10)/10 : Math.round(v);
+      /* element points are a currency; they are never fractional */
+      if(k.startsWith("elem.")) v = Math.round(v);
+      else v = (Math.abs(s[1]-s[0])<3 && Math.abs(s[1])<12) ? Math.round(v*10)/10 : Math.round(v);
       out[k] = v;
     } else out[k] = s;
   }
@@ -1403,63 +1419,60 @@ const ARCH = {
 };
 function T(o){ return o; }
 const TRIALS = [
-T({n:1,  id:"t1",  name:"Pit Dummy, Reinforced", arch:"bulwark", lvl:1,
+T({n:1,  id:"t1", name:"Pit Dummy, Reinforced", arch:"bulwark", lvl:1,
    flavor:"A sack of gravel in a steel frame. It does not fight back. It only has to outlast you.",
-   hp:2600, timeLimit:30, res:{neutral:10}, dps:null}),
-T({n:2,  id:"t2",  name:"Ashmoth Swarm", arch:"pyre", lvl:2, adds:3,
+   hp:320, timeLimit:30, res:{"neutral":10}, dps:null}),
+T({n:2,  id:"t2", name:"Ashmoth Swarm", arch:"pyre", lvl:2, adds:3,
    flavor:"Individually harmless. There are not, at any point, individually.",
-   hp:4200, timeLimit:30, res:{ember:35, frost:-20}, dps:{ember:26, neutral:6}}),
-T({n:3,  id:"t3",  name:"The Slab", arch:"bulwark", lvl:3,
+   hp:600, timeLimit:30, res:{"ember":35,"frost":-20}, dps:{"ember":8.7,"neutral":2}}),
+T({n:3,  id:"t3", name:"The Slab", arch:"bulwark", lvl:3,
    flavor:"Nine tonnes of quarried basalt with an opinion.",
-   hp:9500, timeLimit:32, res:{neutral:25, stone:30, volt:-15}, dps:{stone:30, neutral:12}}),
-T({n:4,  id:"t4",  name:"Kiln-Warden Orlo", arch:"pyre", lvl:4,
+   hp:1180, timeLimit:32, res:{"neutral":25,"stone":30,"volt":-15}, dps:{"stone":24.5,"neutral":9.8}}),
+T({n:4,  id:"t4", name:"Kiln-Warden Orlo", arch:"pyre", lvl:4,
    flavor:"He has stood in the doorway of the same kiln for eleven years and is no longer entirely outside it.",
-   hp:14000, timeLimit:34, res:{ember:50, frost:-25, neutral:10}, dps:{ember:74, neutral:14}}),
-T({n:5,  id:"t5",  name:"Tallow Executioner", arch:"executioner", lvl:5,
+   hp:2080, timeLimit:34, res:{"ember":50,"frost":-25,"neutral":10}, dps:{"ember":25.7,"neutral":4.8}}),
+T({n:5,  id:"t5", name:"Tallow Executioner", arch:"executioner", lvl:5,
    flavor:"Slow. Announces itself. Kills you anyway.",
-   hp:19000, timeLimit:34, res:{neutral:20, stone:15},
-   dps:{neutral:22}, spike:{every:6, dmg:{neutral:420, stone:240}}}),
-T({n:6,  id:"t6",  name:"Sealed Reliquary", arch:"ward", lvl:6,
+   hp:2330, timeLimit:34, res:{"neutral":20,"stone":15}, dps:{"neutral":6},
+   spike:{"every":6,"dmg":{"neutral":115,"stone":65}}}),
+T({n:6,  id:"t6", name:"Sealed Reliquary", arch:"ward", lvl:6,
    flavor:"It reseals every eight seconds whether or not you were finished.",
-   hp:24000, timeLimit:36, res:{neutral:15, frost:20}, dps:{frost:56, neutral:20},
-   ward:{hp:5200, window:4.0, every:8, first:5, healOnFail:3500, failDmg:{frost:360}}}),
-T({n:7,  id:"t7",  name:"Marrow Leech", arch:"leech", lvl:7,
+   hp:4100, timeLimit:36, res:{"neutral":15,"frost":20}, dps:{"frost":9.9,"neutral":3.6},
+   ward:{"hp":340,"window":4,"every":8,"first":5,"healOnFail":492,"failDmg":{"frost":38}}}),
+T({n:7,  id:"t7", name:"Marrow Leech", arch:"leech", lvl:7,
    flavor:"It is not trying to kill you. It is trying to make you boring.",
-   hp:30000, timeLimit:38, res:{neutral:20, gale:25}, dps:{gale:62, neutral:26},
-   drain:9, regen:190}),
-T({n:8,  id:"t8",  name:"Glacier Gate", arch:"bulwark", lvl:8,
+   hp:7220, timeLimit:38, res:{"neutral":20,"gale":25}, dps:{"gale":35.8,"neutral":15.0},
+   regen:46, drain:4.4}),
+T({n:8,  id:"t8", name:"Glacier Gate", arch:"bulwark", lvl:8,
    flavor:"Two hundred metres of ice with a door in it. The door is the boss.",
-   hp:52000, timeLimit:40, res:{frost:60, neutral:30, ember:-25}, dps:{frost:94, neutral:34}}),
-T({n:9,  id:"t9",  name:"The Nine Bells", arch:"ward", lvl:9,
+   hp:9540, timeLimit:40, res:{"frost":60,"neutral":30,"ember":-25}, dps:{"frost":36.0,"neutral":13.0}}),
+T({n:9,  id:"t9", name:"The Nine Bells", arch:"ward", lvl:9,
    flavor:"Each bell is a ward. You are not expected to get all nine.",
-   hp:62000, timeLimit:40, res:{neutral:25, volt:20}, dps:{volt:96, neutral:40},
-   ward:{hp:13000, window:3.5, every:7, first:4, healOnFail:9000, failDmg:{volt:520}}}),
-T({n:10, id:"t10", name:"Cinder Choir", arch:"pyre", lvl:10, adds:4,
+   hp:11930, timeLimit:40, res:{"neutral":25,"volt":20}, dps:{"volt":7.6,"neutral":3.1},
+   ward:{"hp":1080,"window":3.5,"every":7,"first":4,"healOnFail":1432,"failDmg":{"volt":22}}}),
+T({n:10,  id:"t10", name:"Cinder Choir", arch:"pyre", lvl:10, adds:4,
    flavor:"Seven voices, one lung, and it is on fire.",
-   hp:78000, timeLimit:40, res:{ember:65, neutral:25, frost:-30}, dps:{ember:188, neutral:46},
-   spike:{every:9, dmg:{ember:640}}}),
-T({n:11, id:"t11", name:"Ossuary Warden", arch:"executioner", lvl:11,
+   hp:25580, timeLimit:40, res:{"ember":65,"neutral":25,"frost":-30}, dps:{"ember":23.0,"neutral":5.7},
+   spike:{"every":9,"dmg":{"ember":52}}}),
+T({n:11,  id:"t11", name:"Ossuary Warden", arch:"executioner", lvl:11,
    flavor:"It hits once every five seconds and it has never needed a second.",
-   hp:96000, timeLimit:42, res:{neutral:35, stone:35, gale:-20}, dps:{neutral:54, stone:38},
-   spike:{every:5, dmg:{neutral:1180, stone:760}}}),
-T({n:12, id:"t12", name:"The Debt Collector", arch:"leech", lvl:12,
+   hp:18580, timeLimit:42, res:{"neutral":35,"stone":35,"gale":-20}, dps:{"neutral":7.5,"stone":5.3},
+   spike:{"every":5,"dmg":{"neutral":163,"stone":66}}}),
+T({n:12,  id:"t12", name:"The Debt Collector", arch:"leech", lvl:12,
    flavor:"Every second you are not spending, it is.",
-   hp:132000, timeLimit:44, res:{neutral:30, frost:30, volt:30}, dps:{neutral:96, frost:84},
-   drain:22, regen:1150, thorns:3}),
-T({n:13, id:"t13", name:"Anvil of Noon", arch:"bulwark", lvl:13,
+   hp:24900, timeLimit:44, res:{"neutral":30,"frost":30,"volt":30}, dps:{"neutral":0.9,"frost":0.8}, thorns:3,
+   regen:217, drain:7.9}),
+T({n:13,  id:"t13", name:"Anvil of Noon", arch:"bulwark", lvl:13,
    flavor:"Resists everything a little and one thing completely. Find out which.",
-   hp:212000, timeLimit:46, res:{neutral:45, ember:70, stone:45, frost:35, gale:35, volt:35},
-   dps:{ember:214, neutral:96}, thorns:4}),
-T({n:14, id:"t14", name:"The Hollow Verdict", arch:"ward", lvl:14,
+   hp:23770, timeLimit:46, res:{"neutral":45,"ember":70,"stone":45,"frost":35,"gale":35,"volt":35}, dps:{"ember":1.5,"neutral":0.7}, thorns:4}),
+T({n:14,  id:"t14", name:"The Hollow Verdict", arch:"ward", lvl:14,
    flavor:"A ward every six seconds, and it takes your health when it closes.",
-   hp:268000, timeLimit:48, res:{neutral:40, gale:40, volt:40, frost:25}, dps:{gale:186, neutral:120},
-   ward:{hp:46000, window:3.0, every:6, first:4, healOnFail:34000, failDmg:{gale:1400}}}),
-T({n:15, id:"t15", name:"Null, Who Counts", arch:"executioner", lvl:15, adds:2,
+   hp:41210, timeLimit:48, res:{"neutral":40,"gale":40,"volt":40,"frost":25}, dps:{"gale":5.5,"neutral":3.5},
+   ward:{"hp":2130,"window":3,"every":6,"first":4,"healOnFail":4945,"failDmg":{"gale":41}}}),
+T({n:15,  id:"t15", name:"Null, Who Counts", arch:"executioner", lvl:15, adds:2,
    flavor:"It checks every defence you have, in order, and then adds them up.",
-   hp:390000, timeLimit:50, res:{neutral:45, ember:45, frost:45, gale:45, stone:45, volt:45},
-   dps:{ember:120, frost:120, gale:120, stone:120, volt:120, neutral:90},
-   spike:{every:7, dmg:{neutral:1500, ember:700, volt:700}}, drain:14, regen:1600, executeGate:true,
-   ward:{hp:52000, window:3.5, every:11, first:9, healOnFail:30000, failDmg:{neutral:1700}}})
+   hp:50150, timeLimit:50, res:{"neutral":45,"ember":45,"frost":45,"gale":45,"stone":45,"volt":45}, dps:{"ember":0.8,"frost":0.8,"gale":0.8,"stone":0.8,"volt":0.8,"neutral":0.7}, executeGate:true,
+   spike:{"every":7,"dmg":{"neutral":10,"ember":5,"volt":3}}, ward:{"hp":3420,"window":3.5,"every":11,"first":9,"healOnFail":6018,"failDmg":{"neutral":7}}, regen:205, drain:5})
 ];
 const TRIAL_BY_ID = {}; for(const t of TRIALS) TRIAL_BY_ID[t.id]=t;
 
@@ -2199,10 +2212,11 @@ function diffHeadHtml(d){
     return '<div class="dh"><div class="k">'+label+'</div><div class="v num '+c+'">'+(Math.abs(val)<0.005?"—":sign(val))+
            '</div><div class="s num">'+fmt(cur)+'</div></div>';
   };
-  return '<div class="diffhead">'+
+  return '<div class="diffhead d4">'+
     cell("dps","Δ DPS", d.head.dps, d.b.dps)+
     cell("ehp","Δ EHP", d.head.ehp, d.b.ehp)+
-    cell("burst","Δ Burst 4s", d.head.burst, d.b.burst)+
+    cell("sus","Δ Sustain", d.head.sustain, d.b.sustain)+
+    cell("burst","Δ Burst", d.head.burst, d.b.burst)+
   '</div>';
 }
 function diffRowsHtml(d, limit){
@@ -2623,7 +2637,9 @@ function openStat(which){
 }
 function openDpsAttribution(){
   if(HL.broken) return openSheet({head:'<div class="sh-title">DPS</div>',
-    body:'<div class="note">No damage can be computed: '+(!CTX.weapon?'you have no weapon equipped.':'one or more equipped items are inactive because their element requirements are unmet.')+'</div>',
+    body:'<div class="note">No damage can be computed: '+(CTX.equipped.some(i=>i.slot==="weapon")
+      ? 'your weapon is inactive because its element requirements are unmet. Everything it provides, including its base damage, is switched off.'
+      : 'you have no weapon equipped.')+'</div>',
     buttons:[{label:"Close",cls:"gho",action:()=>closeSheet(true)}]});
   const at = attributeBySource(S, HL.dps);
   const maxAbs = Math.max(...at.rows.map(r=>Math.abs(r.delta)), 1);
@@ -3218,9 +3234,11 @@ function runTrial(t){
     S.cleared[t.id] = true;
     if(S.level < t.lvl+1 && t.n < 15){ S.level = t.lvl+1; levelled = true; }
     rewards = rollDrops(S, t.lvl, 3);
-  } else if(!r.win && !S.salvaged[t.id]){
-    S.salvaged[t.id] = true;
-    rewards = rollDrops(S, Math.max(1,t.lvl-1), 1);
+  } else if(!r.win){
+    /* Losing is a readout, not a wall. Every failed attempt still hands
+       you an input, so a run can never dead-end with nothing left to try. */
+    S.salvaged[t.id] = (S.salvaged[t.id]||0) + 1;
+    rewards = rollDrops(S, Math.max(1, t.lvl - (S.salvaged[t.id]>3?0:1)), 1);
   }
   for(const it of rewards) S.inv.push(it);
   showTab("Trial");
