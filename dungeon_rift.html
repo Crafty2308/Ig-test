@@ -112,6 +112,21 @@ input{font-family:'Crimson Pro',Georgia,serif}
 
 #spiritbar .bar{height:calc(5px * var(--hud));background:rgba(255,255,255,.07);border-radius:2px;margin-top:3px;overflow:hidden}
 #spiritbar .bar i{display:block;height:100%;background:linear-gradient(90deg,#5b4d86,#9a86d4)}
+/* A trigger gem with no charge meter is a gem you cannot plan around, so
+   each armed one gets a row above the spirit bar. */
+#metabar{position:absolute;bottom:calc(102px * var(--hud) + 52px);
+  right:calc(12px + env(safe-area-inset-right));width:calc(142px * var(--hud));
+  font-size:calc(8px * var(--hud));color:var(--dim);letter-spacing:.1em;text-align:right;display:none}
+#metabar.on{display:block}
+#metabar .mg{margin-bottom:3px}
+#metabar .mg b{color:#b8a8dc;font-weight:400;font-family:'Cinzel',serif}
+#metabar .mb{height:calc(3.5px * var(--hud));background:rgba(255,255,255,.07);border-radius:2px;
+  margin-top:2px;overflow:hidden}
+#metabar .mb i{display:block;height:100%;background:linear-gradient(90deg,#6a4f9a,#c0a0e8)}
+#metabar .mg.ready .mb i{background:#f0dca8}
+#metabar .mg.ready b{color:#f0dca8}
+body.touch #metabar{left:calc(12px + env(safe-area-inset-left));right:auto;text-align:left;
+  bottom:calc(102px * var(--hud) + 78px)}
 #slots{position:absolute;bottom:calc(16px + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);
   display:flex;gap:8px}
 .sl{width:calc(54px * var(--hud));height:calc(54px * var(--hud));background:rgba(10,10,14,.66);
@@ -146,6 +161,13 @@ input{font-family:'Crimson Pro',Georgia,serif}
   position:relative;overflow:hidden}
 #bossbar .bar i{display:block;height:100%;background:linear-gradient(90deg,#7d2420,#c8483a);width:100%}
 #bossbar .ph{position:absolute;top:0;bottom:0;width:1px;background:rgba(0,0,0,.65)}
+/* the armour strip under the life bar: it empties as you break it, and turns
+   red across its whole width once the boss is Fully Broken */
+#bossbar .armour{height:4px;margin-top:3px;background:rgba(20,16,10,.8);
+  border:1px solid rgba(206,192,164,.2);border-radius:2px;overflow:hidden}
+#bossbar .armour i{display:block;height:100%;width:100%;background:#cec0a4;transition:width .12s linear}
+#bossbar .armour.broke{border-color:rgba(214,72,58,.6)}
+#bossbar .armour.broke i{background:#d6483a}
 #pointhint{position:absolute;top:calc(46px + env(safe-area-inset-top));left:50%;
   transform:translateX(-50%);font-family:'Cinzel',serif;font-size:calc(10px * var(--hud));
   letter-spacing:.16em;color:var(--gold);background:rgba(200,169,110,.1);
@@ -187,8 +209,24 @@ body.touch #slots{display:none}
 #tb1{right:74px;bottom:20px}
 #tb2{right:112px;bottom:84px}
 #tb3{right:52px;bottom:118px}
-#tb4{right:132px;bottom:2px}
+#tb4{right:144px;bottom:0}
 #tbswap{position:absolute;right:6px;bottom:78px;width:44px;height:44px;font-size:10px}
+/* the roll sits where the thumb already rests; sprint is a hold beside it */
+#tbroll{position:absolute;right:176px;bottom:62px;width:62px;height:62px;font-size:10px;
+  border-color:rgba(143,192,224,.45);color:#9fd8ee}
+#tbsprint{position:absolute;right:196px;bottom:132px;width:48px;height:48px;font-size:9px;
+  border-color:rgba(143,192,224,.28);color:#8fa8c8}
+#tbsprint.down{background:rgba(143,192,224,.22)}
+/* Stun. It fills from heavy hits only, and at full you are staggered — which
+   is what makes Unwavering Stance a keystone instead of a pure downside. */
+#stungauge{position:absolute;left:calc(14px + env(safe-area-inset-left));
+  bottom:calc(6px + env(safe-area-inset-bottom));width:92px;height:5px;border-radius:3px;
+  background:rgba(20,16,10,.75);border:1px solid rgba(232,216,160,.2);overflow:hidden;display:none}
+#stungauge.on{display:block}
+#stungauge i{display:block;height:100%;width:0;background:#e8d8a0}
+#stungauge.full{border-color:rgba(232,216,160,.8)}
+#stungauge.full i{background:#fff0c0}
+body.touch #stungauge{bottom:calc(4px + env(safe-area-inset-bottom));width:80px}
 #tmenu{position:absolute;top:calc(8px + env(safe-area-inset-top));left:calc(8px + env(safe-area-inset-left));
   display:none;gap:6px;pointer-events:auto}
 body.touch #tmenu{display:flex}
@@ -196,8 +234,7 @@ body.touch #tmenu{display:flex}
   border:1px solid rgba(200,169,110,.2);font-size:12px;color:var(--gold)}
 
 /* ---------- panels ---------- */
-.panel{position:absolute;inset:0;display:none;background:rgba(4,4,6,.93);z-index:30;
-  backdrop-filter:blur(2px);-webkit-backdrop-filter:blur(2px)}
+.panel{position:absolute;inset:0;display:none;background:rgba(4,4,6,.96);z-index:30}
 .panel.on{display:block}
 .ptitle{font-family:'Cinzel',serif;font-size:clamp(17px,3.4vw,25px);color:var(--gold);letter-spacing:.18em;
   text-transform:uppercase;text-align:center}
@@ -273,7 +310,7 @@ body.touch #tmenu{display:flex}
 .item{position:absolute;border-radius:3px;background:rgba(16,16,22,.9);border:1px solid rgba(255,255,255,.1);
   display:flex;align-items:center;justify-content:center;text-align:center;font-size:10px;line-height:1.1;
   padding:2px;cursor:grab;overflow:hidden;font-family:'Crimson Pro',serif}
-.item.drag{opacity:.45;cursor:grabbing}
+.item.dragging{opacity:.2;cursor:grabbing}
 .item.r0{border-color:rgba(207,202,189,.35);color:var(--r0)}
 .item.r1{border-color:rgba(106,143,200,.5);color:var(--r1)}
 .item.r2{border-color:rgba(212,192,96,.5);color:var(--r2)}
@@ -285,7 +322,30 @@ body.touch #tmenu{display:flex}
 .item.stack .ct{font-family:'Cinzel',serif;font-size:9px;color:#efe4c4}
 .item.armed{border-color:var(--gold);box-shadow:inset 0 0 0 1px rgba(200,169,110,.5)}
 .item.dim{opacity:.3}
-.item.dropping{border-color:#b4685f;opacity:.75}
+/* Drag feedback. The footprint box rides above the item elements: as cell
+   classes it was hidden behind the very items that blocked the drop, which
+   is exactly when the player needs to see it. */
+#fitbox{position:fixed;z-index:59;display:none;pointer-events:none;border-radius:3px;border:1px solid}
+#fitbox.on{display:block}
+#fitbox.ok{background:rgba(104,186,118,.22);border-color:rgba(132,214,150,.85);
+  box-shadow:inset 0 0 0 1px rgba(132,214,150,.35)}
+#fitbox.bad{background:rgba(198,72,60,.26);border-color:rgba(224,104,88,.9);
+  box-shadow:inset 0 0 0 1px rgba(224,104,88,.4)}
+#dragghost.fit{border-color:rgba(132,214,150,.9)}
+#dragghost.unfit{border-color:rgba(224,104,88,.95)}
+.eqslot.nope{border-color:rgba(198,72,60,.6);background:rgba(198,72,60,.12)}
+/* the dragged item rides on a ghost so it never jumps to the cursor */
+#dragghost{position:fixed;z-index:62;display:none;pointer-events:none;opacity:.94;
+  box-shadow:0 8px 22px rgba(0,0,0,.6)}
+#dragghost.on{display:flex}
+/* panels cover the whole screen, so the ground needs a real target */
+#dropzone{position:fixed;z-index:58;display:none;left:50%;transform:translateX(-50%);
+  bottom:calc(16px + env(safe-area-inset-bottom));padding:11px 22px;border-radius:5px;
+  border:1px dashed rgba(200,169,110,.45);background:rgba(6,6,9,.94);
+  font-family:'Cinzel',serif;font-size:11px;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--dim);pointer-events:none;white-space:nowrap}
+#dropzone.on{display:block}
+#dropzone.hot{border-style:solid;border-color:#b4685f;color:#e0b4a8;background:rgba(40,12,10,.95)}
 #tooltip{position:fixed;z-index:60;max-width:290px;background:rgba(6,6,9,.97);
   border:1px solid rgba(200,169,110,.28);border-radius:4px;padding:11px 13px;display:none;
   pointer-events:none;font-size:13.5px;line-height:1.45}
@@ -420,14 +480,17 @@ body.touch #spiritbar{left:50%;right:auto;transform:translateX(-50%);text-align:
     <div id="zoneinfo"><div class="zn" id="zone-nm">—</div><div class="zl" id="zone-lv">—</div></div>
     <div id="minimap-wrap"><canvas id="minimap" width="118" height="118"></canvas></div>
     <div id="bossbar"><div class="nm" id="boss-nm"></div><div class="bar"><i id="boss-fill"></i>
-      <div class="ph" style="left:33.3%"></div><div class="ph" style="left:66.6%"></div></div></div>
+      <div class="ph" style="left:33.3%"></div><div class="ph" style="left:66.6%"></div></div>
+      <div class="armour" id="boss-armour"><i id="boss-armour-fill"></i></div></div>
     <div class="orb" id="orb-life"><div class="fill" id="life-fill"></div><div class="es" id="es-fill"></div>
       <div class="txt" id="life-txt"></div></div>
+    <div id="stungauge"><i id="stun-fill"></i></div>
     <div class="orb" id="orb-mana"><div class="fill" id="mana-fill"></div><div class="txt" id="mana-txt"></div></div>
     <div class="flasks" id="flask-life"></div>
     <div class="flasks" id="flask-mana"></div>
     <div id="pail"></div>
     <div id="spiritbar"><span id="spirit-lb">SPIRIT</span><div class="bar"><i id="spirit-fill"></i></div></div>
+    <div id="metabar"></div>
     <div id="slots"></div>
     <div id="setind">SET <b id="set-nm">I</b></div>
     <div id="pointhint"></div>
@@ -450,6 +513,8 @@ body.touch #spiritbar{left:50%;right:auto;transform:translateX(-50%);text-align:
       <div class="tb" id="tb3" data-sk="3"><div class="sweep"></div><span>4</span><span class="lb"></span></div>
       <div class="tb" id="tb4" data-sk="4"><div class="sweep"></div><span>5</span><span class="lb"></span></div>
       <div class="tb" id="tbswap"><span>SET</span></div>
+      <div class="tb" id="tbroll"><span>ROLL</span></div>
+      <div class="tb" id="tbsprint"><span>RUN</span></div>
     </div>
   </div>
 
@@ -490,12 +555,12 @@ body.touch #spiritbar{left:50%;right:auto;transform:translateX(-50%);text-align:
    ========================================================================== */
 
 const SAVE_KEY = 'dungeonrift_save_v1';
-const SAVE_VERSION = 2;
+const SAVE_VERSION = 4;
 const TILE = 48;
 const GRID = 160;
 const MAX_SLOTS = 6;
 const RES_CAP = 75;
-const SKILL_KEYS = ['LMB','Q','E','R','SPACE'];
+const SKILL_KEYS = ['LMB','Q','E','R','T'];
 
 /* ---------------------------------------------------------------- classes */
 const CLASSES = {
@@ -541,118 +606,143 @@ const WEAPON_KINDS = {
   sceptre:{name:'Sceptre',hands:1,crit:6,aspd:1.3,dmg:[6,10],attr:'strint'}
 };
 
-/* --------------------------------------------------------------- attributes */
-const ATTR_TEXT = {
-  str:['Strength','+2 maximum life per point, and scales melee damage'],
-  dex:['Dexterity','+2 evasion rating per point, and scales attack speed and accuracy'],
-  int:['Intelligence','+2 maximum mana per point, and scales spell damage and energy shield']
-};
-
 /* -------------------------------------------------------------- active gems
    sockets: gem levels at which each of the 5 support sockets unlocks.
    Attacks deal a multiplier of weapon damage; spells deal their own base.
-   combo: 'enabler' primes an ailment, 'finisher' pays off a primed target. */
+   Combos are states, not damage bonuses: `applies` names what a skill puts
+   on a target, `consumes`/`shatter`/`detonates` name what it takes off, and
+   `flammable` marks ground that fire turns into a burning field. */
 const SOCK_LADDER = [1,4,8,13,18];
 const GEMS = {
   ground_slam:{name:'Ground Slam',type:'melee_arc',tags:['attack','melee','area'],dtype:'physical',
     attr:'str',req:16,lvlReq:1,mana:7,cd:0.75,dmgMult:1.4,arc:1.5,range:165,stunMult:2.2,
-    wep:['mace','axe','staff'],combo:'finisher',
-    mech:'Slams a 165-unit fan in front of you for 140% of weapon damage, with heavy stun buildup. As a combo finisher it deals 45% more damage to a stunned target, 60% more to a frozen one.',
+    wep:['mace','axe','staff'],breakMult:1.6,
+    applies:'Armour Break, Stun',
+    mech:'Slams a 165-unit fan in front of you for 140% of weapon damage, stripping armour 60% faster than an ordinary hit and building heavy stun across everything in the fan.',
     desc:'A shockwave hammered out of the floor in a wide fan. Staggered things come apart under it.'},
   heavy_strike:{name:'Heavy Strike',type:'melee_arc',tags:['attack','melee'],dtype:'physical',
     attr:'str',req:16,lvlReq:1,mana:6,cd:0.7,dmgMult:1.85,arc:0.75,range:120,stunMult:3.4,
-    wep:['mace','axe','sword'],combo:'enabler',ailment:'stun',
-    mech:'One narrow swing for 185% of weapon damage with the highest stun buildup of any skill. Primes targets for finishers.',
+    wep:['mace','axe','sword'],ailment:'stun',breakMult:2.4,
+    applies:'Armour Break, Stun',
+    mech:'One narrow swing for 185% of weapon damage. Strips armour two and a half times as fast as an ordinary physical hit, and builds stun harder than any other skill.',
     desc:'One committed swing at one target. It is mostly used to make things stop moving.'},
   cleave:{name:'Cleave',type:'melee_arc',tags:['attack','melee','area'],dtype:'physical',
     attr:'str',req:20,lvlReq:4,mana:8,cd:0.62,dmgMult:1.15,arc:2.5,range:140,stunMult:1.4,
-    wep:['axe','sword','mace'],
-    mech:'A wide 2.5-radian sweep for 115% of weapon damage. Built for crowds, not single targets.',
+    wep:['axe','sword','mace'],breakMult:1.3,
+    applies:'Armour Break',
+    mech:'A wide 2.5-radian sweep for 115% of weapon damage, stripping armour from everything it touches. Built for breaking a crowd open, not for single targets.',
     desc:'A flat sweep at hip height, meant for crowds rather than for anything important.'},
   leap_slam:{name:'Leap Slam',type:'dash',tags:['attack','melee','area','movement'],dtype:'physical',
     attr:'str',req:22,lvlReq:6,mana:14,cd:3.4,dmgMult:1.5,radius:120,range:330,stunMult:2.6,
-    wep:['mace','axe','sword','staff'],
-    mech:'Leaps up to 330 units and lands for 150% of weapon damage in a 120-unit burst. Travels over nothing: walls still stop you.',
+    wep:['mace','axe','sword','staff'],breakMult:2.0,
+    applies:'Armour Break, Stun (to the whole landing radius)',
+    mech:'Leaps up to 330 units and lands for 150% of weapon damage in a 120-unit burst, stripping armour twice as fast from everything inside it. Heavy Strike breaks one target; this breaks a pack, from across the room.',
     desc:'You leave the ground entirely and arrive badly, on purpose, on someone.'},
   sunder:{name:'Sunder',type:'nova',tags:['attack','melee','area'],dtype:'physical',
     attr:'str',req:30,lvlReq:12,mana:16,cd:2.1,dmgMult:1.25,count:9,radius:110,speed:420,range:420,stunMult:1.8,
-    wep:['mace','axe','staff'],
-    mech:'Sends 9 shockwaves outward in every direction, each dealing 125% of weapon damage.',
+    wep:['mace','axe','staff'],consumes:'broken',breakFlat:40,
+    applies:'Armour Break', consumesLabel:'Fully Broken',
+    mech:'Nine shockwaves outward, each 125% of weapon damage. Against a Fully Broken target it is a guaranteed critical strike \u2014 and consuming the break puts the armour back on, so you have to earn it again.',
     desc:'The ground splits away from you in every direction at once and does not close again.'},
   split_arrow:{name:'Split Arrow',type:'projectile',tags:['attack','projectile'],dtype:'physical',
     attr:'dex',req:16,lvlReq:1,mana:7,cd:0.5,dmgMult:0.78,count:3,speed:620,range:480,spread:0.34,
-    wep:['bow'],
-    mech:'Fires 3 arrows in a spread, each for 78% of weapon damage. Bow only.',
+    wep:['bow'],breakMult:1.5,
+    applies:'Armour Break (to every target the spread reaches)',
+    mech:'Fires 3 arrows in a spread, each for 78% of weapon damage and each stripping armour half again as fast. It is how a bow opens a scattered pack before a consumer lands.',
     desc:'Three arrows leave together and arrive apart. None of them is aimed at you.'},
   puncture:{name:'Puncture',type:'projectile',tags:['attack','projectile'],dtype:'physical',
     attr:'dex',req:18,lvlReq:3,mana:8,cd:0.75,dmgMult:1.2,count:1,speed:660,range:500,
-    wep:['bow','dagger','claw'],combo:'enabler',ailment:'bleed',bleedMult:2.4,
-    mech:'A single arrow for 120% of weapon damage that applies bleed buildup at 2.4x rate. Bleeding targets take double damage while moving.',
+    wep:['bow','dagger','claw'],ailment:'bleed',bleedMult:2.4,consumes:'broken',
+    applies:'Bleed', consumesLabel:'Fully Broken',
+    mech:'A single arrow for 120% of weapon damage, applying bleed at 2.4x rate; bleeding targets take double damage while moving. Against a Fully Broken target it is a guaranteed critical strike, and restores the armour.',
     desc:'A wound shaped so that walking reopens it. Runners bleed out faster than the patient.'},
   rain_of_arrows:{name:'Rain of Arrows',type:'aoe',tags:['attack','projectile','area'],dtype:'physical',
     attr:'dex',req:26,lvlReq:9,mana:17,cd:2.4,dmgMult:1.35,radius:155,range:430,delay:0.55,
-    wep:['bow'],
-    mech:'After a 0.55s delay, arrows land in a 155-unit circle at the aimed point for 135% of weapon damage.',
+    wep:['bow'],ailment:'bleed',bleedMult:1.4,breakFlat:18,
+    applies:'Bleed (across the whole area), Armour Break',
+    mech:'After a 0.55s delay, arrows land in a 155-unit circle for 135% of weapon damage, bleeding everything caught and stripping some armour off all of it. Puncture bleeds one target hard; this bleeds a whole area, and the delay means you place it where things are going to be.',
     desc:'Everything you have, straight up, and a short quiet while it comes back down.'},
   whirling_blades:{name:'Whirling Blades',type:'dash',tags:['attack','melee','movement'],dtype:'physical',
     attr:'dex',req:16,lvlReq:1,mana:11,cd:2.2,dmgMult:1.05,radius:52,range:310,
-    wep:['sword','dagger','claw'],
-    mech:'Travels 310 units through everything in the way, dealing 105% of weapon damage along the path.',
+    wep:['sword','dagger','claw'],consumes:'broken',
+    consumesLabel:'Fully Broken (on every target along the path)',
+    mech:'Travels 310 units through everything in the way for 105% of weapon damage. Every Fully Broken target on the path is consumed for a guaranteed critical strike \u2014 the only skill that cashes in a break on several targets in one movement.',
     desc:'You travel through a line of people rather than around them.'},
   lightning_strike:{name:'Lightning Strike',type:'projectile',tags:['attack','melee','projectile'],dtype:'lightning',
     attr:'dex',req:24,lvlReq:7,mana:9,cd:0.55,dmgMult:0.9,count:3,speed:560,range:330,spread:0.5,
-    wep:['sword','dagger','claw','axe'],combo:'enabler',ailment:'shock',
+    wep:['sword','dagger','claw','axe'],ailment:'shock',applies:'Shock',
     mech:'Strikes for 90% of weapon damage as lightning, then throws 3 shards onward. Builds shock.',
     desc:'The strike lands and then leaves the weapon in pieces of light, looking for a second target.'},
   fireball:{name:'Fireball',type:'projectile',tags:['spell','projectile','area','fire'],dtype:'fire',
     attr:'int',req:16,lvlReq:1,mana:9,cd:0.65,base:16,perLvl:5.4,count:1,speed:470,range:520,radius:70,
-    combo:'enabler',ailment:'ignite',
-    mech:'A slow projectile dealing its own fire damage in a 70-unit burst. Builds ignite.',
+    ailment:'ignite',detonates:1,
+    applies:'Ignite', consumesLabel:'Burning ground',
+    mech:'A slow projectile dealing its own fire damage in a 70-unit burst. Builds ignite, and lights any flammable ground it lands in.',
     desc:'It is not fast. It does not need to be, and it leaves the floor burning behind it.'},
   frost_bolt:{name:'Frost Bolt',type:'projectile',tags:['spell','projectile','cold'],dtype:'cold',
     attr:'int',req:16,lvlReq:1,mana:7,cd:0.5,base:12,perLvl:4.1,count:1,speed:380,range:560,pierce:1,
-    combo:'enabler',ailment:'freeze',
-    mech:'A slow shard that pierces one enemy and builds freeze heavily.',
+    ailment:'freeze',
+    applies:'Freeze',
+    mech:'A slow shard that pierces one enemy and builds freeze heavily. Freeze is what a shatter skill consumes.',
     desc:'A slow shard that takes the heat out of everything it passes through.'},
   ice_nova:{name:'Ice Nova',type:'nova',tags:['spell','area','cold'],dtype:'cold',
     attr:'int',req:24,lvlReq:8,mana:19,cd:1.9,base:30,perLvl:9.5,count:12,speed:430,range:340,radius:130,
-    combo:'finisher',
-    mech:'A ring of 12 cold projectiles. As a combo finisher it deals 60% more damage to frozen enemies and shatters them.',
+    shatter:1,
+    consumesLabel:'Frozen',
+    mech:'A ring of 12 cold projectiles. Hitting a frozen target SHATTERS it: the freeze is consumed and the body comes apart, dealing area damage to everything within 150 units and building freeze on all of them.',
     desc:'A ring of cold thrown outward at ankle height. Frozen things do not survive the pressure change.'},
   spark:{name:'Spark',type:'projectile',tags:['spell','projectile','lightning'],dtype:'lightning',
     attr:'int',req:18,lvlReq:2,mana:8,cd:0.45,base:9,perLvl:3.4,count:4,speed:520,range:400,spread:1.5,erratic:1,
-    combo:'enabler',ailment:'shock',
-    mech:'Fires 4 erratic bolts that wander the room. Builds shock on every hit.',
+    ailment:'shock',
+    applies:'Shock',
+    mech:'Fires 4 erratic bolts that wander the room, building shock on every hit. Shock is what a chain skill reaches for.',
     desc:'Loose current that wanders the room until it finds something conductive.'},
   arc:{name:'Arc',type:'chain',tags:['spell','lightning','chain'],dtype:'lightning',
     attr:'int',req:22,lvlReq:5,mana:13,cd:0.9,base:22,perLvl:7.2,chains:3,range:330,
-    combo:'enabler',ailment:'shock',
-    mech:'Jumps to the 3 nearest enemies in turn, losing 15% damage per jump. Builds shock.',
+    ailment:'shock',
+    applies:'Shock', consumesLabel:'Shock',
+    mech:'Jumps to the 3 nearest enemies in turn, losing 15% damage per jump. It reaches half again as far to find a SHOCKED body and arrives 45% harder when it does, and every shocked body it passes through buys it another jump.',
     desc:'It picks the shortest path between bodies, and keeps picking until it runs out.'},
   flame_wall:{name:'Flame Wall',type:'dot_cloud',tags:['spell','area','fire','duration'],dtype:'fire',
     attr:'int',req:20,lvlReq:4,mana:16,cd:4.5,base:11,perLvl:3.6,radius:82,duration:4.5,range:300,
-    combo:'enabler',ailment:'ignite',
-    mech:'Leaves a burning patch for 4.5s that ticks fire damage and builds ignite on anything standing in it.',
+    ailment:'ignite',
+    applies:'Ignite, burning ground',
+    mech:'Leaves a burning patch for 4.5s that ticks fire damage and builds ignite on anything standing in it. It also sets alight any flammable ground it overlaps.',
     desc:'A standing sheet of fire. Things walk into it more often than you would expect.'},
   detonate:{name:'Detonate',type:'aoe',tags:['spell','area','fire'],dtype:'fire',
     attr:'int',req:28,lvlReq:10,mana:22,cd:3.2,base:26,perLvl:8.6,radius:150,range:360,
-    combo:'finisher',
-    mech:'Bursts a 150-unit area. As a combo finisher against an ignited target it consumes the ignite and deals its remaining damage to everything nearby.',
+    detonates:1,
+    consumesLabel:'Ignite, burning ground',
+    mech:'Bursts a 150-unit area. Consumes an ignite on anything it hits, dealing the burn\u2019s whole remaining damage to everything nearby, and sets alight any flammable ground in range.',
     desc:'Whatever is already burning is asked to give all of it back at once.'},
   holy_flame:{name:'Holy Flame',type:'melee_arc',tags:['attack','melee','area','fire'],dtype:'fire',
     attr:'strint',req:18,lvlReq:1,mana:8,cd:0.7,dmgMult:1.1,arc:1.3,range:145,addBase:9,addPerLvl:3.1,
-    wep:['sceptre','staff','mace','sword'],combo:'enabler',ailment:'ignite',
+    wep:['sceptre','staff','mace','sword'],ailment:'ignite',applies:'Ignite',
     mech:'A 145-unit arc for 110% of weapon damage plus its own fire damage. Builds ignite.',
     desc:'The swing is ordinary. What follows the swing is not, and it clings.'},
+  oil_slick:{name:'Oil Slick',type:'dot_cloud',tags:['spell','area','duration'],dtype:'physical',
+    attr:'dex',req:18,lvlReq:3,mana:10,cd:5.0,base:2,perLvl:0.5,radius:96,duration:9,range:330,
+    flammable:1,burnMult:14,burnTime:9,
+    applies:'Flammable ground',
+    mech:'Throws a slick of oil that lasts 9s and barely hurts anything by itself. Put fire into it \u2014 a fire hit, an ignite, a Flame Wall \u2014 and it becomes a burning field for 9s at fourteen times the damage. It is half of a combo, not a skill.',
+    desc:'A flask of lamp oil, thrown low. On its own it is a nuisance. It is not meant to be on its own.'},
+  caustic_cloud:{name:'Caustic Cloud',type:'dot_cloud',tags:['spell','area','chaos','duration'],dtype:'chaos',
+    attr:'dexint',req:22,lvlReq:6,mana:15,cd:5.5,base:8,perLvl:2.6,radius:104,duration:7,range:320,
+    flammable:1,burnMult:5,burnTime:8,ailment:'poison',
+    applies:'Poison, flammable ground',
+    mech:'A cloud of caustic vapour for 7s, poisoning anything inside it. The vapour is flammable: set it alight and it burns for 8s at five times the damage as fire instead of chaos.',
+    desc:'It sits low and does not drift. Whoever mixed it was not thinking about what happens near a torch.'},
   viper_strike:{name:'Viper Strike',type:'melee_arc',tags:['attack','melee','chaos'],dtype:'chaos',
     attr:'dexint',req:17,lvlReq:1,mana:7,cd:0.6,dmgMult:1.15,arc:0.9,range:125,
-    wep:['dagger','claw','sword'],combo:'enabler',ailment:'poison',poisonMult:2.6,
-    mech:'A short arc for 115% of weapon damage as chaos, applying poison buildup at 2.6x rate. Poison stacks.',
+    wep:['dagger','claw','sword'],ailment:'poison',poisonMult:2.6,
+    applies:'Poison',
+    mech:'A short arc for 115% of weapon damage as chaos, applying poison at 2.6x rate. Poison stacks feed each other: every stack already on a target makes the next 18% stronger, up to eight.',
     desc:'A shallow cut, twice, and then a long wait while it does the rest.'},
   lightning_totem:{name:'Lightning Totem',type:'totem',tags:['spell','totem','lightning','duration'],dtype:'lightning',
     attr:'int',req:26,lvlReq:9,mana:24,cd:6,base:14,perLvl:4.6,duration:9,range:340,interval:0.7,
     spirit:15,
-    mech:'Plants a totem for 9s that fires at the nearest enemy every 0.7s. Reserves 15 spirit while it stands.',
+    applies:'Shock (continuously, while it stands)',
+    mech:'Plants a totem for 9s that fires lightning at the nearest enemy every 0.7s, shocking as it goes. Reserves 15 spirit while it stands. It is the only skill that keeps applying a state while you are busy doing something else, which is what makes it the partner for a chain skill.',
     desc:'It stands where you put it and does the tedious part of the fight for you.'},
   vitality:{name:'Vitality',type:'aura',tags:['spell','aura','persistent'],dtype:'physical',
     attr:'str',req:20,lvlReq:4,mana:0,spirit:20,grants:{lifeRegen:6},
@@ -680,11 +770,51 @@ const GEMS = {
     desc:'A held breath, kept in the shape of a shell.'},
   cast_on_crit:{name:'Cast on Critical',type:'meta',tags:['meta','persistent'],dtype:'physical',
     attr:'dexint',req:24,lvlReq:8,mana:0,spirit:25,trigger:'crit',energyMax:100,energyPer:34,
-    mech:'Persistent. Reserves 25 spirit. Builds 34 energy per critical strike and casts its linked skill for free at 100.',
+    applies:'Triggered cast',
+    mech:'Persistent. Reserves 25 spirit. Builds 34 charge per critical strike and casts its socketed skill for free at 100. Supports in this gem apply to the skill it casts.',
     desc:'A held spell that spends itself the moment your weapon finds a seam.'},
+  cast_on_kill:{name:'Cast on Kill',type:'meta',tags:['meta','persistent'],dtype:'physical',
+    attr:'str',req:22,lvlReq:7,mana:0,spirit:20,trigger:'kill',energyMax:100,energyPer:26,
+    applies:'Triggered cast',
+    mech:'Persistent. Reserves 20 spirit. Builds 26 charge per kill and casts its socketed skill for free at 100. Four bodies buys one cast, so it pays off in a crowd and does nothing against one target.',
+    desc:'Something has to die first. After that it is only arithmetic.'},
+  cast_when_hit:{name:'Cast when Hit',type:'meta',tags:['meta','persistent'],dtype:'physical',
+    attr:'strint',req:24,lvlReq:8,mana:0,spirit:30,trigger:'hit',energyMax:100,energyPer:0,
+    applies:'Triggered cast',
+    mech:'Persistent. Reserves 30 spirit. Charges off how hard you are hit rather than how often: a hit for a fifth of your life fills it half way. A defensive engine \u2014 it rewards standing in the wrong place.',
+    desc:'It is charged by being wrong about where to stand.'},
+  cast_on_break:{name:'Cast on Armour Break',type:'meta',tags:['meta','persistent'],dtype:'physical',
+    attr:'str',req:26,lvlReq:9,mana:0,spirit:25,trigger:'break',energyMax:100,energyPer:50,
+    applies:'Triggered cast', consumesLabel:'(charges on Fully Broken)',
+    mech:'Persistent. Reserves 25 spirit. Builds 50 charge each time you fully break a target\u2019s armour, so two breaks is one cast. Pairs with Heavy Strike and Cleave.',
+    desc:'The sound of plate giving way, used as a trigger.'},
+  cast_on_interval:{name:'Cast on Interval',type:'meta',tags:['meta','persistent'],dtype:'physical',
+    attr:'int',req:20,lvlReq:6,mana:0,spirit:35,trigger:'interval',energyMax:100,energyPer:31,
+    applies:'Triggered cast',
+    mech:'Persistent. Reserves 35 spirit \u2014 the most of any trigger, because it asks nothing of you. Builds 31 charge a second and casts its socketed skill for free at 100, about every 3.2 seconds, whatever else you are doing.',
+    desc:'It keeps its own time and does not consult you.'},
+  doppelganger:{name:'Doppelganger',type:'meta',tags:['meta','persistent'],dtype:'physical',
+    attr:'dexint',req:26,lvlReq:10,mana:0,spirit:30,trigger:'skilluse',energyMax:100,energyPer:22,
+    transform:'clone',
+    applies:'Triggered cast from a duplicate',
+    mech:'Persistent. Reserves 30 spirit. Builds 22 charge every time you use a skill. At 100 it leaves a duplicate of you standing where you were and the duplicate casts the socketed skill from there \u2014 so the skill comes from behind the target while you are in front of it.',
+    desc:'It stands where you were a moment ago and does what you were about to.'},
+  twinned_echo:{name:'Twinned Echo',type:'meta',tags:['meta','persistent'],dtype:'physical',
+    attr:'dex',req:26,lvlReq:10,mana:0,spirit:30,trigger:'crit',energyMax:100,energyPer:28,
+    transform:'twin',
+    applies:'Triggered cast, twice',
+    mech:'Persistent. Reserves 30 spirit. Builds 28 charge per critical strike. At 100 it casts the socketed skill TWICE, from two points flanking the target, each at 70% damage \u2014 more total damage than one cast, and from two angles, which matters for anything that fires in a line.',
+    desc:'Two of the same answer, arriving from either side.'},
+  prismatic_seal:{name:'Prismatic Seal',type:'meta',tags:['meta','persistent'],dtype:'physical',
+    attr:'int',req:24,lvlReq:9,mana:0,spirit:25,trigger:'shock',energyMax:100,energyPer:34,
+    transform:'convert',
+    applies:'Triggered cast, damage type converted',
+    mech:'Persistent. Reserves 25 spirit. Builds 34 charge each time you shock something. At 100 it casts the socketed skill with its damage type converted \u2014 rotating fire, then cold, then lightning \u2014 which lets one skill answer three resistances.',
+    desc:'The same spell, refracted. It never comes out the colour it went in.'},
   cast_on_freeze:{name:'Cast on Freeze',type:'meta',tags:['meta','persistent'],dtype:'physical',
     attr:'int',req:24,lvlReq:8,mana:0,spirit:25,trigger:'freeze',energyMax:100,energyPer:50,
-    mech:'Persistent. Reserves 25 spirit. Builds 50 energy each time you freeze something and casts its linked skill for free at 100.',
+    applies:'Triggered cast',
+    mech:'Persistent. Reserves 25 spirit. Builds 50 charge each time you freeze something, so two freezes is one cast. Supports in this gem apply to the skill it casts.',
     desc:'It waits for something to go still, and answers on your behalf.'}
 };
 const GEM_KEYS = Object.keys(GEMS);
@@ -703,6 +833,9 @@ const SUPPORTS = {
     desc:'32% increased area of effect, 8% less damage.'},
   multiple_proj:{name:'Multiple Projectiles',allow:'projectile',manaMult:1.3,mods:{projAdd:2,dmgPct:-22},
     desc:'Fires 2 additional projectiles, 22% less damage each.'},
+  armour_explosion:{name:'Armour Explosion',allow:'attack',manaMult:1.25,
+    mods:{},flags:{breakBoom:1},
+    desc:'Fully breaking a target\u2019s armour detonates it for fire damage in a 150-unit radius, igniting everything caught.'},
   life_leech:{name:'Life Leech',allow:'any',manaMult:1.3,mods:{leechPct:4},
     desc:'Leeches 4% of damage dealt as life.'},
   inc_crit:{name:'Increased Critical Strikes',allow:'any',manaMult:1.2,mods:{critChance:80},
@@ -713,6 +846,21 @@ const SUPPORTS = {
     desc:'Projectiles chain 2 additional times, 25% less damage.'},
   pierce_sup:{name:'Pierce',allow:'projectile',manaMult:1.15,mods:{pierceAdd:3},
     desc:'Projectiles pierce 3 additional enemies.'},
+  /* These four exist to make the one-use-per-build rule bite. Each is the
+     best support for two or three different skills at once, so socketing it
+     is a decision about which skill gets to be good. */
+  deadly_ailments:{name:'Deadly Ailments',allow:'any',manaMult:1.3,
+    mods:{dotPct:55,dmgPct:-28},
+    desc:'55% increased damage over time, 28% less hit damage. Every bleed, poison and ignite skill in the build wants this, and only one of them can have it.'},
+  hypothermia:{name:'Hypothermia',allow:'any',manaMult:1.25,
+    mods:{coldPct:38,freezeBuild:45},
+    desc:'38% increased cold damage and 45% increased freeze buildup. The freezer and the shatterer both want it. Pick one.'},
+  unbound_ailments:{name:'Unbound Ailments',allow:'any',manaMult:1.25,
+    mods:{stunBuild:50,bleedBuild:40,poisonBuild:40,dmgPct:-14},
+    desc:'50% increased stun buildup, 40% increased bleed and poison buildup, 14% less damage. Every enabler you own is competing for this one socket.'},
+  ruthless:{name:'Ruthless',allow:'attack',manaMult:1.35,
+    mods:{physPct:34,critDmg:26,aspd:-16},
+    desc:'34% increased physical damage and +26% critical damage, 16% less attack speed. It is the best support for a breaker and the best for a consumer, and it can only sit in one of them.'},
   ele_focus:{name:'Elemental Focus',allow:'any',manaMult:1.3,mods:{elePct:34,noAilment:1},
     desc:'34% more elemental damage, but the skill can no longer build ailments.'},
   brutality:{name:'Brutality',allow:'attack',manaMult:1.3,mods:{physPct:40,noEle:1},
@@ -766,6 +914,10 @@ function pctText(mult,noun){
   const pct=Math.round(Math.abs(1-mult)*100);
   return pct+'% '+(mult<1?'less':'more')+(noun?' '+noun:'');
 }
+/* ------------------------------------------------------------------ keystones
+   Twenty-four, each one build-defining and each one carrying a real cost.
+   The id is what the engine reads: every keystone below is wired somewhere in
+   recalc(), the damage path, or the ailment code. */
 const KEYSTONES = {
   resolute:{name:'Resolute Technique',
     text:'Your hits can never be evaded. You can never deal a critical strike.'},
@@ -782,321 +934,710 @@ const KEYSTONES = {
   unwavering:{name:'Unwavering Stance',
     text:'You cannot be stunned, and cold builds on you half as fast. Your evasion rating is always zero.'},
   crimson_dance:{name:'Crimson Dance',
-    text:'Your bleeds stack up to four times, but each stack deals 45% less damage.'}
+    text:'Your bleeds stack up to four times, but each stack deals 45% less damage.'},
+  glass_cannon:{name:'Glass Cannon',
+    text:'55% more damage. 45% less maximum life.'},
+  chaos_inoc:{name:'Chaos Inoculation',
+    text:'Your maximum life becomes 1. You are immune to chaos damage.'},
+  eldritch:{name:'Eldritch Battery',
+    text:'Your energy shield is added to your mana. Skills cost 25% less. You have no energy shield.'},
+  acrobatics:{name:'Acrobatics',
+    text:'45% more evasion rating. 50% less armour and energy shield.'},
+  point_blank:{name:'Point Blank',
+    text:'Projectiles deal 45% more damage within 200 units and 35% less beyond 500.'},
+  vaal_pact:{name:'Vaal Pact',
+    text:'60% more life leeched. You cannot regenerate life.'},
+  mind_matter:{name:'Mind over Matter',
+    text:'30% of damage is taken from mana before life. Half mana regeneration.'},
+  perfect_agony:{name:'Perfect Agony',
+    text:'Critical strikes apply 60% more ailment buildup and deal 35% less hit damage.'},
+  conduit:{name:'Conduit',
+    text:'Shock you apply is 60% stronger and chains reach one further target. You cannot ignite.'},
+  frostbound:{name:'Frostbound',
+    text:'Freeze builds 70% faster. You can no longer stun.'},
+  berserk:{name:'Berserker’s Fury',
+    text:'30% more attack speed and 30% more damage. You take 30% more damage.'},
+  iron_grip:{name:'Iron Grip',
+    text:'Strength raises projectile damage as it does melee. You cannot use an offhand.'},
+  runic_skin:{name:'Runic Skin',
+    text:'Your armour applies in full against elemental hits. 35% less armour.'},
+  wicked_ward:{name:'Wicked Ward',
+    text:'Energy shield recharge is never interrupted, but begins 60% slower.'},
+  ancestral:{name:'Ancestral Bond',
+    text:'Totems deal 80% more damage. Your own hits deal 35% less.'},
+  shatterborn:{name:'Shatterborn',
+    text:'Shattering a frozen target costs no cooldown and deals 50% more area damage. You cannot freeze bosses.'}
 };
 
-/* -------------------------------------------------------------- passive tree
-   Authored as branches. Each branch walks outward-to-inward (or along the
-   rim) from a class start or another node; the builder below turns this into
-   a linked graph with polar positions. m = minor, n = notable, k = keystone. */
-const TREE_STARTS = {str:270, strdex:330, dex:30, dexint:90, int:150, strint:210};
+/* ---------------------------------------------------------------- passive tree
+   A dense web of 600 allocatable nodes plus six class starts, authored as an
+   explicit graph and generated offline: the coordinates below are final, so
+   the game does no layout and no relaxation at boot. The old version walked
+   polar branches outward from each start and then relaxed 200 nodes over 90
+   O(n^2) passes, which both stalled the boot and left a tree with no routing
+   decision in it — you followed your spoke.
+
+   Shape: six class starts on the rim; four bands of clusters per class going
+   inward; six contested boundary regions that each reach into the two class
+   regions either side of them, so a Marauder can route into dexterity ground
+   if they are willing to spend the points; a twelve-cluster inner ring that is
+   expensive to reach from anywhere; and a six-cluster core behind gates.
+   Bands are joined tangentially as well as radially, so there are 255
+   independent loops — more than one way to reach almost anything.
+
+   A cluster is a ring of minors with its notable on the far side: you pay for
+   the cluster to get the notable. Travel nodes sit on the long band-to-band
+   roads and give nothing at all, so crossing the tree costs points you can
+   feel. No keystone touches a class start; the nearest is nine nodes out and
+   the median is seventeen.
+
+   Row = [x, y, kind, name, stats, keystone?]
+   kind: 0 minor, 1 notable, 2 travel, 3 keystone, 4 class start.
+   stats of 0 means none. */
+const TREE_NODES = [
+[0,-660,4,'Strength Start',0],
+[572,-330,4,'Strength / Dexterity Start',0],
+[572,330,4,'Dexterity Start',0],
+[0,660,4,'Dexterity / Intelligence Start',0],
+[-572,330,4,'Intelligence Start',0],
+[-572,-330,4,'Strength / Intelligence Start',0],
+[-177,-575,0,'Close Quarters',{meleePct:6}],
+[-106,-582,0,'Vitality',{life:8}],
+[-138,-524,0,'Concussion',{stunBuild:10}],
+[-118,-490,1,'Bloodletter',{life:22}],
+[-14,-547,0,'Butchery',{physPct:6}],
+[-32,-601,0,'Brawn',{str:4}],
+[39,-589,0,'Heavy Swing',{stunBuild:13}],
+[76,-603,1,'Stonebreaker',{str:14}],
+[132,-599,0,'Constitution',{life:9}],
+[178,-543,0,'Knitting',{lifeRegen:2}],
+[111,-535,0,'Thick Hide',{life:6}],
+[79,-510,1,'Ironwood',{life:22}],
+[-205,-449,0,'Sinew',{str:6}],
+[-149,-466,0,'Ringing Blow',{stunBuild:8}],
+[-148,-426,0,'Blood Vessels',{life:7}],
+[-121,-364,1,'Oxhide',{meleePct:13}],
+[-71,-428,0,'Bludgeon',{meleePct:5}],
+[-79,-499,0,'Strong Arm',{meleePct:6}],
+[-33,-475,0,'Hammerfall',{meleePct:6}],
+[45,-481,1,'Brutal-Hand',{stunBuild:26}],
+[7,-468,0,'Heart of Oak',{life:6}],
+[41,-521,0,'Close Quarters',{meleePct:8}],
+[103,-478,0,'Mending Flesh',{lifeRegen:2}],
+[82,-435,0,'Slow Recovery',{lifeRegen:2}],
+[42,-438,0,'Sanguine',{life:7}],
+[13,-411,1,'Titanbone',{armour:40,physPct:13}],
+[140,-462,0,'Bludgeon',{meleePct:6}],
+[207,-479,0,'Skullcracker',{stunBuild:8}],
+[160,-418,0,'Plating',{armour:16}],
+[149,-380,1,'Warcry',{str:11}],
+[-201,-366,0,'Thewed Arm',{str:4}],
+[-84,-347,0,'Fortitude',{life:7}],
+[-147,-314,0,'Scar Tissue',{lifeRegen:2}],
+[-159,-250,1,'Hearthguard',{armour:37}],
+[-79,-387,0,'Hardened',{armour:12}],
+[-30,-380,0,'Concussion',{stunBuild:13}],
+[-42,-342,0,'Strong Arm',{meleePct:8}],
+[-67,-311,1,'Bastion',{meleePct:16}],
+[46,-356,0,'Heavy Swing',{stunBuild:11}],
+[9,-371,0,'Knitting',{lifeRegen:2}],
+[70,-388,0,'Heavy Hands',{str:4}],
+[121,-427,1,'Redoubt',{armour:40}],
+[125,-348,0,'Brutality',{physPct:5}],
+[188,-389,0,'Mending Flesh',{lifeRegen:2}],
+[159,-302,0,'Scale',{armour:17}],
+[151,-263,1,'Anvilheart',{life:18}],
+[-130,-278,0,'Hammerfall',{meleePct:8}],
+[-107,-310,0,'Ringing Blow',{stunBuild:9}],
+[-53,-274,0,'Close Quarters',{meleePct:6}],
+[-83,-221,0,'Heft',{physPct:8}],
+[-88,-155,0,'Vitality',{life:8}],
+[-162,-173,1,'Crushblow',{armour:35,physPct:17}],
+[24,-250,0,'Cleaving',{physPct:5}],
+[-43,-221,0,'Bludgeon',{meleePct:8}],
+[-27,-304,0,'Ox Blood',{str:6}],
+[40,-317,0,'Brawn',{str:7}],
+[79,-308,1,'Wallbreaker',{physPct:15}],
+[99,-274,0,'Skullcracker',{stunBuild:10}],
+[92,-209,0,'Strong Arm',{meleePct:6}],
+[52,-279,0,'Bulwark',{armour:12}],
+[10,-289,1,'Granitegrip',{physPct:15}],
+[424,-439,0,'Iron Skin',{armour:8}],
+[443,-371,0,'Ragged Wound',{bleedBuild:12}],
+[385,-389,0,'Steady Aim',{accuracy:27}],
+[345,-390,1,'Boneshaker',{aspd:10}],
+[454,-317,0,'Lithe',{evasion:17}],
+[502,-333,0,'Riveted',{armour:11}],
+[543,-297,0,'Slippery',{evasion:17}],
+[527,-248,0,'Constitution',{life:5}],
+[487,-245,0,'Light Step',{evasion:17}],
+[420,-217,1,'Dreadnought',{bleedBuild:27,evasion:35}],
+[536,-118,0,'Thick Hide',{life:9}],
+[539,-197,0,'Fast Hands',{aspd:5}],
+[590,-151,0,'Blood Vessels',{life:5}],
+[629,-140,1,'Swiftblade',{bleedBuild:30}],
+[274,-359,0,'Plating',{armour:9}],
+[267,-399,0,'Practised Eye',{accuracy:32}],
+[316,-418,0,'Wristwork',{aspd:4}],
+[361,-353,0,'Flurry',{aspd:3}],
+[296,-326,0,'Heart of Oak',{life:5}],
+[333,-301,1,'Duelling',{evasion:39,bleedBuild:26}],
+[413,-304,0,'Hardened',{armour:11}],
+[394,-248,0,'Loose Grip',{aspd:5}],
+[355,-267,0,'Shifting Guard',{evasion:11}],
+[371,-315,0,'Fast Hands',{aspd:4}],
+[320,-358,1,'Form',{allAttr:7}],
+[474,-168,0,'Wristwork',{aspd:5}],
+[422,-136,0,'Unseen',{evasion:10}],
+[384,-200,0,'Flurry',{aspd:4}],
+[460,-215,0,'Sanguine',{life:6}],
+[468,-280,1,'Feint',{aspd:10}],
+[477,-39,0,'Fortitude',{life:5}],
+[446,-89,0,'Balance',{allAttr:3}],
+[491,-105,0,'Open Cut',{bleedBuild:13}],
+[507,-145,1,'Riposte',{allAttr:7}],
+[189,-275,0,'Laceration',{bleedBuild:8}],
+[205,-353,0,'Scale',{armour:14}],
+[256,-260,0,'Roundness',{allAttr:4}],
+[284,-230,1,'Whirlwind',{allAttr:7}],
+[320,-248,0,'Even Hand',{allAttr:4}],
+[319,-208,0,'Hooked Blade',{bleedBuild:10}],
+[285,-187,0,'Wholeness',{allAttr:2}],
+[246,-219,0,'Range Finder',{accuracy:36}],
+[218,-248,1,'Lightfoot',{armour:37}],
+[367,-104,0,'Vitality',{life:6}],
+[307,-111,0,'Loose Grip',{aspd:3}],
+[312,-151,0,'Bulwark',{armour:12}],
+[343,-176,0,'Fast Hands',{aspd:4}],
+[376,-152,0,'Wristwork',{aspd:5}],
+[416,-176,1,'Quickened',{aspd:10,life:17}],
+[331,-11,0,'Iron Skin',{armour:9}],
+[334,-81,0,'Balance',{allAttr:3}],
+[387,-65,0,'Ragged Wound',{bleedBuild:14}],
+[409,-18,0,'Roundness',{allAttr:3}],
+[444,3,1,'Bladedancer',{allAttr:6}],
+[105,-171,0,'Flurry',{aspd:5}],
+[180,-236,0,'Loose Grip',{aspd:4}],
+[206,-176,0,'Riveted',{armour:12}],
+[231,-140,1,'Huntsmark',{bleedBuild:26}],
+[246,-179,0,'Fleet',{evasion:16}],
+[267,-109,0,'Sight Line',{accuracy:31}],
+[210,-104,0,'Even Hand',{allAttr:4}],
+[170,-87,1,'Farshot',{allAttr:8}],
+[241,-78,0,'Steady Aim',{accuracy:37}],
+[312,-48,0,'Plating',{armour:12}],
+[227,11,0,'Wholeness',{allAttr:3}],
+[187,6,1,'Longbowman',{allAttr:6}],
+[592,145,0,'Keen Edge',{critChance:11}],
+[545,199,0,'Windage',{projSpeed:11}],
+[522,133,0,'Nimble',{dex:4}],
+[499,100,1,'Eagle-Eye',{dex:11}],
+[463,285,0,'Lithe',{evasion:13}],
+[502,242,0,'Eye for Weakness',{critChance:12}],
+[543,277,0,'Precision',{critChance:10}],
+[522,327,0,'Taut String',{projSpeed:11}],
+[469,324,0,'Swift Arrow',{projSpeed:9}],
+[441,353,1,'Hawkwatch',{aspd:11,evasion:44}],
+[397,437,0,'Slippery',{evasion:16}],
+[391,368,0,'Fast Hands',{aspd:5}],
+[455,395,0,'Fletching',{projPct:6}],
+[494,392,1,'Trueflight',{critChance:37}],
+[503,50,0,'Fleet Foot',{moveSpeed:2}],
+[463,118,0,'Draw Weight',{projSpeed:9}],
+[441,75,0,'Windage',{projSpeed:7}],
+[401,72,1,'Windrunner',{projPct:19}],
+[474,186,0,'Long Stride',{moveSpeed:3}],
+[414,230,0,'Unburdened',{moveSpeed:3}],
+[425,150,0,'Quick Fingers',{dex:7}],
+[413,110,1,'Arrowstorm',{evasion:40}],
+[416,286,0,'Thin Blade',{critChance:13}],
+[343,307,0,'Loose Joints',{dex:5}],
+[370,270,0,'Cat Step',{dex:6}],
+[308,236,1,'Silksteel',{critChance:38}],
+[311,401,0,'Fleet Foot',{moveSpeed:2}],
+[279,376,0,'Wristwork',{aspd:6}],
+[331,347,0,'Marksman',{projPct:6}],
+[376,331,1,'Shadowstep',{critChance:33}],
+[346,27,0,'Long Stride',{moveSpeed:3}],
+[425,39,0,'True Flight',{projPct:8}],
+[362,63,0,'Light Step',{evasion:18}],
+[337,116,1,'Nightblade',{aspd:9}],
+[314,173,0,'Bowyer',{projPct:7}],
+[301,134,0,'Nimble',{dex:6}],
+[325,78,0,'Quick Fingers',{dex:7}],
+[374,101,0,'Fletching',{projPct:8}],
+[386,140,0,'Loose Joints',{dex:4}],
+[349,154,0,'Fine Point',{critChance:11}],
+[368,230,1,'Ghostwalk',{moveSpeed:6,dex:13}],
+[330,270,0,'Shifting Guard',{evasion:20}],
+[279,269,0,'Unburdened',{moveSpeed:2}],
+[258,235,0,'Unseen',{evasion:20}],
+[286,203,0,'Marksman',{projPct:8}],
+[336,207,0,'True Flight',{projPct:8}],
+[411,190,1,'Venomcraft',{critChance:32,projSpeed:21}],
+[225,268,0,'Taut String',{projSpeed:9}],
+[252,298,0,'Fleet Foot',{moveSpeed:2}],
+[223,374,0,'Cat Step',{dex:6}],
+[171,385,1,'Serpent\'s',{projSpeed:24}],
+[241,49,0,'Nimble',{dex:4}],
+[267,17,0,'Long Stride',{moveSpeed:3}],
+[281,55,0,'Unburdened',{moveSpeed:2}],
+[250,88,0,'Keen Edge',{critChance:16}],
+[235,158,1,'Kiss',{moveSpeed:4}],
+[261,126,0,'Bowyer',{projPct:5}],
+[246,197,0,'Eye for Weakness',{critChance:9}],
+[196,151,0,'Precision',{critChance:14}],
+[211,82,0,'Flurry',{aspd:5}],
+[171,75,1,'Creeping',{dex:13}],
+[207,190,0,'Quick Fingers',{dex:6}],
+[218,228,0,'Thin Blade',{critChance:9}],
+[148,244,0,'Fletching',{projPct:8}],
+[165,177,0,'Fleet',{evasion:13}],
+[112,129,1,'Death',{moveSpeed:5}],
+[114,593,0,'Deep Cuts',{critDmg:5}],
+[104,533,0,'Fine Point',{critChance:11}],
+[165,523,0,'Frostbite',{coldPct:8}],
+[175,583,0,'Venom',{poisonBuild:15}],
+[207,606,1,'Quiet',{dex:9}],
+[-18,544,0,'Study',{int:5}],
+[43,567,0,'Toxin',{poisonBuild:10}],
+[8,618,0,'Sharp Wit',{int:4}],
+[-38,583,0,'Ward',{es:9}],
+[-78,585,1,'Kill',{int:8}],
+[-179,569,0,'Keen Edge',{critChance:14}],
+[-117,519,0,'Static Skin',{es:8}],
+[-118,586,0,'Lithe',{evasion:9}],
+[-83,624,1,'Coldforge',{evasion:38}],
+[205,451,0,'Chill',{coldPct:5}],
+[151,485,0,'Cruelty',{critDmg:7}],
+[159,423,0,'Slippery',{evasion:13}],
+[105,352,1,'Rimeward',{poisonBuild:33}],
+[43,501,0,'Shimmering Shell',{es:10}],
+[42,447,0,'Eye for Weakness',{critChance:14}],
+[94,468,0,'Septic',{poisonBuild:11}],
+[131,451,1,'Winterheart',{critChance:34}],
+[-84,452,0,'Loose Joints',{dex:4}],
+[-18,455,0,'Bad Blood',{poisonBuild:10}],
+[-67,506,0,'Glass Armour',{es:7}],
+[-76,545,1,'Deep',{evasion:30}],
+[-212,429,0,'Rime',{coldPct:7}],
+[-134,424,0,'Hollow Ward',{es:8}],
+[-149,481,0,'Precision',{critChance:12}],
+[-158,520,1,'Frost',{poisonBuild:30}],
+[191,350,0,'Thin Blade',{critChance:16}],
+[132,393,0,'Light Step',{evasion:9}],
+[125,317,0,'Ward',{es:11}],
+[74,253,1,'Icebreaker',{es:23}],
+[76,382,0,'Static Skin',{es:7}],
+[34,373,0,'Venom',{poisonBuild:12}],
+[60,338,0,'Shifting Guard',{evasion:15}],
+[52,286,1,'Hoarfrost',{int:11}],
+[-15,385,0,'Vital Strike',{critDmg:7}],
+[-95,414,0,'Shimmering Shell',{es:10}],
+[-38,352,0,'Killing Blow',{critDmg:6}],
+[-53,315,1,'Glacial',{dex:11}],
+[-180,379,0,'Unseen',{evasion:12}],
+[-126,307,0,'Cat Step',{dex:3}],
+[-97,374,0,'Deep Cuts',{critDmg:6}],
+[-59,386,1,'Mind',{evasion:27}],
+[86,307,0,'Nimble',{dex:3}],
+[35,250,0,'Cruelty',{critDmg:9}],
+[56,217,0,'Lucid',{int:5}],
+[137,205,0,'Glass Armour',{es:11}],
+[109,274,0,'Quick Fingers',{dex:4}],
+[187,253,1,'Frozen',{poisonBuild:28,int:8}],
+[-41,238,0,'Toxin',{poisonBuild:10}],
+[14,195,0,'Loose Joints',{dex:4}],
+[26,317,0,'Deep Winter',{coldPct:5}],
+[-13,310,0,'Cat Step',{dex:4}],
+[-87,335,1,'Well',{es:21}],
+[-88,295,0,'Fleet',{evasion:12}],
+[-157,282,0,'Nimble',{dex:4}],
+[-143,202,0,'Fine Point',{critChance:14}],
+[-60,180,0,'Vital Strike',{critDmg:8}],
+[-38,278,0,'Cold Reason',{int:4}],
+[2,273,1,'Arcanist',{int:9,evasion:27}],
+[-395,360,0,'Elemental Focus',{elePct:4}],
+[-374,418,0,'Reservoir',{mana:11}],
+[-432,439,0,'Study',{int:4}],
+[-453,381,0,'Hollow Ward',{es:13}],
+[-489,364,1,'Spellbinder',{manaRegen:5}],
+[-460,310,0,'Incantation',{spellPct:8}],
+[-518,326,0,'Arcane Study',{spellPct:9}],
+[-537,268,0,'Mental Depth',{mana:9}],
+[-484,253,0,'Four Winds',{elePct:4}],
+[-457,194,1,'Mana',{int:14}],
+[-571,201,0,'Sharp Wit',{int:6}],
+[-599,154,0,'Thaumaturgy',{spellPct:8}],
+[-563,114,0,'Trickle',{manaRegen:2}],
+[-513,135,0,'Prismatic',{elePct:6}],
+[-521,185,0,'Static',{lightPct:9}],
+[-493,214,1,'Font',{int:11,mana:40}],
+[-303,294,0,'Ward',{es:10}],
+[-272,357,0,'Refilling',{manaRegen:1}],
+[-294,390,0,'Attunement',{elePct:4}],
+[-323,418,0,'Quiet Focus',{manaRegen:2}],
+[-342,382,0,'Elemental Focus',{elePct:5}],
+[-348,343,0,'Arcing',{lightPct:8}],
+[-378,315,1,'Runewright',{spellPct:18,elePct:12}],
+[-415,299,0,'Four Winds',{elePct:7}],
+[-378,244,0,'Spellcraft',{spellPct:8}],
+[-343,295,0,'Lucid',{int:6}],
+[-308,338,1,'Loremaster',{elePct:14}],
+[-394,204,0,'Prismatic',{elePct:7}],
+[-446,233,0,'Clarity of Mind',{mana:14}],
+[-474,158,0,'Static Skin',{es:11}],
+[-427,164,0,'Wellspring',{mana:13}],
+[-368,121,1,'Thoughtform',{es:29}],
+[-504,86,0,'Attunement',{elePct:6}],
+[-462,43,0,'Deep Cistern',{mana:16}],
+[-453,110,0,'Reservoir',{mana:10}],
+[-416,126,1,'Mindspring',{es:36}],
+[-251,261,0,'Mental Depth',{mana:16}],
+[-188,256,0,'Elemental Focus',{elePct:4}],
+[-237,338,0,'Storm Charge',{lightPct:6}],
+[-219,376,1,'Clear',{spellPct:16}],
+[-254,209,0,'Shimmering Shell',{es:10}],
+[-293,255,0,'Cold Reason',{int:5}],
+[-312,204,0,'Incantation',{spellPct:6}],
+[-359,184,1,'Sight',{lightPct:14}],
+[-325,163,0,'Still Water',{manaRegen:1}],
+[-388,156,0,'Arcane Study',{spellPct:8}],
+[-328,123,0,'Four Winds',{elePct:4}],
+[-316,84,1,'Stormcaller',{manaRegen:5}],
+[-336,49,0,'Study',{int:7}],
+[-359,82,0,'Clarity of Mind',{mana:16}],
+[-384,42,0,'Prismatic',{elePct:5}],
+[-419,-4,1,'Thunderhead',{manaRegen:3}],
+[-151,242,0,'Thaumaturgy',{spellPct:5}],
+[-222,234,0,'Attunement',{elePct:4}],
+[-208,155,0,'Wellspring',{mana:15}],
+[-136,163,0,'Tesla Coil',{lightPct:5}],
+[-99,150,1,'Lightning',{lightPct:16}],
+[-215,195,0,'Elemental Focus',{elePct:5}],
+[-245,169,0,'Glass Armour',{es:8}],
+[-272,123,0,'Deep Cistern',{mana:16}],
+[-236,84,0,'Hollow Ward',{es:9}],
+[-172,133,0,'Trickle',{manaRegen:2}],
+[-160,93,1,'Rod',{lightPct:18,manaRegen:3}],
+[-226,23,0,'Spellcraft',{spellPct:5}],
+[-276,84,0,'Four Winds',{elePct:4}],
+[-303,8,0,'Static',{lightPct:5}],
+[-333,-19,1,'Charged',{es:36}],
+[-577,-195,0,'Reservoir',{mana:11}],
+[-516,-183,0,'Mental Depth',{mana:7}],
+[-529,-122,0,'Sharp Wit',{int:3}],
+[-589,-134,0,'Presence',{spirit:2}],
+[-622,-112,1,'Core',{str:8}],
+[-488,-332,0,'Hardened',{armour:8}],
+[-452,-297,0,'Constitution',{life:7}],
+[-487,-243,0,'Sinew',{str:3}],
+[-533,-257,0,'Command',{spirit:2}],
+[-536,-308,0,'Clarity of Mind',{mana:13}],
+[-537,-350,1,'Arc',{es:20,life:16}],
+[-444,-368,0,'Force of Will',{spirit:4}],
+[-437,-433,0,'Bearing',{spirit:4}],
+[-373,-403,0,'Kindling',{firePct:9}],
+[-333,-406,1,'Weaver',{es:21}],
+[-435,-77,0,'Presence',{spirit:2}],
+[-514,-69,0,'Scale',{armour:14}],
+[-451,-114,0,'Elemental Ward',{resAll:3}],
+[-421,-148,1,'Skyfire',{armour:30}],
+[-462,-152,0,'Thick Hide',{life:8}],
+[-457,-216,0,'Wellspring',{mana:10}],
+[-407,-198,0,'Thewed Arm',{str:5}],
+[-337,-191,1,'Galvanic',{mana:24}],
+[-349,-309,0,'Bulwark',{armour:10}],
+[-352,-255,0,'Iron Skin',{armour:9}],
+[-410,-262,0,'Command',{spirit:4}],
+[-396,-316,0,'Ward',{es:10}],
+[-406,-355,1,'Static',{mana:22}],
+[-303,-345,0,'Four Wards',{resAll:3}],
+[-340,-359,0,'Lucid',{int:5}],
+[-289,-404,0,'Blood Vessels',{life:5}],
+[-272,-453,1,'Field',{int:9}],
+[-334,-99,0,'Heavy Hands',{str:5}],
+[-355,14,0,'Cold Reason',{int:3}],
+[-413,-43,0,'Ox Blood',{str:3}],
+[-452,-32,1,'Emberward',{mana:24}],
+[-309,-130,0,'Heart of Oak',{life:6}],
+[-369,-119,0,'Force of Will',{spirit:4}],
+[-343,-151,0,'Riveted',{armour:10}],
+[-366,-217,1,'Pyre-Tender',{life:19}],
+[-285,-195,0,'Deep Cistern',{mana:12}],
+[-313,-223,0,'Prismatic Skin',{resAll:5}],
+[-293,-257,0,'Bearing',{spirit:4}],
+[-275,-306,1,'Cinderheart',{armour:38}],
+[-219,-293,0,'Reservoir',{mana:11}],
+[-214,-253,0,'Brawn',{str:3}],
+[-253,-273,0,'Ember',{firePct:7}],
+[-313,-292,1,'Firebrand',{int:10}],
+[-299,-41,0,'Elemental Ward',{resAll:4}],
+[-286,-79,0,'Sanguine',{life:9}],
+[-238,-94,0,'Mental Depth',{mana:12}],
+[-177,-13,0,'Static Skin',{es:6}],
+[-186,26,1,'Forgewarden',{firePct:20}],
+[-229,-134,0,'Smoulder',{firePct:5}],
+[-272,-116,0,'Presence',{spirit:2}],
+[-239,-173,0,'Study',{int:4}],
+[-264,-229,1,'Ash',{life:20}],
+[-227,-214,0,'Four Wards',{resAll:3}],
+[-200,-184,0,'Fortitude',{life:9}],
+[-191,-146,0,'Sinew',{str:4}],
+[-155,-123,1,'Priest',{firePct:14}],
+[270,-490,0,'Rot',{chaosPct:6}],
+[280,-436,0,'Fire Ward',{resFire:8}],
+[232,-438,0,'Cold Iron',{resCold:5}],
+[193,-442,1,'Flamekeeper',{resCold:18}],
+[165,-342,0,'Force',{dmgPct:5}],
+[227,-398,0,'Warded',{resChaos:5}],
+[242,-336,0,'Bloodletting',{leech:1}],
+[264,-303,1,'Slow',{allAttr:7}],
+[227,-287,0,'Balance',{allAttr:2}],
+[172,-197,0,'Violence',{dmgPct:5}],
+[119,-308,0,'Reach',{areaSize:7}],
+[85,-348,1,'Burn',{leech:3}],
+[540,36,0,'Harm',{dmgPct:4}],
+[484,0,0,'Void Touch',{chaosPct:9}],
+[541,-35,0,'Grounded',{resLight:7}],
+[562,-70,1,'Zealot\'s',{dmgPct:11}],
+[465,37,0,'Clean Blood',{resChaos:5}],
+[386,31,0,'Escalation',{dmgPct:5}],
+[425,-55,0,'Roundness',{allAttr:4}],
+[407,-99,1,'Oath',{leech:3}],
+[273,-54,0,'Ash Skin',{resFire:6}],
+[352,-45,0,'Force',{dmgPct:3}],
+[306,24,0,'Wide Arc',{areaSize:4}],
+[289,96,1,'Templar\'s',{resChaos:11}],
+[232,484,0,'Earthing',{resLight:8}],
+[239,427,0,'Frost Ward',{resCold:8}],
+[279,427,0,'Expanse',{areaSize:6}],
+[294,478,0,'Untainted',{resChaos:5}],
+[325,503,1,'Vow',{chaosPct:15}],
+[203,409,0,'Feeding',{leech:1}],
+[145,355,0,'Siphon',{leech:1}],
+[252,347,0,'Heat Shield',{resFire:7}],
+[292,338,1,'Sanctified',{resCold:13}],
+[147,284,0,'Violence',{dmgPct:4}],
+[176,215,0,'Warm Blood',{resCold:8}],
+[194,293,0,'Reach',{areaSize:4}],
+[220,323,1,'Consecration',{areaSize:14}],
+[-266,494,0,'Wide Arc',{areaSize:5}],
+[-301,452,0,'Insulated',{resLight:8}],
+[-251,435,0,'Bloodletting',{leech:1}],
+[-223,468,0,'Grounded',{resLight:8}],
+[-181,458,1,'Faithward',{resChaos:14}],
+[-173,418,0,'Warded',{resChaos:6}],
+[-255,395,0,'Fire Ward',{resFire:8}],
+[-270,316,0,'Expanse',{areaSize:4}],
+[-197,343,0,'Harm',{dmgPct:5}],
+[-140,385,0,'Ash Skin',{resFire:5}],
+[-127,347,1,'Reliquary',{resCold:17,resLight:15}],
+[-181,216,0,'Clean Blood',{resChaos:4}],
+[-117,268,0,'Withering',{chaosPct:9}],
+[-194,296,0,'Feeding',{leech:1}],
+[-234,298,1,'Martyr',{areaSize:11}],
+[-500,31,0,'Heat Shield',{resFire:7}],
+[-552,29,0,'Cold Iron',{resCold:9}],
+[-549,-32,0,'Siphon',{leech:2}],
+[-492,-29,0,'Untainted',{resChaos:5}],
+[-474,-66,1,'Ordained',{chaosPct:20}],
+[-469,4,0,'Warded',{resChaos:5}],
+[-375,-55,0,'Frost Ward',{resCold:6}],
+[-423,36,0,'Bloodletting',{leech:2}],
+[-435,74,1,'Corrupted',{resCold:17}],
+[-296,48,0,'Even Hand',{allAttr:2}],
+[-335,-59,0,'Escalation',{dmgPct:5}],
+[-261,-30,0,'Earthing',{resLight:5}],
+[-230,-55,1,'Soil',{chaosPct:18}],
+[-308,-471,0,'Fire Ward',{resFire:7}],
+[-231,-480,0,'Feeding',{leech:1}],
+[-246,-422,0,'Ash Skin',{resFire:5}],
+[-255,-383,1,'Rotcaller',{resCold:16}],
+[-225,-333,0,'Heat Shield',{resFire:8}],
+[-263,-344,0,'Siphon',{leech:2}],
+[-210,-405,0,'Insulated',{resLight:7}],
+[-172,-393,0,'Clean Blood',{resChaos:7}],
+[-115,-403,1,'Blightmark',{leech:3}],
+[-92,-266,0,'Fire Ward',{resFire:5}],
+[-188,-223,0,'Untainted',{resChaos:6}],
+[-180,-285,0,'Force',{dmgPct:4}],
+[-160,-355,1,'Plaguebearer',{resChaos:11}],
+[173,-31,0,'Wholeness',{allAttr:3}],
+[212,-26,0,'Killing Blow',{critDmg:7}],
+[201,43,0,'Command',{spirit:4}],
+[147,-1,0,'Swelling Vigour',{lifePct:5}],
+[92,51,1,'Wither',{areaSize:13}],
+[162,36,0,'Deep Cuts',{critDmg:12}],
+[222,121,0,'Layered Plate',{armourPct:6}],
+[140,101,0,'Tempered Steel',{armourPct:11}],
+[85,158,1,'Entropy',{esPct:14}],
+[151,139,0,'Prismatic Skin',{resAll:5}],
+[91,198,0,'Thickened Ward',{esPct:7}],
+[51,137,0,'Cruelty',{critDmg:12}],
+[24,108,1,'Unravel',{dmgPct:11}],
+[49,177,0,'Broadened Mind',{manaPct:6}],
+[-26,201,0,'Force of Will',{spirit:5}],
+[-25,160,0,'Vital Strike',{critDmg:7}],
+[-53,100,1,'Soul',{spirit:8}],
+[-174,176,0,'Elemental Ward',{resAll:7}],
+[-60,140,0,'Four Wards',{resAll:5}],
+[-75,217,0,'Bearing',{spirit:5}],
+[-76,257,1,'Rend',{areaSize:18}],
+[-232,124,0,'Prismatic Skin',{resAll:4}],
+[-154,53,0,'Balance',{allAttr:4}],
+[-91,110,0,'Killing Blow',{critDmg:9}],
+[-121,83,1,'Crossroads',{allAttr:8}],
+[-190,-51,0,'Lingering',{dotPct:8}],
+[-148,14,0,'Greater Vitality',{lifePct:4}],
+[-202,63,0,'Elemental Ward',{resAll:4}],
+[-256,49,1,'Contested',{lifePct:13}],
+[-167,-84,0,'Amplified Shell',{esPct:9}],
+[-128,-152,0,'Reinforced Aegis',{esPct:6}],
+[-146,-39,0,'Widened Channel',{manaPct:9}],
+[-105,-48,1,'Ground',{resAll:10}],
+[-109,-117,0,'Roundness',{allAttr:4}],
+[-111,-189,0,'Abundant Blood',{lifePct:6}],
+[-69,-119,0,'Blurred Form',{evasionPct:6}],
+[17,-186,1,'No',{armourPct:25}],
+[-31,-106,0,'Deep Reserves',{lifePct:5}],
+[-23,-186,0,'Deep Cuts',{critDmg:8}],
+[-16,-259,0,'Thickened Ward',{esPct:5}],
+[44,-216,0,'Practised Evasion',{evasionPct:8}],
+[36,-151,0,'Swelling Vigour',{lifePct:5}],
+[76,-143,1,'Man\'s',{critDmg:20,dmgPct:11}],
+[115,-133,0,'Reinforced Plating',{armourPct:11}],
+[50,-114,0,'Even Hand',{allAttr:3}],
+[63,-181,0,'Presence',{spirit:4}],
+[72,-244,1,'Land',{lifePct:12}],
+[204,-65,0,'Expanded Reservoir',{manaPct:6}],
+[93,-59,0,'Cruelty',{critDmg:11}],
+[154,-123,0,'Vital Strike',{critDmg:9}],
+[150,-163,1,'Borderstone',{manaPct:17}],
+[117,-27,0,'Violence',{dmgPct:8}],
+[131,62,0,'Harm',{dmgPct:9}],
+[63,99,0,'Quick Casting',{cspd:6}],
+[64,22,0,'Four Wards',{resAll:7}],
+[-1,-5,1,'Marchwarden',{allAttr:14}],
+[14,154,0,'Fluent Tongue',{cspd:4}],
+[-26,71,0,'Wholeness',{allAttr:6}],
+[14,69,0,'Escalation',{dmgPct:9}],
+[53,60,1,'Frontier',{resAll:17}],
+[-85,17,0,'Loose Grip',{aspd:5}],
+[-55,43,0,'Greater Vitality',{lifePct:8}],
+[-83,71,0,'Snap Incant',{cspd:5}],
+[-133,123,1,'Watchtower',{resAll:14}],
+[-115,-10,0,'Fast Hands',{aspd:4}],
+[-87,-84,0,'Abundant Blood',{lifePct:8}],
+[-68,-33,0,'Killing Blow',{critDmg:11}],
+[-10,-72,1,'Toll',{resAll:13}],
+[9,-113,0,'Deep Cuts',{critDmg:10}],
+[30,-79,0,'Force',{dmgPct:9}],
+[-50,-69,0,'Violence',{dmgPct:7}],
+[-44,-151,0,'Cruelty',{critDmg:11}],
+[-63,-186,1,'Gate',{lifePct:19}],
+[55,-48,0,'Balance',{allAttr:4}],
+[87,-99,0,'Vital Strike',{critDmg:12}],
+[143,-58,0,'Prismatic Skin',{resAll:7}],
+[79,-16,0,'Harm',{dmgPct:7}],
+[108,14,1,'Hollow',{lifePct:15}],
+[2,-511,2,'Long Road',0],
+[-30,-420,2,'Long Road',0],
+[3,-331,2,'Deep Road',0],
+[-3,-221,2,'Descent',0],
+[438,-253,2,'Long Road',0],
+[354,-227,2,'Long Road',0],
+[272,-148,2,'Deep Road',0],
+[191,-139,2,'Descent',0],
+[450,247,2,'Long Road',0],
+[371,188,2,'Long Road',0],
+[275,164,2,'Deep Road',0],
+[182,114,2,'Descent',0],
+[4,511,2,'Long Road',0],
+[23,411,2,'Long Road',0],
+[2,349,2,'Deep Road',0],
+[-1,232,2,'Descent',0],
+[-445,273,2,'Long Road',0],
+[-339,233,2,'Long Road',0],
+[-285,162,2,'Deep Road',0],
+[-198,103,2,'Descent',0],
+[-449,-257,2,'Long Road',0],
+[-378,-170,2,'Long Road',0],
+[-275,-156,2,'Deep Road',0],
+[-200,-107,2,'Descent',0],
+[119,-239,2,'Contested Pass',0],
+[292,-14,2,'Contested Pass',0],
+[110,234,2,'Contested Pass',0],
+[-113,228,2,'Contested Pass',0],
+[-264,10,2,'Contested Pass',0],
+[-120,-237,2,'Contested Pass',0],
+[102,89,2,'Inner Gate',0],
+[-14,121,2,'Inner Gate',0],
+[-115,44,2,'Inner Gate',0],
+[-127,-82,2,'Inner Gate',0],
+[-4,-151,2,'Inner Gate',0],
+[127,-94,2,'Inner Gate',0],
+[110,-388,3,'Resolute Technique',0,'resolute'],
+[298,-282,3,'Blood Magic',0,'blood_magic'],
+[304,300,3,'Iron Reflexes',0,'iron_reflexes'],
+[99,415,3,'Elemental Overload',0,'ele_overload'],
+[-398,90,3,'Avatar of Fire',0,'avatar_fire'],
+[-398,-92,3,'Hollow Bones',0,'hollow_bones'],
+[197,-314,3,'Unwavering Stance',0,'unwavering'],
+[371,-7,3,'Crimson Dance',0,'crimson_dance'],
+[165,320,3,'Glass Cannon',0,'glass_cannon'],
+[-163,321,3,'Chaos Inoculation',0,'chaos_inoc'],
+[-381,-16,3,'Eldritch Battery',0,'eldritch'],
+[-186,-324,3,'Acrobatics',0,'acrobatics'],
+[252,-20,3,'Point Blank',0,'point_blank'],
+[124,168,3,'Vaal Pact',0,'vaal_pact'],
+[-104,189,3,'Mind over Matter',0,'mind_matter'],
+[-218,-17,3,'Perfect Agony',0,'perfect_agony'],
+[-150,-211,3,'Conduit',0,'conduit'],
+[132,-201,3,'Frostbound',0,'frostbound'],
+[24,28,3,'Berserker’s Fury',0,'berserk'],
+[-16,32,3,'Iron Grip',0,'iron_grip'],
+[-48,2,3,'Runic Skin',0,'runic_skin'],
+[-28,-34,3,'Wicked Ward',0,'wicked_ward'],
+[16,-41,3,'Ancestral Bond',0,'ancestral'],
+[39,-9,3,'Shatterborn',0,'shatterborn']
+];
+/* ids, positionally matched to TREE_NODES; saved allocations key off these */
+const TREE_IDS = ['start_str','start_strdex','start_dex','start_dexint','start_int','start_strint','n1','n2','n3','n4','n5','n6','n7','n8','n9','n10','n11','n12','n13','n14','n15','n16','n17','n18','n19','n20','n21','n22','n23','n24','n25','n26','n27','n28','n29','n30','n31','n32','n33','n34','n35','n36','n37','n38','n39','n40','n41','n42','n43','n44','n45','n46','n47','n48','n49','n50','n51','n52','n53','n54','n55','n56','n57','n58','n59','n60','n61','n62','n63','n64','n65','n66','n67','n68','n69','n70','n71','n72','n73','n74','n75','n76','n77','n78','n79','n80','n81','n82','n83','n84','n85','n86','n87','n88','n89','n90','n91','n92','n93','n94','n95','n96','n97','n98','n99','n100','n101','n102','n103','n104','n105','n106','n107','n108','n109','n110','n111','n112','n113','n114','n115','n116','n117','n118','n119','n120','n121','n122','n123','n124','n125','n126','n127','n128','n129','n130','n131','n132','n133','n134','n135','n136','n137','n138','n139','n140','n141','n142','n143','n144','n145','n146','n147','n148','n149','n150','n151','n152','n153','n154','n155','n156','n157','n158','n159','n160','n161','n162','n163','n164','n165','n166','n167','n168','n169','n170','n171','n172','n173','n174','n175','n176','n177','n178','n179','n180','n181','n182','n183','n184','n185','n186','n187','n188','n189','n190','n191','n192','n193','n194','n195','n196','n197','n198','n199','n200','n201','n202','n203','n204','n205','n206','n207','n208','n209','n210','n211','n212','n213','n214','n215','n216','n217','n218','n219','n220','n221','n222','n223','n224','n225','n226','n227','n228','n229','n230','n231','n232','n233','n234','n235','n236','n237','n238','n239','n240','n241','n242','n243','n244','n245','n246','n247','n248','n249','n250','n251','n252','n253','n254','n255','n256','n257','n258','n259','n260','n261','n262','n263','n264','n265','n266','n267','n268','n269','n270','n271','n272','n273','n274','n275','n276','n277','n278','n279','n280','n281','n282','n283','n284','n285','n286','n287','n288','n289','n290','n291','n292','n293','n294','n295','n296','n297','n298','n299','n300','n301','n302','n303','n304','n305','n306','n307','n308','n309','n310','n311','n312','n313','n314','n315','n316','n317','n318','n319','n320','n321','n322','n323','n324','n325','n326','n327','n328','n329','n330','n331','n332','n333','n334','n335','n336','n337','n338','n339','n340','n341','n342','n343','n344','n345','n346','n347','n348','n349','n350','n351','n352','n353','n354','n355','n356','n357','n358','n359','n360','n361','n362','n363','n364','n365','n366','n367','n368','n369','n370','n371','n372','n373','n374','n375','n376','n377','n378','n379','n380','n381','n382','n383','n384','n385','n386','n387','n388','n389','n390','n391','n392','n393','n394','n395','n396','n397','n398','n399','n400','n401','n402','n403','n404','n405','n406','n407','n408','n409','n410','n411','n412','n413','n414','n415','n416','n417','n418','n419','n420','n421','n422','n423','n424','n425','n426','n427','n428','n429','n430','n431','n432','n433','n434','n435','n436','n437','n438','n439','n440','n441','n442','n443','n444','n445','n446','n447','n448','n449','n450','n451','n452','n453','n454','n455','n456','n457','n458','n459','n460','n461','n462','n463','n464','n465','n466','n467','n468','n469','n470','n471','n472','n473','n474','n475','n476','n477','n478','n479','n480','n481','n482','n483','n484','n485','n486','n487','n488','n489','n490','n491','n492','n493','n494','n495','n496','n497','n498','n499','n500','n501','n502','n503','n504','n505','n506','n507','n508','n509','n510','n511','n512','n513','n514','n515','n516','n517','n518','n519','n520','n521','n522','n523','n524','n525','n526','n527','n528','n529','n530','n531','n532','n533','n534','n535','n536','n537','n538','n539','n540','n541','n542','n543','n544','n545','n546','n547','n548','n549','n550','n551','n552','n553','n554','n555','n556','n557','n558','n559','n560','n561','n562','n563','n564','n565','n566','n567','n568','n569','n570','n571','n572','n573','n574','n575','n576','n577','n578','n579','n580','n581','n582','n583','n584','n585','n586','n587','n588','n589','n590','n591','n592','n593','n594','n595','n596','n597','n598','n599','n600'];
+/* edges as flat index pairs into TREE_NODES */
+const TREE_EDGES = [6,0,6,7,6,10,6,455,7,8,8,9,9,546,10,0,10,11,10,14,11,12,12,13,14,0,15,14,15,16,16,17,17,546,18,19,18,22,18,459,19,20,20,21,21,455,21,547,22,13,22,23,22,26,22,546,23,24,24,25,25,547,26,27,26,28,26,32,26,546,27,28,28,29,29,30,30,31,31,44,31,547,32,33,32,394,33,34,34,35,35,390,35,547,36,37,36,40,37,38,38,39,39,464,39,548,40,41,40,44,40,547,41,42,42,43,43,548,43,582,44,45,44,48,44,547,45,46,46,47,47,548,47,582,48,49,49,50,50,51,51,548,52,53,52,54,52,58,52,548,53,54,54,55,55,56,56,57,57,549,58,59,58,60,58,63,58,548,59,60,60,61,61,62,63,64,64,65,65,66,67,1,67,68,67,71,68,69,69,70,71,1,71,72,71,73,71,77,72,73,73,74,74,75,75,76,76,87,77,1,77,78,78,79,79,80,81,82,81,83,81,87,82,83,83,84,84,85,85,86,87,88,87,89,87,92,88,89,89,90,90,91,92,93,92,94,92,97,93,94,94,95,95,96,97,98,98,99,99,100,101,102,102,103,103,104,105,101,105,106,105,107,105,110,105,551,106,107,107,108,108,109,109,552,109,583,110,96,110,111,110,112,110,116,110,551,111,112,112,113,113,114,114,115,115,552,115,583,116,117,116,118,117,118,118,119,119,120,120,410,120,552,121,122,121,125,121,552,122,123,123,124,124,553,125,126,125,129,125,552,126,127,127,128,128,553,129,130,129,552,130,131,131,132,132,553,133,2,133,134,133,137,133,402,134,135,135,136,136,554,137,2,137,138,137,139,137,143,138,139,139,140,140,141,141,142,142,151,142,554,143,2,143,144,143,414,144,145,145,146,146,554,147,148,147,151,147,406,148,149,149,150,150,402,150,555,151,152,151,155,151,554,152,153,153,154,154,555,155,156,155,159,155,554,156,157,157,158,158,174,158,555,159,160,159,419,160,161,161,162,162,414,162,555,163,164,163,167,164,165,165,166,166,410,166,556,167,168,167,170,167,174,167,555,168,169,169,170,170,171,171,172,171,173,172,173,173,556,173,584,174,175,174,176,174,180,174,555,175,176,176,177,177,178,178,179,179,556,179,584,180,181,181,182,182,183,183,423,183,556,184,185,184,186,184,189,184,556,185,186,186,187,187,188,188,557,189,190,189,191,189,194,189,556,190,191,191,192,192,193,193,557,194,195,194,196,194,556,195,196,196,197,197,198,198,557,199,3,199,200,199,201,199,204,199,414,200,201,201,202,202,203,203,558,204,3,204,205,204,206,204,209,205,206,206,207,207,208,208,217,208,558,209,3,209,210,209,427,210,211,211,212,212,558,213,214,213,217,213,419,214,215,215,216,216,414,216,559,217,218,217,221,217,558,218,219,219,220,220,559,221,222,221,225,221,558,222,223,223,224,224,237,224,559,225,226,225,432,226,227,227,228,228,427,228,559,229,230,229,233,230,231,231,232,232,423,232,560,233,234,233,237,233,559,234,235,235,236,236,560,236,585,237,238,237,241,237,559,238,239,239,240,240,560,240,585,241,242,242,243,243,244,244,438,244,560,245,246,245,247,245,251,245,560,246,247,247,248,248,249,249,250,250,561,251,252,251,253,251,256,251,560,252,253,253,254,254,255,255,561,256,257,256,258,256,560,257,258,258,259,259,260,260,261,261,561,262,4,262,263,262,264,262,267,262,427,263,264,264,265,265,266,266,562,267,4,267,268,267,269,267,272,268,269,269,270,270,271,271,285,271,562,272,4,272,273,272,274,272,442,273,274,274,275,275,276,276,277,277,562,278,279,278,281,278,285,278,432,279,280,280,281,281,282,282,283,282,284,283,284,284,427,284,563,285,286,285,289,285,562,286,287,287,288,288,563,289,290,289,291,289,294,289,562,290,291,291,292,292,293,293,306,293,563,294,295,294,447,295,296,296,297,297,442,297,563,298,299,298,302,299,300,300,301,301,438,301,564,302,303,302,306,302,563,303,304,304,305,305,564,305,586,306,307,306,310,306,563,307,308,308,309,309,564,309,586,310,311,311,312,312,313,313,451,313,564,314,315,314,316,314,319,314,564,315,316,316,317,317,318,318,565,319,320,319,321,319,325,319,564,320,321,321,322,322,323,323,324,324,565,325,326,325,564,326,327,327,328,328,565,329,5,329,330,329,331,329,334,329,442,330,331,331,332,332,333,333,566,334,5,334,335,334,336,334,340,335,336,336,337,337,338,338,339,339,348,339,566,340,5,340,341,340,455,341,342,342,343,343,566,344,345,344,348,344,447,345,346,346,347,347,442,347,567,348,349,348,352,348,566,349,350,350,351,351,567,352,353,352,354,352,357,352,566,353,354,354,355,355,356,356,369,356,567,357,358,357,459,358,359,359,360,360,455,360,567,361,362,361,365,362,363,363,364,364,451,364,568,365,366,365,369,365,567,366,367,367,368,368,568,368,587,369,370,369,373,369,567,370,371,371,372,372,568,372,587,373,374,374,375,375,376,376,464,376,568,377,378,377,379,377,382,377,568,378,379,379,380,380,381,381,569,382,383,382,386,382,568,383,384,384,385,385,569,386,387,386,568,387,388,388,389,389,569,390,14,390,67,390,86,390,391,391,392,392,393,393,394,394,81,394,395,395,396,396,397,397,398,397,588,398,51,398,104,398,399,399,400,400,401,401,570,402,77,402,100,402,403,403,404,404,405,405,406,406,97,406,407,407,408,408,409,409,410,409,589,410,411,411,412,412,413,413,571,414,415,414,416,415,416,416,417,417,418,418,419,419,420,420,421,421,422,422,423,422,590,423,424,424,425,425,426,426,572,427,428,427,429,428,429,429,430,430,431,431,432,432,433,432,434,433,434,434,435,435,436,436,437,437,438,437,591,438,439,439,440,440,441,441,573,442,443,442,444,443,444,444,445,445,446,446,447,447,448,448,449,449,450,450,451,450,592,451,452,452,453,453,454,454,574,455,456,456,457,457,458,458,459,459,460,459,461,460,461,461,462,462,463,463,464,463,593,464,465,465,466,466,467,467,575,468,469,468,470,468,473,468,515,468,518,468,553,468,557,468,571,469,470,470,471,471,472,472,473,472,576,472,581,472,594,473,474,473,477,473,557,474,475,475,476,476,477,476,576,477,478,477,481,477,557,477,561,477,572,478,479,479,480,480,481,480,576,480,577,480,595,481,482,481,485,481,561,482,483,483,484,484,485,484,577,485,486,485,489,485,561,485,565,485,573,486,487,487,488,488,489,488,577,488,578,488,596,489,490,489,493,489,565,490,491,491,492,492,493,492,578,493,494,493,497,493,565,493,569,493,574,494,495,495,496,496,497,496,578,496,579,496,597,497,498,497,501,497,569,498,499,499,500,500,501,500,579,501,502,501,505,501,549,501,569,501,575,502,503,503,504,504,505,504,579,504,580,504,598,505,506,505,507,505,511,505,549,506,507,507,508,508,509,509,510,510,511,510,580,511,512,511,515,511,549,511,553,511,570,512,513,513,514,514,515,514,580,514,581,514,599,515,516,515,553,516,517,517,518,518,581,519,520,519,521,519,524,519,541,519,576,520,521,521,522,522,523,523,600,524,525,524,528,524,577,525,526,526,527,527,601,528,529,528,532,528,578,529,530,530,531,531,602,532,533,532,536,532,579,533,534,534,535,535,603,536,537,536,538,536,541,536,580,537,538,538,539,539,540,540,604,541,542,541,543,541,581,542,543,543,544,544,545,545,605,546,13,548,63,549,62,549,66,550,70,550,76,550,80,550,87,550,92,551,86,551,91,551,96,551,100,552,104];
+
 const START_LABEL = {str:'Strength',strdex:'Strength / Dexterity',dex:'Dexterity',
   dexint:'Dexterity / Intelligence',int:'Intelligence',strint:'Strength / Intelligence'};
-const R_START = 620, R_STEP = 74;
-
-const TREE_BRANCHES = [
-  /* ---- Strength (Marauder) ---- */
-  {id:'st_a',from:{start:'str'},da:-5,dr:-1,nodes:[
-    ['m','Strong Arm',{meleePct:8}],['m','Thick Hide',{life:10}],
-    ['n','Butchery',{meleePct:16,stunBuild:25},'Heavy swings put things down before they answer.'],
-    ['m','Blunt Force',{physPct:10}],['m','Sinew',{str:8}],
-    ['n','Unyielding',{life:24,armour:40},'You are simply harder to finish than the room expects.']]},
-  {id:'st_b',from:{start:'str'},da:5,dr:-1,nodes:[
-    ['m','Iron Skin',{armour:26}],['m','Endurance',{lifePct:5}],
-    ['n','Bulwark',{armourPct:24,resAll:6},'Plate, and the patience to stand in it.'],
-    ['m','Weight of Iron',{armour:34}],['m','Broad Shoulders',{str:6,life:8}],
-    ['n','Immovable',{lifePct:8,stunBuild:-30},'Nothing that hits you gets the reaction it wanted.']]},
-  {id:'st_c',from:{node:'st_a_2'},da:-9,dr:-1,nodes:[
-    ['m','Crushing Blows',{stunBuild:20}],['m','Wide Arc',{areaSize:10}],
-    ['n','Earthbreaker',{areaPct:20,areaSize:14},'The swing is wider than the weapon has any right to be.'],
-    ['m','Overkill',{meleePct:10}],
-    ['k','iron_reflexes',{keystone:'iron_reflexes'}]]},
-  {id:'st_rim',from:{start:'str'},da:11,dr:0,nodes:[
-    ['m','Vitality',{life:12}],['m','Vigour',{lifeRegen:2}],
-    ['n','Second Skin',{lifePct:6,lifeRegen:3},'The bleeding stops sooner than it used to.'],
-    ['m','Hardy',{life:12}]]},
-
-  /* ---- Strength / Dexterity (Duelist) ---- */
-  {id:'sd_a',from:{start:'strdex'},da:-5,dr:-1,nodes:[
-    ['m','Duellist’s Stance',{aspd:5}],['m','Precision',{accuracy:80}],
-    ['n','Opening',{critChance:30,critDmg:12},'You are only interested in the half-second they leave open.'],
-    ['m','Quick Grip',{aspd:5}],['m','Balance',{str:5,dex:5}],
-    ['n','Exsanguinate',{physPct:20,bleedBuild:30},'Cuts placed where movement keeps them working.']]},
-  {id:'sd_b',from:{start:'strdex'},da:5,dr:-1,nodes:[
-    ['m','Bladework',{physPct:9}],['m','Footwork',{moveSpeed:3}],
-    ['n','Riposte',{aspd:9,critChance:24},'Their commitment is the whole opportunity.'],
-    ['m','Sharpened',{critChance:20}],['m','Tempered Edge',{physPct:10}],
-    ['n','Executioner',{critDmg:24},'The second hit is the one that is worth anything.']]},
-  {id:'sd_c',from:{node:'sd_b_2'},da:9,dr:-1,nodes:[
-    ['m','Leeching Strikes',{leech:1}],['m','Blood Drinker',{leech:1,life:10}],
-    ['n','Vampirism',{leech:2},'What you take back is not politely asked for.'],
-    ['m','Killer’s Instinct',{critDmg:14}],
-    ['k','resolute',{keystone:'resolute'}]]},
-  {id:'sd_rim',from:{start:'strdex'},da:11,dr:0,nodes:[
-    ['m','Agile Frame',{evasion:40}],['m','Lean',{dex:6}],
-    ['n','Dancer',{moveSpeed:6,evasionPct:14},'Distance kept on purpose rather than by luck.'],
-    ['m','Reflexes',{evasion:44}]]},
-
-  /* ---- Dexterity (Ranger) ---- */
-  {id:'dx_a',from:{start:'dex'},da:-5,dr:-1,nodes:[
-    ['m','Steady Hand',{projPct:8}],['m','Fleet',{evasion:36}],
-    ['n','Barrage',{projPct:18,projSpeed:20},'Everything leaves the string a little faster than it should.'],
-    ['m','Keen Eye',{accuracy:100}],['m','Sure Shot',{projPct:9}],
-    ['n','Far Shot',{projPct:22,areaSize:-10},'Distance stops being a penalty and starts being the point.']]},
-  {id:'dx_b',from:{start:'dex'},da:5,dr:-1,nodes:[
-    ['m','Evasive',{evasionPct:8}],['m','Light Step',{moveSpeed:3}],
-    ['n','Phase Step',{evasionPct:20,moveSpeed:5},'You are somewhere adjacent to where they aimed.'],
-    ['m','Wiry',{dex:8}],['m','Cat’s Footing',{evasion:48}],
-    ['n','Untouched',{evasionPct:22,resAll:5},'Being missed is a form of armour, if you commit to it.']]},
-  {id:'dx_c',from:{node:'dx_a_2'},da:-9,dr:-1,nodes:[
-    ['m','Cold Steel',{coldPct:10}],['m','Frostbite',{freezeBuild:25}],
-    ['n','Hypothermia',{coldPct:20,freezeBuild:30},'Cold accumulates in things that keep moving.'],
-    ['m','Splinter',{critChance:24}],
-    ['k','ele_overload',{keystone:'ele_overload'}]]},
-  {id:'dx_rim',from:{start:'dex'},da:11,dr:0,nodes:[
-    ['m','Swift Hands',{aspd:6}],['m','Quiver Discipline',{projPct:8}],
-    ['n','Volley',{projPct:16,aspd:6},'The rhythm matters more than any single arrow.'],
-    ['m','Poise',{dex:7}]]},
-
-  /* ---- Dexterity / Intelligence (Shadow) ---- */
-  {id:'di_a',from:{start:'dexint'},da:-5,dr:-1,nodes:[
-    ['m','Toxins',{chaosPct:9}],['m','Venom',{poisonBuild:22}],
-    ['n','Plague Bearer',{chaosPct:18,poisonBuild:30},'Nothing you do looks fatal at the time.'],
-    ['m','Rot',{dotPct:12}],['m','Slow Death',{dotPct:12}],
-    ['n','Wither',{dotPct:22,chaosPct:12},'The wound gets worse for as long as it is ignored.']]},
-  {id:'di_b',from:{start:'dexint'},da:5,dr:-1,nodes:[
-    ['m','Shadowed',{es:22}],['m','Nimble',{evasion:34}],
-    ['n','Ghost Dance',{evasionPct:16,esPct:14},'Half armour, half absence.'],
-    ['m','Cruel Blade',{critDmg:12}],['m','Assassinate',{critChance:26}],
-    ['n','Ambush',{critDmg:26,critChance:20},'The first strike is worth all the others put together.']]},
-  {id:'di_c',from:{node:'di_b_2'},da:9,dr:-1,nodes:[
-    ['m','Mind Over Matter',{mana:24}],['m','Focus',{esPct:10}],
-    ['n','Clarity of Purpose',{manaRegen:3,spirit:15},'Room enough in your head for one more permanent thing.'],
-    ['m','Discipline',{es:34}],
-    ['k','blood_magic',{keystone:'blood_magic'}]]},
-  {id:'di_rim',from:{start:'dexint'},da:11,dr:0,nodes:[
-    ['m','Quick Fingers',{aspd:5,cspd:5}],['m','Sleight',{critChance:20}],
-    ['n','Perfect Crime',{critChance:28,critDmg:14},'Neatly done, and nobody standing to describe it.'],
-    ['m','Deft',{dex:5,int:5}]]},
-
-  /* ---- Intelligence (Witch) ---- */
-  {id:'in_a',from:{start:'int'},da:-5,dr:-1,nodes:[
-    ['m','Arcane Study',{spellPct:9}],['m','Deep Thought',{mana:22}],
-    ['n','Conflagration',{firePct:20,igniteBuild:30},'Fire that is not in a hurry to go out.'],
-    ['m','Kindling',{firePct:10}],['m','Insight',{int:8}],
-    ['n','Pyromancer',{firePct:24,areaPct:12},'The room takes the damage on the target’s behalf.']]},
-  {id:'in_b',from:{start:'int'},da:5,dr:-1,nodes:[
-    ['m','Static',{lightPct:10}],['m','Conductivity',{shockBuild:25}],
-    ['n','Overcharge',{lightPct:20,shockBuild:30},'Everything nearby becomes a slightly better conductor.'],
-    ['m','Energy Shield',{es:26}],['m','Ward',{esPct:9}],
-    ['n','Aegis',{esPct:22,resAll:6},'A shell that fills back in when nobody is looking at it.']]},
-  {id:'in_c',from:{node:'in_a_2'},da:-9,dr:-1,nodes:[
-    ['m','Quick Recitation',{cspd:7}],['m','Elemental Study',{elePct:9}],
-    ['n','Elementalist',{elePct:20,resAll:8},'All three at once, none of them favoured.'],
-    ['m','Spell Echo',{cspd:9}],
-    ['n','Wide Casting',{areaSize:18,areaPct:14},'What you cast arrives across a wider piece of floor.']]},
-  {id:'in_rim',from:{start:'int'},da:11,dr:0,nodes:[
-    ['m','Mana Flow',{manaRegen:2}],['m','Reservoir',{manaPct:8}],
-    ['n','Deep Well',{manaPct:14,spirit:15},'There is more room in you than there was.'],
-    ['m','Scholar',{int:7}]]},
-
-  /* ---- Strength / Intelligence (Templar) ---- */
-  {id:'si_a',from:{start:'strint'},da:-5,dr:-1,nodes:[
-    ['m','Zeal',{meleePct:8}],['m','Devotion',{spellPct:8}],
-    ['n','Consecrate',{firePct:18,meleePct:12},'The swing and the fire arrive a half-beat apart.'],
-    ['m','Hymn',{life:10,mana:12}],['m','Faith',{str:5,int:5}],
-    ['n','Templar’s Resolve',{lifePct:6,esPct:12},'Two kinds of protection, neither of them subtle.']]},
-  {id:'si_b',from:{start:'strint'},da:5,dr:-1,nodes:[
-    ['m','Warded Plate',{resAll:5}],['m','Sanctified',{armour:28}],
-    ['n','Purity',{resAll:10},'Whatever they throw arrives thinner than it left.'],
-    ['m','Chastening',{elePct:10}],['m','Anointed',{spirit:12}],
-    ['n','Reservation',{spirit:25},'Room for one more standing miracle.']]},
-  {id:'si_c',from:{node:'si_b_2'},da:9,dr:-1,nodes:[
-    ['m','Retribution',{critDmg:12}],['m','Judgement',{elePct:10}],
-    ['n','Inquisitor',{elePct:22,critChance:24},'Certainty, applied at speed.'],
-    ['m','Reliquary',{es:30}],
-    ['n','Chaos Innoculation',{resChaos:22},'The chaos finds nothing in you that it recognises.']]},
-  {id:'si_rim',from:{start:'strint'},da:11,dr:0,nodes:[
-    ['m','Blessing',{lifeRegen:2}],['m','Vestments',{armour:24}],
-    ['n','Sacred Ground',{lifeRegen:4,resAll:5},'The floor you stand on is on your side.'],
-    ['m','Ordained',{int:5,str:5}]]},
-
-  /* ---- inner ring: shared, expensive, and worth walking to ---- */
-  {id:'core_n',from:{node:'st_c_4'},da:0,dr:-1,nodes:[
-    ['m','Core Fortitude',{lifePct:5}],
-    ['n','Heart of the Rift',{lifePct:10,resAll:6},'Something down here agrees to keep you alive a while longer.']]},
-  {id:'core_e',from:{node:'sd_c_4'},da:0,dr:-1,nodes:[
-    ['m','Core Precision',{critDmg:12}],
-    ['n','Perfect Form',{aspd:8,cspd:8,critDmg:14},'Everything you do arrives on time.']]},
-  {id:'core_s',from:{node:'di_c_4'},da:0,dr:-1,nodes:[
-    ['m','Core Patience',{dotPct:12}],
-    ['n','Long Game',{dotPct:24,chaosPct:12},'You have stopped needing the kill to be immediate.']]},
-  {id:'core_w',from:{node:'in_c_4'},da:0,dr:-1,nodes:[
-    ['m','Core Focus',{elePct:10}],
-    ['n','Unbound Element',{elePct:22,areaSize:12},'The element stops asking where the edges are.']]},
-  /* ---- second layer: filler spokes and outer arcs, mostly minor ---- */
-  {id:'st_d',from:{start:'str'},da:-11,dr:-1,nodes:[
-    ['m','Callused',{life:9}],['m','Heaving',{meleePct:7}],['m','Stone Grip',{armour:24}],
-    ['n','Titan\u2019s Bearing',{lifePct:7,armourPct:14},'Everything about you is load-bearing.'],
-    ['m','Bracing',{str:6}],['k','unwavering',{keystone:'unwavering'}]]},
-  {id:'st_rim2',from:{node:'st_rim_2'},da:9,dr:0,nodes:[
-    ['m','Field Dressing',{lifeRegen:1}],['m','Old Scars',{life:10}],
-    ['m','Deep Breath',{lifePct:4}],['m','Stubborn',{stunBuild:-15}],['m','Weathered',{resAll:4}]]},
-  {id:'sd_d',from:{start:'strdex'},da:-11,dr:-1,nodes:[
-    ['m','Lunge',{aspd:4}],['m','Feint',{critChance:18}],['m','Whipcord',{physPct:8}],
-    ['n','Duellist\u2019s Grace',{aspd:8,evasionPct:12},'You never stand where the last exchange ended.'],
-    ['m','Wristwork',{aspd:4}],['k','crimson_dance',{keystone:'crimson_dance'}]]},
-  {id:'sd_rim2',from:{node:'sd_rim_2'},da:9,dr:0,nodes:[
-    ['m','Sidestep',{evasion:34}],['m','Loose Guard',{moveSpeed:2}],
-    ['m','Trained',{dex:5}],['m','Read the Room',{accuracy:70}],['m','Second Nature',{aspd:4}]]},
-  {id:'dx_d',from:{start:'dex'},da:-11,dr:-1,nodes:[
-    ['m','Fletching',{projPct:7}],['m','Draw Weight',{physPct:8}],['m','Long Sight',{accuracy:80}],
-    ['n','Ranger\u2019s Patience',{projPct:16,critDmg:12},'One arrow, placed, beats six thrown.'],
-    ['m','Windage',{projSpeed:14}],['k','avatar_fire',{keystone:'avatar_fire'}]]},
-  {id:'dx_rim2',from:{node:'dx_rim_2'},da:9,dr:0,nodes:[
-    ['m','Light Frame',{evasion:32}],['m','Roadworn',{moveSpeed:2}],
-    ['m','Lithe',{dex:5}],['m','Hunter\u2019s Eye',{critChance:16}],['m','Endless March',{lifeRegen:1}]]},
-  {id:'di_d',from:{start:'dexint'},da:-11,dr:-1,nodes:[
-    ['m','Brew',{chaosPct:8}],['m','Sap',{dotPct:9}],['m','Numbing Cut',{poisonBuild:18}],
-    ['n','Apothecary',{dotPct:18,poisonBuild:20},'Measured out, and measured badly on purpose.'],
-    ['m','Thin Blade',{critChance:16}],['k','hollow_bones',{keystone:'hollow_bones'}]]},
-  {id:'di_rim2',from:{node:'di_rim_2'},da:9,dr:0,nodes:[
-    ['m','Shroud',{es:20}],['m','Unlit',{evasion:30}],
-    ['m','Whisper',{cspd:4}],['m','Cold Hands',{critDmg:10}],['m','Quiet Mind',{mana:18}]]},
-  {id:'in_d',from:{start:'int'},da:-11,dr:-1,nodes:[
-    ['m','Recitation',{spellPct:8}],['m','Chalk Circle',{areaSize:8}],['m','Ledger',{mana:20}],
-    ['n','Grimoire',{spellPct:18,cspd:6},'Somebody else did the difficult thinking already.'],
-    ['m','Marginalia',{int:6}],['n','Void Battery',{manaPct:16,spellPct:12},'Power kept where your reserves used to be.']]},
-  {id:'in_rim2',from:{node:'in_rim_2'},da:9,dr:0,nodes:[
-    ['m','Trance',{cspd:4}],['m','Steady Chant',{manaRegen:1}],
-    ['m','Ink',{spellPct:7}],['m','Cold Reading',{coldPct:8}],['m','Charged',{lightPct:8}]]},
-  {id:'si_d',from:{start:'strint'},da:-11,dr:-1,nodes:[
-    ['m','Litany',{spellPct:7}],['m','Censer',{firePct:8}],['m','Mail Coif',{armour:22}],
-    ['n','Crusader',{meleePct:14,resAll:6},'Armoured conviction, swung on the beat.'],
-    ['m','Tithe',{spirit:10}],['n','Divine Favour',{spirit:20,lifeRegen:2},'Something is keeping an eye on you.']]},
-  {id:'si_rim2',from:{node:'si_rim_2'},da:9,dr:0,nodes:[
-    ['m','Plated',{armour:22}],['m','Anointment',{resFire:6}],
-    ['m','Cold Iron',{resCold:6}],['m','Grounded',{resLight:6}],['m','Warded',{resChaos:5}]]}
-
-];
-/* rim connections, so neighbouring class areas are walkable between */
-const TREE_LINKS = [
-  /* each class's rim arc runs round to the next class's start, so the whole
-     outer edge is walkable in both directions */
-  ['st_rim_4','start_strdex'],['sd_rim_4','start_dex'],['dx_rim_4','start_dexint'],
-  ['di_rim_4','start_int'],['in_rim_4','start_strint'],['si_rim_4','start_str'],
-  ['st_rim2_5','start_strdex'],['sd_rim2_5','start_dex'],['dx_rim2_5','start_dexint'],
-  ['di_rim2_5','start_int'],['in_rim2_5','start_strint'],['si_rim2_5','start_str'],
-  ['core_n_2','core_e_2'],['core_e_2','core_s_2'],['core_s_2','core_w_2'],['core_w_2','core_n_2']
-];
-
-const TREE = {nodes:{}, list:[]};
+const TREE = {nodes:{}, list:[], links:[]};
 (function buildTree(){
-  function add(id,x,y,type,name,st,desc){
-    const n={id:id,x:x,y:y,type:type,name:name,st:st||{},desc:desc||'',adj:[]};
-    TREE.nodes[id]=n; TREE.list.push(n);
-    return n;
+  const KIND=['minor','notable','travel','keystone','start'];
+  for(let i=0;i<TREE_NODES.length;i++){
+    const r=TREE_NODES[i];
+    const n={id:TREE_IDS[i], x:r[0], y:r[1], type:KIND[r[2]], name:r[3],
+      st:r[4]?r[4]:{}, desc:'', adj:[]};
+    if(r[5]){ n.st=Object.assign({keystone:r[5]},n.st); n.desc=KEYSTONES[r[5]].text; }
+    else if(n.type==='start') n.desc='Where this class begins on the tree.';
+    else if(n.type==='travel') n.desc='A stretch of road. It grants nothing; it only costs a point to pass.';
+    TREE.nodes[n.id]=n; TREE.list.push(n);
   }
-  function link(a,b){
-    const A=TREE.nodes[a], B=TREE.nodes[b];
-    if(!A||!B) return;
-    if(A.adj.indexOf(b)<0) A.adj.push(b);
-    if(B.adj.indexOf(a)<0) B.adj.push(a);
+  for(let i=0;i<TREE_EDGES.length;i+=2){
+    const A=TREE.list[TREE_EDGES[i]], B=TREE.list[TREE_EDGES[i+1]];
+    A.adj.push(B.id); B.adj.push(A.id);
+    TREE.links.push([A,B]);
   }
-  /* class start nodes around the rim */
-  for(const k in TREE_STARTS){
-    const a=TREE_STARTS[k]*Math.PI/180;
-    add('start_'+k, Math.cos(a)*R_START, Math.sin(a)*R_START, 'start',
-        START_LABEL[k]+' Start', {}, 'Where this class begins on the tree.');
-  }
-  for(const br of TREE_BRANCHES){
-    let px,py,pid,baseA,baseR;
-    if(br.from.start){
-      pid='start_'+br.from.start;
-      baseA=TREE_STARTS[br.from.start];
-      baseR=R_START;
-    } else {
-      pid=br.from.node;
-      const pn=TREE.nodes[pid];
-      if(!pn) continue;
-      baseA=Math.atan2(pn.y,pn.x)*180/Math.PI;
-      baseR=Math.hypot(pn.x,pn.y);
-    }
-    px=pid;
-    br.nodes.forEach((spec,i)=>{
-      const step=i+1;
-      const ang=(baseA + (br.da||0)*step)*Math.PI/180;
-      const rad=baseR + (br.dr||0)*R_STEP*step;
-      const id=br.id+'_'+step;
-      const type= spec[0]==='k'?'keystone': spec[0]==='n'?'notable':'minor';
-      let name=spec[1], st=spec[2]||{}, desc=spec[3]||'';
-      if(type==='keystone'){ const ks=KEYSTONES[spec[1]]; name=ks.name; desc=ks.text; }
-      add(id, Math.cos(ang)*rad, Math.sin(ang)*rad, type, name, st, desc);
-      link(px,id);
-      px=id;
-    });
-  }
-  for(const [a,b] of TREE_LINKS) link(a,b);
-
-  /* Relaxation: the authored branches are polar walks, so inward spokes
-     crowd near the middle. Push overlapping nodes apart and keep everything
-     off the very centre. Class starts stay pinned to the rim. */
-  /* Overlap resolution through a spatial grid rather than every pair, and it
-     stops the moment nothing moves. Boot must not stall on this. */
-  const MIN=46, CELL=46;
-  const buckets=new Map();
-  const bkey=(x,y)=>((y/CELL)|0)*100000+((x/CELL)|0);
-  for(let pass=0;pass<90;pass++){
-    buckets.clear();
-    for(const n of TREE.list){
-      const k=bkey(n.x,n.y);
-      let arr=buckets.get(k);
-      if(!arr){ arr=[]; buckets.set(k,arr); }
-      arr.push(n);
-    }
-    let moved=0;
-    for(const a of TREE.list){
-      const cx=(a.x/CELL)|0, cy=(a.y/CELL)|0;
-      for(let oy=-1;oy<=1;oy++) for(let ox=-1;ox<=1;ox++){
-        const near=buckets.get((cy+oy)*100000+(cx+ox));
-        if(!near) continue;
-        for(const b of near){
-          if(b===a) continue;
-          let dx=b.x-a.x, dy=b.y-a.y;
-          let d=Math.hypot(dx,dy);
-          if(d>=MIN) continue;
-          if(d<0.01){ dx=Math.cos(a.x*2.4); dy=Math.sin(a.y*2.4); d=1; }
-          const push=(MIN-d)/2;
-          const ux=dx/d, uy=dy/d;
-          if(a.type!=='start'){ a.x-=ux*push; a.y-=uy*push; }
-          if(b.type!=='start'){ b.x+=ux*push; b.y+=uy*push; }
-          moved++;
-        }
-      }
-    }
-    for(const n of TREE.list){
-      if(n.type==='start') continue;
-      const r=Math.hypot(n.x,n.y);
-      if(r<120){ const k=120/(r||1); n.x*=k; n.y*=k; }
-      if(r>R_START+40){ const k=(R_START+40)/r; n.x*=k; n.y*=k; }
-    }
-    if(!moved) break;
-  }
-  /* the link list never changes: build it once instead of every frame */
-  TREE.links=[];
-  const seenL={};
-  for(const n of TREE.list) for(const id of n.adj){
-    const k=n.id<id?n.id+'|'+id:id+'|'+n.id;
-    if(seenL[k]) continue;
-    seenL[k]=1;
-    TREE.links.push([n,TREE.nodes[id]]);
+  /* A bucket grid so hit-testing a pointer against 606 nodes is a handful of
+     distance checks rather than all of them, on every pointermove. */
+  TREE.cell=64;
+  TREE.grid=new Map();
+  for(const n of TREE.list){
+    const k=Math.floor(n.y/TREE.cell)*100000+Math.floor(n.x/TREE.cell);
+    let a=TREE.grid.get(k);
+    if(!a){ a=[]; TREE.grid.set(k,a); }
+    a.push(n);
   }
 })();
 
-/* ------------------------------------------------------------------- slots */
-const SLOTS = ['weapon','offhand','helmet','body','gloves','boots','belt','ring1','ring2','amulet'];
-const SLOT_LABEL = {weapon:'Weapon',offhand:'Offhand',helmet:'Helmet',body:'Body Armour',
-  gloves:'Gloves',boots:'Boots',belt:'Belt',ring1:'Ring',ring2:'Ring',amulet:'Amulet'};
 
 /* -------------------------------------------------------------------- bases
    Bases carry an implicit mod and the core defence or damage numbers.
@@ -1408,26 +1949,53 @@ const BOSSES = {
 
 /* --------------------------------------------------------------------- zones */
 const ZONES = {
-  hideout:{name:'Your Hideout',level:0,town:1,hideout:1,
+  /* A hub is never procedural: the player has to be able to learn its
+     geography. '.' is floor, ' ' is wall, and a letter is floor plus the
+     fixture anchored there. S is the arrival point, P the portal. */
+  hideout:{name:'Your Hideout',level:0,town:1,hideout:1,safe:1,
     theme:{bg:'#06070a',floor:'#262b30',rim:'#8fa8c8',mote:'dust',moteColor:'#b8c8dc'},
-    blobs:5,pool:[],boss:null,next:null,
-    fixtures:[
-      {id:'stash',name:'Stash',kind:'stash',
-       mech:'Store and retrieve gear across all your characters. Four tabs.',
-       line:'Four drawers, shared by everyone who still comes back.'},
-      {id:'bench',name:'Crafting Bench',kind:'bench',
-       mech:'Put an item on the bench to see every orb you hold that can change it, and what each would do, before you commit. Essence buys a modifier you pick.',
-       line:'Someone else\u2019s tools, left where they fell.'},
-      {id:'mirror',name:'Mirror of Second Thoughts',kind:'mirror',
-       mech:'Refund one leaf passive, or all of them, for salvage shards.',
-       line:'It shows you the version of yourself that chose differently.'},
-      {id:'gate',name:'Standing Gate',kind:'waypoint',
-       mech:'Travel to any zone you have already reached.',
-       line:'It remembers every place you have already survived.'}
-    ]},
-  town:{name:'The Last Landing',level:0,town:1,
+    pool:[],boss:null,next:null,
+    layout:{
+      rows:[
+      '       ......       ',
+      '    ............    ',
+      '  ....X......B....  ',
+      ' .................. ',
+      '....................',
+      '....................',
+      '.........S..........',
+      '....................',
+      '....................',
+      ' .................. ',
+      '  ....M......G....  ',
+      '    .....P......    ',
+      '       ......       '
+    ],
+      at:{X:'stash',B:'bench',M:'mirror',G:'waypoint'}
+    }},
+  town:{name:'The Last Landing',level:0,town:1,safe:1,
+    layout:{
+      rows:[
+      '         ......         ',
+      '      ............      ',
+      '    ................    ',
+      '   ..................   ',
+      '  ....................  ',
+      ' ...................... ',
+      '.....V............G.....',
+      '........................',
+      '........................',
+      ' .........S............ ',
+      '  ....................  ',
+      '   ..................   ',
+      '    ................    ',
+      '      .....P......      ',
+      '         ......         '
+    ],
+      at:{V:'vendor',G:'waypoint'}
+    },
     theme:{bg:'#07070a',floor:'#2e2a22',rim:'#c8a96e',mote:'dust',moteColor:'#c8a96e'},
-    blobs:7,pool:[],boss:null,next:'drowned_shore'},
+    pool:[],boss:null,next:'drowned_shore'},
   drowned_shore:{name:'Drowned Shore',level:1,
     theme:{bg:'#04070c',floor:'#1d2a35',rim:'#6fa8c8',mote:'bubble',moteColor:'#8ec6e4'},
     pool:[['drowned_hand',3],['brinecrawler',3],['tide_archer',2],['bloatfish',1]],
@@ -1465,14 +2033,25 @@ const ZONE_ORDER = ['hideout','town','drowned_shore','tidewrack_caves','sunken_r
   'cathedral_ruins','the_ossuary','emberdeep','wardens_sanctum'];
 
 /* -------------------------------------------------------------------- vendors */
-const NPCS = [
-  {id:'vendor',name:'Serrec, Quartermaster',kind:'vendor',
+/* Every hub fixture in one place. Hub layouts reference these by letter,
+   so a fixture's position is authored in the map itself. */
+const FIXTURES = {
+  vendor:{name:'Serrec, Quartermaster',kind:'vendor',
     mech:'Buy currency with shards, exchange orbs at better rates than buying, and sell gear.',
     line:'Everything here belonged to somebody who stopped needing it.'},
-  {id:'waypoint',name:'The Standing Gate',kind:'waypoint',
+  waypoint:{name:'The Standing Gate',kind:'waypoint',
     mech:'Travel to any zone you have already reached.',
-    line:'It remembers every place you have already survived.'}
-];
+    line:'It remembers every place you have already survived.'},
+  stash:{name:'Stash',kind:'stash',
+    mech:'Store and retrieve gear across all your characters. Four tabs.',
+    line:'Four drawers, shared by everyone who still comes back.'},
+  bench:{name:'Crafting Bench',kind:'bench',
+    mech:'Put an item on the bench to see every orb you hold that can change it, and what each would do, before you commit. Essence buys a modifier you pick.',
+    line:'Someone else\u2019s tools, left where they fell.'},
+  mirror:{name:'Mirror of Second Thoughts',kind:'mirror',
+    mech:'Refund one leaf passive, or all of them, for salvage shards.',
+    line:'It shows you the version of yourself that chose differently.'}
+};
 /* what the quartermaster sells, and the currency exchange rates */
 const SHOP_STOCK = [
   {cur:'wisdom',price:1},{cur:'transmute',price:2},{cur:'augment',price:4},
@@ -1525,7 +2104,6 @@ function roman(n){return ['I','II','III','IV'][n]||String(n+1);}
 let uidCounter = 1;
 function newUid(){ return 'i'+(uidCounter++)+'_'+Math.floor(Math.random()*1e6); }
 
-const DTYPES = ['physical','fire','cold','lightning','chaos'];
 /* damage type -> the key it uses in st.m. 'physical' is stored as 'phys',
    which is exactly the mismatch that silently ate every physical increase. */
 const DTYPE_MULT = {physical:'phys',fire:'fire',cold:'cold',lightning:'lightning',chaos:'chaos'};
@@ -1535,7 +2113,15 @@ const AIL_COLOR = {stun:'#e8d8a0',freeze:'#8fd0e8',ignite:'#e07a3c',shock:'#e8d8
   poison:'#8fc060',bleed:'#c04040'};
 
 /* XP required to advance from the given level */
-function xpForLevel(lv){ return Math.round(38*Math.pow(lv,1.62) + 22*lv); }
+/* Act 1 is eight zones capped at monster level 16. A full clear of all eight
+   used to carry a character to level 22 in about an hour — ten times too
+   fast, and it left the tree arriving faster than it could be read.
+   This curve is steep enough that one clean pass through the act ends around
+   level 13, two around 16, and the zone level pulls ahead of the character
+   from the fifth zone on, so the player is always a little under-levelled.
+   The shallow first term keeps the opening levels quick. */
+const MAX_LEVEL = 60;
+function xpForLevel(lv){ return Math.round(130*Math.pow(lv,1.20) + 40*Math.pow(lv,2.10)); }
 
 /* ==========================================================================
    GLOBAL RUNTIME STATE
@@ -1560,8 +2146,8 @@ const G = {
   touch:{id:null,ox:0,oy:0,dx:0,dy:0,active:false,btn:{}},
   view:{w:0,h:0,dpr:1}, dprCap:2, slowT:0,
   panel:null, tree:{x:0,y:0,z:0.62,drag:false,sel:null,set:0,search:''},
-  drag:null, tip:null, toastT:0, prompt:null,
-  explored:null, mapMode:0, kills:0, pendingLevel:0
+  tip:null, toastT:0, prompt:null,
+  explored:null, kills:0, mirrors:[]
 };
 window.G=G;
 
@@ -1653,10 +2239,11 @@ function newCharacter(name,clsKey){
   G.ch=prev;
   return ch;
 }
-const BOSS_POINTS = 3;
+const BOSS_POINTS = 6;
 function clearedCount(ch){ return ch.zonesCleared?Object.keys(ch.zonesCleared).length:0; }
-/* one point per level plus three for the first kill of each zone's master:
-   39 from levels and 24 from the eight masters */
+/* One point per level, plus six for the first kill of each zone's master.
+   A character who has finished Act 1 twice over holds roughly 63: a real
+   route through the tree rather than a handful of adjacent picks. */
 function charPoints(ch){ return (ch.level-1) + clearedCount(ch)*BOSS_POINTS; }
 function pointsSpent(ch){ return Object.keys(ch.passives).length; }
 
@@ -1706,7 +2293,10 @@ function makeItem(base,ilvl,rarity,uniqueKey){
   const it={uid:newUid(),b:base,il:Math.max(1,ilvl|0),r:rarity|0,pre:[],suf:[],q:0,
     runes:new Array(runeSocketCount(base)).fill(null),uq:null,idf:true,nm:null,cor:false};
   if(uniqueKey){
+    /* uniques carry no rolled mods, but they are still physical objects and
+       roll quality like anything else */
     it.uq=uniqueKey; it.r=3; it.idf=false;
+    if(Math.random()<0.35) it.q=rndi(1,12);
     return it;
   }
   if(it.r>=1){
@@ -1804,7 +2394,6 @@ function itemLevelReq(it){ return Math.max(1, Math.round(BASES[it.b].ilvl*0.9));
 
 /* ------------------------------------------------------------------ crafting */
 function modCount(it){ return it.pre.length+it.suf.length; }
-function maxMods(it){ return it.r===1?2 : it.r===2?6 : 0; }
 function addRandomMod(it){
   const ex=it.pre.concat(it.suf).map(m=>m.id);
   const preFull = it.pre.length >= (it.r===1?1:3);
@@ -1948,22 +2537,29 @@ function recalc(){
   life *= 1+(S.lifePct||0)/100;
   if(flags.lifePctMult) life *= 1+flags.lifePctMult/100;
   if(keys.hollow_bones) life *= 0.7;
+  if(keys.glass_cannon) life *= 0.55;
+  if(keys.chaos_inoc) life = 1;
   st.maxLife=Math.max(1,Math.round(life));
 
   let mana = 20 + cls.mana + ch.level*5 + int*2 + (S.mana||0);
   mana *= 1+(S.manaPct||0)/100;
   if(flags.manaPctMult) mana *= 1+flags.manaPctMult/100;
   if(keys.blood_magic) mana=0;
-  st.maxMana=Math.max(0,Math.round(mana));
 
   let es = (S.es||0) + Math.floor(int*0.5);
   es *= 1+(S.esPct||0)/100;
   if(flags.esZero) es=0;
+  if(keys.acrobatics) es *= 0.5;
+  /* Eldritch Battery folds the whole shield into the mana pool */
+  if(keys.eldritch){ mana += es; es = 0; }
+  st.maxMana=Math.max(0,Math.round(mana));
   st.maxES=Math.max(0,Math.round(es));
 
   /* defences */
   let armour=(S.armour||0)*(1+(S.armourPct||0)/100);
   let evasion=(35+dex*2+(S.evasion||0))*(1+(S.evasionPct||0)/100);
+  if(keys.acrobatics){ evasion*=1.45; armour*=0.5; }
+  if(keys.runic_skin) armour*=0.65;
   if(keys.iron_reflexes){ armour+=evasion; evasion=0; }
   if(keys.unwavering) evasion=0;
   st.armour=Math.round(armour);
@@ -1975,7 +2571,7 @@ function recalc(){
     fire:clamp((S.resFire||0)+(S.resAll||0)+zoneRes,-100,RES_CAP),
     cold:clamp((S.resCold||0)+(S.resAll||0)+zoneRes,-100,RES_CAP),
     lightning:clamp((S.resLight||0)+(S.resAll||0)+zoneRes,-100,RES_CAP),
-    chaos:clamp((S.resChaos||0)+Math.floor(zoneRes/2),-100,RES_CAP)
+    chaos:keys.chaos_inoc?100:clamp((S.resChaos||0)+Math.floor(zoneRes/2),-100,RES_CAP)
   };
   st.resRaw={fire:(S.resFire||0)+(S.resAll||0),cold:(S.resCold||0)+(S.resAll||0),
     lightning:(S.resLight||0)+(S.resAll||0),chaos:(S.resChaos||0)};
@@ -1989,12 +2585,21 @@ function recalc(){
   if(keys.resolute){ st.critChance=0; }
   if(keys.ele_overload){ st.critDmg=0; }
   st.accuracy=200+dex*3+(S.accuracy||0);
-  st.aspd=w.aspd*(1+(S.aspd||0)/100+dex*0.0015);
+  st.aspd=w.aspd*(1+(S.aspd||0)/100+dex*0.0015)*(keys.berserk?1.3:1);
   st.cspd=1*(1+(S.cspd||0)/100);
   st.moveSpeed=200*(1+(S.moveSpeed||0)/100);
-  st.leech=(S.leech||0);
-  st.lifeRegen=flags.noRegen?0:(1+ch.level*0.12+(S.lifeRegen||0));
-  st.manaRegen=(1.4+ch.level*0.16+(S.manaRegen||0));
+  st.leech=(S.leech||0)*(keys.vaal_pact?1.6:1);
+  st.lifeRegen=(flags.noRegen||keys.vaal_pact)?0:(1+ch.level*0.12+(S.lifeRegen||0));
+  st.manaRegen=(1.4+ch.level*0.16+(S.manaRegen||0))*(keys.mind_matter?0.5:1);
+  /* Mind over Matter shunts part of every hit into the mana pool */
+  st.mindMatter=keys.mind_matter?0.30:0;
+  /* Berserker buys its speed and damage with everything landing harder */
+  st.dmgTaken=keys.berserk?1.3:1;
+  /* Runic Skin lets armour work against elemental hits too */
+  st.armourAllTypes=!!keys.runic_skin;
+  /* Wicked Ward never breaks the recharge, but starts it far later */
+  st.wardUninterrupted=!!keys.wicked_ward;
+  st.esDelayMult=keys.wicked_ward?2.6:1;
   st.spiritMax=cls.spirit+30+(S.spirit||0);
   st.spiritUsed=spiritUsed;
   st.spiritBreak=spiritBreak;
@@ -2006,19 +2611,32 @@ function recalc(){
     phys:1+(S.physPct||0)/100, fire:1+(S.firePct||0)/100, cold:1+(S.coldPct||0)/100,
     lightning:1+(S.lightPct||0)/100, chaos:1+(S.chaosPct||0)/100,
     ele:1+(S.elePct||0)/100+(keys.ele_overload?0.4:0),
-    melee:1+(S.meleePct||0)/100+str*0.006, proj:1+(S.projPct||0)/100+dex*0.005,
+    melee:1+(S.meleePct||0)/100+str*0.006,
+    proj:1+(S.projPct||0)/100+dex*0.005+(keys.iron_grip?str*0.006:0),
     spell:1+(S.spellPct||0)/100+int*0.006+(keys.hollow_bones?0.4:0), area:1+(S.areaPct||0)/100,
-    dot:1+(S.dotPct||0)/100, all:1+(S.dmgPct||0)/100
+    dot:1+(S.dotPct||0)/100,
+    all:(1+(S.dmgPct||0)/100)*(keys.glass_cannon?1.55:1)*(keys.berserk?1.3:1)
+        *(keys.ancestral?0.65:1)
   };
+  /* Ancestral Bond hands your damage to what you put on the ground */
+  st.totemMult=keys.ancestral?1.8:1;
   st.added={fire:S.addFire||0,cold:S.addCold||0,lightning:S.addLight||0,physical:S.addPhys||0};
   st.areaSize=1+(S.areaSize||0)/100;
   st.projSpeed=1+(S.projSpeed||0)/100;
-  st.build={stun:1+(S.stunBuild||0)/100,freeze:1+(S.freezeBuild||0)/100,
+  st.build={stun:(1+(S.stunBuild||0)/100),
+    freeze:(1+(S.freezeBuild||0)/100)*(keys.frostbound?1.7:1),
     ignite:1+(S.igniteBuild||0)/100,shock:1+(S.shockBuild||0)/100,
     poison:1+(S.poisonBuild||0)/100+(flags.poisonMore||0)/100,bleed:1+(S.bleedBuild||0)/100};
   st.stunTaken=1-((flags.stunResist||0)/100);
+  /* what the player can no longer inflict */
+  st.noStun=!!keys.frostbound;
+  st.noIgnite=!!keys.conduit;
+  st.noBossFreeze=!!keys.shatterborn;
+  st.shockMult=keys.conduit?1.6:1;
   st.raw=S;
   G.st=st;
+  /* every resolved skill reads from st, so they are all stale now */
+  invalidateSkills();
 
   /* clamp the live pools to the new maxima */
   const p=G.player;
@@ -2053,20 +2671,27 @@ function supportUsedBy(ch,supId){
     if(ch.gems[i].sockets.indexOf(supId)>=0) return i;
   return -1;
 }
-function skillStats(g,idx){
+/* `extraSups` is how a trigger gem lends its own supports to the skill it
+   casts: the triggered skill is resolved with both sets socketed. */
+function skillStats(g,idx,extraSups){
   const def=GEMS[g.gem], st=G.st, ch=G.ch;
   const lvl=gemLevelFor(g,def);
   const mods={}; let manaMult=1;
   const sups=[];
+  const supFlags={};
   const nSock=socketsUnlocked(lvl);
-  for(let i=0;i<g.sockets.length;i++){
-    const s=g.sockets[i];
-    if(!s || i>=nSock) continue;
+  const own=g.sockets.slice(0,nSock);
+  const all=extraSups&&extraSups.length? own.concat(extraSups) : own;
+  for(let i=0;i<all.length;i++){
+    const s=all[i];
+    if(!s) continue;
     const sup=SUPPORTS[s];
-    if(!sup) continue;
+    if(!sup||sups.indexOf(s)>=0) continue;
     sups.push(s);
     manaMult*=sup.manaMult;
     for(const k in sup.mods) mods[k]=(mods[k]||0)+sup.mods[k];
+    /* a support can change what the skill DOES, not just its numbers */
+    if(sup.flags) for(const k in sup.flags) supFlags[k]=(supFlags[k]||0)+sup.flags[k];
   }
   const tags=def.tags;
   const isAttack=tags.indexOf('attack')>=0;
@@ -2089,6 +2714,8 @@ function skillStats(g,idx){
   if(st.keys.avatar_fire) dtype='fire';
   if(flags.allChaos) dtype='chaos';
   if(mods.noEle && dtype!=='physical' && dtype!=='chaos') dtype='physical';
+  /* Armour Explosion converts the physical damage it detonates into fire */
+  if(supFlags.breakBoom && dtype==='physical') dtype='fire';
 
   /* multipliers */
   let mult=st.m.all;
@@ -2119,7 +2746,7 @@ function skillStats(g,idx){
   const spdMod=1+((isAttack?(mods.aspd||0):(mods.cspd||0))/100);
   const cd=(def.cd||0)/Math.max(0.25,speedStat*spdMod);
 
-  let mana=Math.round((def.mana||0)*manaMult*(flags.manaCostMult||1));
+  let mana=Math.round((def.mana||0)*manaMult*(flags.manaCostMult||1)*(st.keys.eldritch?0.75:1));
   const radius=(def.radius||0)*st.areaSize*(1+(mods.radiusPct||0)/100);
   const count=(def.count||1)+(isProj?(mods.projAdd||0):0);
 
@@ -2148,19 +2775,31 @@ function skillStats(g,idx){
     dmg:dmg, addFire:addFire, addCold:addCold, addLight:addLight,
     count:count, radius:radius, range:(def.range||0), speed:(def.speed||0)*st.projSpeed,
     arc:def.arc||0, cd:cd, mana:mana, duration:def.duration||0, interval:def.interval||0,
-    chains:(def.chains||0)+(mods.chainAdd||0), pierce:(def.pierce||0)+(mods.pierceAdd||0),
+    chains:(def.chains||0)+(mods.chainAdd||0)+((st.keys.conduit&&(def.chains||0))?1:0),
+    pierce:(def.pierce||0)+(mods.pierceAdd||0),
     crit:st.critChance*(1+(mods.critChance||0)/100), critDmg:st.critDmg,
     leech:st.leech+(mods.leechPct||0), noAilment:!!mods.noAilment,
-    ailment:def.ailment||null, combo:def.combo||null, spirit:def.spirit||0,
+    ailment:def.ailment||null, spirit:def.spirit||0,
     stunMult:def.stunMult||1, isAttack:isAttack, isSpell:isSpell, isArea:isArea,
     delay:def.delay||0, spread:def.spread||0, erratic:def.erratic||0,
     usable:usable, reason:reason, sups:sups, nSock:socketsUnlocked(lvl),
+    /* combo semantics: what this skill puts on, and what it takes off */
+    breakMult:def.breakMult||1, breakFlat:def.breakFlat||0,
+    shatter:!!def.shatter, detonates:!!def.detonates, consumes:def.consumes||null,
+    flammable:!!def.flammable, burnMult:def.burnMult||3.2, burnTime:def.burnTime||6,
+    flags:supFlags,
     bleedMult:def.bleedMult||1, poisonMult:def.poisonMult||1,
     trigger:def.trigger||null, energyMax:def.energyMax||0, energyPer:def.energyPer||0
   };
 }
-/* the five bound skills for the active weapon set */
+/* The five bound skills for the active weapon set. skillStats() is not cheap
+   and this is read several times a frame, so the resolved set is cached and
+   thrown away whenever anything it reads from changes: recalc(), a gear or
+   socket change, a rebind, a gem level, or a weapon swap. */
+let _skCache=null;
+function invalidateSkills(){ _skCache=null; }
 function activeSkills(){
+  if(_skCache) return _skCache;
   const ch=G.ch;
   const out=[];
   for(let i=0;i<5;i++){
@@ -2168,6 +2807,7 @@ function activeSkills(){
     if(gi==null||!ch.gems[gi]){ out.push(null); continue; }
     out.push(skillStats(ch.gems[gi],gi));
   }
+  _skCache=out;
   return out;
 }
 
@@ -2379,10 +3019,45 @@ function snapToWalkable(x,y,r){
   return tileCenter(t.x,t.y);
 }
 
+/* Carves a hand-authored layout centred in the nav grid and returns the
+   letter-anchored fixture tiles. */
+function carveLayout(L){
+  const h=L.rows.length, w=L.rows[0].length;
+  const ox=(GRID-w)>>1, oy=(GRID-h)>>1;
+  const spots={};
+  for(let y=0;y<h;y++){
+    const row=L.rows[y];
+    for(let x=0;x<row.length;x++){
+      const c=row.charAt(x);
+      if(c===' ') continue;
+      G.nav[NAV(ox+x,oy+y)]=1;
+      if(c!=='.') spots[c]={x:ox+x,y:oy+y};
+    }
+  }
+  return spots;
+}
 function generateZone(zoneKey){
   const z=ZONES[zoneKey];
   G.zoneKey=zoneKey; G.zdef=z; G.theme=z.theme;
   G.nav=new Uint8Array(GRID*GRID);
+  G.hubSpots=null;
+  if(z.layout){
+    /* a hub is authored, and identical on every visit */
+    const spots=carveLayout(z.layout);
+    buildEdge();
+    G.blobs=[]; G.liveBlobs=[];
+    G.explored=new Uint8Array(GRID*GRID);
+    const sp=spots.S||{x:GRID>>1,y:GRID>>1};
+    G.hubSpots=spots;
+    G.spawnTile=sp;
+    G.bossTile=sp;
+    G.exitTile=spots.P||sp;
+    G.reach=floodFrom(sp.x,sp.y);
+    bakeSprites(G.theme);
+    bakeMinimap();
+    initMotes();
+    return;
+  }
   const blobs=scatterBlobs(z.blobs||22);
   for(const b of blobs) carveBlob(b.x,b.y,b.r);
   connectBlobs(blobs);
@@ -2568,7 +3243,7 @@ function bakeVignettes(){
   VIG.dark=mk([[0,'rgba(0,0,0,0)'],[1,'rgba(0,0,0,.6)']],w/2,h*0.46,Math.min(w,h)*0.3,Math.max(w,h)*0.78);
   VIG.red=mk([[0,'rgba(150,20,14,0)'],[1,'rgba(150,20,14,1)']],w/2,h/2,Math.min(w,h)*0.2,Math.max(w,h)*0.72);
 }
-window.addEventListener('resize',()=>{resizeCanvas(); if(G.panel==='inv') openPanel('inv');});
+window.addEventListener('resize',()=>{ if(DRAG) endDrag(); resizeCanvas(); if(G.panel==='inv') openPanel('inv');});
 window.addEventListener('orientationchange',()=>setTimeout(()=>{resizeCanvas(); if(G.panel==='inv') openPanel('inv');},140));
 
 /* ==========================================================================
@@ -2733,7 +3408,9 @@ function makePlayer(){
     flaskCharge:{life:0,mana:0},trailT:0,
     ail:{stun:0,freeze:0,ignite:0,shock:0,poison:0,bleed:0},
     ailT:{stun:0,freeze:0,ignite:0,shock:0,poison:0,bleed:0},
-    dots:[],shockMag:0,moving:false};
+    dots:[],shockMag:0,moving:false,
+    /* dodge roll and sprint */
+    roll:0,rollMax:0,rollA:0,sprint:false,down:0,hitR:14};
   recalc();
   const p=G.player,st=G.st;
   p.life=st.maxLife; p.mana=st.maxMana; p.es=st.maxES;
@@ -2760,7 +3437,9 @@ function makeEnemy(defKey,x,y,forceRarity){
     tele:0,teleMax:0,aim:0,knock:{x:0,y:0},fuse:0,
     ail:{stun:0,freeze:0,ignite:0,shock:0,poison:0,bleed:0},
     ailT:{stun:0,freeze:0,ignite:0,shock:0,poison:0,bleed:0},
-    dots:[],threshold:0
+    dots:[],threshold:0,
+    /* armour soaks physical damage until it is broken off */
+    armourMax:0,armour:0,broken:0,poisonStacks:0
   };
   e.hp=e.maxHp;
   /* rarity: magic gets 1-2 mods, rare gets 3-4 and a name */
@@ -2789,32 +3468,97 @@ function makeEnemy(defKey,x,y,forceRarity){
   /* ailment meters scale with the monster's FINAL life, after rarity and
      modifiers, or Extra Life monsters would freeze faster than normal ones */
   e.threshold=Math.max(18,e.maxHp*0.55);
+  /* Armour, likewise sized off the final life total. Full armour soaks 35%
+     of physical damage; at zero the monster is Fully Broken and takes 20%
+     more instead, so breaking it is worth better than half its physical
+     mitigation. */
+  e.armourMax=Math.round(e.maxHp*0.45*(a.kind==='melee'?1.25:1));
+  e.armour=e.armourMax;
   return e;
+}
+/* ==========================================================================
+   ARMOUR BREAK
+   Physical damage strips armour. Players strip it three times as fast from
+   normal monsters and twice as fast from magic ones, so trash breaks in a
+   swing or two and a boss takes real commitment.
+   ========================================================================== */
+const BROKEN_TIME = 12;
+function breakScale(e){
+  if(e.boss) return 1;
+  return e.rarity===0?3 : e.rarity===1?2 : 1.35;
+}
+function armourFrac(e){ return e.armourMax>0? clamp(e.armour/e.armourMax,0,1) : 0; }
+/* How much of a physical hit the remaining armour soaks. */
+function armourSoak(e){
+  if(e.broken>0) return -0.20;            /* Fully Broken: takes more, not less */
+  return 0.35*armourFrac(e);
+}
+function breakArmour(e,amount,sk){
+  if(e.armourMax<=0||e.broken>0||amount<=0) return;
+  e.armour-=amount*breakScale(e)*(sk&&sk.breakMult?sk.breakMult:1);
+  if(e.armour>0){
+    if(Math.random()<0.5) spawnPart(e.x+rnd(-e.r,e.r),e.y+rnd(-e.r,e.r),rnd(-30,30),rnd(-60,-20),.5,2.2,'#cbbfa4',.92,false);
+    return;
+  }
+  e.armour=0;
+  e.broken=BROKEN_TIME;
+  metaTrigger('break');
+  burst(e.x,e.y,20,'#e0a070',240,3.6,.55,true);
+  spawnFx({type:'shock',x:e.x,y:e.y,r:0,max:e.r*3.4,life:.34,maxLife:.34,color:'#e0a070'});
+  dmgNumber(e.x,e.y-e.r-16,0,false,'physical','BROKEN');
+  sfx('crit');
+  /* Armour Explosion turns the break itself into a fire detonation */
+  if(sk&&sk.flags&&sk.flags.breakBoom){
+    const boom=e.maxHp*0.10+20;
+    spawnFx({type:'shock',x:e.x,y:e.y,r:0,max:150,life:.42,maxLife:.42,color:'#e07a3c'});
+    for(const o of nearbyEnemies(e.x,e.y,150)){
+      if(o.dead||o.dying) continue;
+      o.hp-=boom; o.hurt=.12;
+      dmgNumber(o.x,o.y-o.r,boom,false,'fire');
+      addBuildup(o,'ignite',boom*0.4,boom);
+      if(o.hp<=0) killEnemy(o);
+    }
+  }
+}
+/* A consumer cashes the Fully Broken state in: guaranteed critical strike,
+   and the armour goes straight back on. */
+function consumeBroken(e){
+  if(e.broken<=0) return false;
+  e.broken=0;
+  e.armour=e.armourMax;
+  burst(e.x,e.y,22,'#f0d0a0',260,3.8,.5,true);
+  return true;
 }
 function spawnEnemies(){
   G.enemies=[];
   const z=G.zdef;
   if(!z.pool.length) return;
+  /* Nothing spawns inside the safe radius around the arrival point, whichever
+     blob it happens to sit in. Measured from the spawn tile rather than the
+     player so it holds before the player exists. */
+  const sp=tileCenter(G.spawnTile.x,G.spawnTile.y);
+  const SAFE2=(TILE*5)*(TILE*5);
   for(const b of G.liveBlobs){
     const bt=navAt(b.x,b.y)?b:nearestWalkableTile(b.x,b.y);
-    const isSpawn=(bt.x===G.spawnTile.x&&bt.y===G.spawnTile.y);
     const n=rndi(2,4);
     for(let i=0;i<n;i++){
       let placed=false;
-      for(let att=0;att<10&&!placed;att++){
+      for(let att=0;att<14&&!placed;att++){
         const rad=b.r*rnd(.15,.95), ang=rnd(0,TAU);
         const tx=Math.round(bt.x+Math.cos(ang)*rad), ty=Math.round(bt.y+Math.sin(ang)*rad);
         if(navAt(tx,ty)!==1) continue;
         if(!G.reach[NAV(tx,ty)]) continue;
         const c=tileCenter(tx,ty);
-        if(isSpawn && d2(c.x,c.y,G.player.x,G.player.y)<(TILE*5)*(TILE*5)) continue;
+        if(d2(c.x,c.y,sp.x,sp.y)<SAFE2) continue;
         const e=makeEnemy(weightedPick(z.pool),c.x,c.y);
         if(e) G.enemies.push(e);
         placed=true;
       }
-      if(!placed && !isSpawn){
-        /* every offset missed — fall back to the blob centre rather than skip */
+      if(!placed){
+        /* every offset missed — fall back to the blob centre, unless that is
+           itself inside the safe radius, in which case this one just skips */
         const c=tileCenter(bt.x,bt.y);
+        if(d2(c.x,c.y,sp.x,sp.y)<SAFE2) continue;
         const e=makeEnemy(weightedPick(z.pool),c.x,c.y);
         if(e) G.enemies.push(e);
       }
@@ -2830,7 +3574,6 @@ function makeBoss(){
   }
   const def=BOSSES[z.boss];
   const c=tileCenter(G.bossTile.x,G.bossTile.y);
-  const sc=monsterScale(z.level);
   const b={
     key:z.boss,name:def.name,boss:true,x:c.x,y:c.y,r:def.r,rot:0,
     maxHp:Math.round(def.hp*(1+z.level*0.07)),hp:0,dmg:def.dmg*(1+z.level*0.05),
@@ -2845,6 +3588,12 @@ function makeBoss(){
   };
   b.hp=b.maxHp;
   b.threshold=b.maxHp*0.42;
+  /* A share of boss life would be unbreakable; a flat curve makes it about
+     ten committed swings, and breakScale gives the player no bonus here. */
+  b.armourMax=Math.round(320+z.level*75);
+  b.armour=b.armourMax;
+  b.broken=0;
+  b.poisonStacks=0;
   for(const p of def.patterns) b.cds[p]=rnd(1.5,4);
   G.boss=b;
   return b;
@@ -2852,25 +3601,20 @@ function makeBoss(){
 function placeNpcsAndPortals(){
   G.npcs=[]; G.portals=[];
   const z=G.zdef;
-  if(z.town){
-    /* town: three fixtures spread across the middle blobs, no monsters */
-    const spots=[];
-    for(const b of G.liveBlobs){
-      const t=navAt(b.x,b.y)?b:nearestWalkableTile(b.x,b.y);
-      spots.push(t);
-    }
-    const fixtures=z.fixtures||NPCS;
-    fixtures.forEach((n,i)=>{
-      const t=spots[Math.min(spots.length-1,i+1)]||spots[0];
+  if(z.layout){
+    /* fixtures stand exactly where the layout puts them, every visit */
+    const spots=G.hubSpots||{};
+    for(const letter in z.layout.at){
+      const key=z.layout.at[letter];
+      const t=spots[letter], f=FIXTURES[key];
+      if(!t||!f) continue;
       const c=tileCenter(t.x,t.y);
-      const q=snapToWalkable(c.x,c.y,20);
-      G.npcs.push({id:n.id,name:n.name,kind:n.kind,line:n.line,mech:n.mech,x:q.x,y:q.y,r:20});
-    });
-    const t=spots[spots.length-1];
-    const c=tileCenter(t.x,t.y);
+      G.npcs.push({id:key,name:f.name,kind:f.kind,line:f.line,mech:f.mech,x:c.x,y:c.y,r:20});
+    }
     const dest=(G.zoneKey==='hideout')?(G.ch.returnZone||'town'):(G.ch.reached||'drowned_shore');
-    const q=snapToWalkable(c.x,c.y+80,26);
-    G.portals.push({kind:'zone',to:dest,x:q.x,y:q.y,r:26,
+    const pt=spots.P||G.spawnTile;
+    const c=tileCenter(pt.x,pt.y);
+    G.portals.push({kind:'zone',to:dest,x:c.x,y:c.y,r:26,
       label:(G.zoneKey==='hideout'?'Return to ':'Descend to ')+ZONES[dest].name});
   } else {
     /* every zone has a way back to town at its entrance, and an exit at the far end */
@@ -2886,7 +3630,7 @@ function placeNpcsAndPortals(){
     }
   }
 }
-function enterZone(zoneKey,keepProgress){
+function enterZone(zoneKey){
   const ch=G.ch;
   generateZone(zoneKey);
   ch.zone=zoneKey;
@@ -2895,6 +3639,7 @@ function enterZone(zoneKey,keepProgress){
   const reachedOrder=ZONE_ORDER.indexOf(ch.reached||'drowned_shore');
   if(order>reachedOrder) ch.reached=zoneKey;
   G.shots=[]; G.fx=[]; G.clouds=[]; G.totems=[]; G.pickups=[]; G.enemies=[]; G.boss=null;
+  G.mirrors=[];
   G.hitStop=0; G.flash=0; G.dead=false;
   if(G.player){
     G.player.dots.length=0;
@@ -2931,6 +3676,10 @@ function ailmentActive(e,type){ return e.ailT[type]>0; }
 function addBuildup(e,type,amount,hitDmg){
   if(!amount||amount<=0) return;
   const st=G.st;
+  /* keystones that take an ailment away from you entirely */
+  if(type==='stun'&&st.noStun) return;
+  if(type==='ignite'&&st.noIgnite) return;
+  if(type==='freeze'&&st.noBossFreeze&&e.boss) return;
   e.ail[type]=(e.ail[type]||0)+amount*(st.build[type]||1);
   if(e.ail[type]<e.threshold) return;
   e.ail[type]=0;
@@ -2960,12 +3709,16 @@ function addBuildup(e,type,amount,hitDmg){
       addDot(e,'ignite',hitDmg*0.5*(st.build.ignite||1)*st.m.dot,4,'fire');
       break;
     case 'shock':
+      metaTrigger('shock');
       e.ailT.shock=4;
       e.shockMag=clamp(0.15+hitDmg/Math.max(1,e.maxHp)*0.9,0.1,0.5)*
         ((st.flags.shockDouble)?2:1);
       break;
     case 'poison':
-      addDot(e,'poison',hitDmg*0.32*st.m.dot,
+      /* Chaos theme: poison stacks feed off each other. Each stack already on
+         the target makes the next one 18% stronger, up to eight. */
+      e.poisonStacks=Math.min(8,(e.poisonStacks||0)+1);
+      addDot(e,'poison',hitDmg*0.32*st.m.dot*(1+(e.poisonStacks-1)*0.18),
         (G.st.flags.poisonShort?3:6),'chaos',true);
       break;
     case 'bleed':
@@ -2992,7 +3745,7 @@ function onFreeze(e){
   const ch=G.ch;
   ch.gems.forEach((g,i)=>{
     const def=GEMS[g.gem];
-    if(def && def.trigger==='freeze' && ch.auras[i]) addEnergy(i,def);
+    if(def && def.trigger==='freeze' && ch.auras[i]) addEnergy(i,def);   /* legacy path */
   });
   if(G.st.flags.freezeAura){
     for(const o of nearbyEnemies(e.x,e.y,150)){
@@ -3001,12 +3754,26 @@ function onFreeze(e){
     }
   }
 }
-function addEnergy(gemIdx,def){
+function addEnergy(gemIdx,def,amount){
   const p=G.player;
-  p.energy[gemIdx]=(p.energy[gemIdx]||0)+def.energyPer;
+  p.energy[gemIdx]=(p.energy[gemIdx]||0)+(amount==null?def.energyPer:amount);
   if(p.energy[gemIdx]>=def.energyMax){
     p.energy[gemIdx]=0;
     fireMetaGem(gemIdx);
+  }
+}
+/* Every trigger condition funnels through here, so adding one is a matter of
+   naming it and calling this from wherever it happens. `amount` overrides
+   the gem's fixed charge per event, which is how Cast when Hit charges off
+   the size of the hit rather than the count. */
+function metaTrigger(kind,amount,dt){
+  const ch=G.ch, p=G.player;
+  if(!ch||!p||G.dead) return;
+  for(let i=0;i<ch.gems.length;i++){
+    const def=GEMS[ch.gems[i].gem];
+    if(!def||def.trigger!==kind) continue;
+    if(!ch.auras[i]) continue;
+    addEnergy(i,def,dt!=null?def.energyPer*dt:amount);
   }
 }
 
@@ -3094,20 +3861,53 @@ function playerStunned(){
 function monsterTakeDamage(e,base,dtype,crit,sk,kx,ky){
   if(e.dead||e.dying) return 0;
   let dmg=base;
-  /* combo payoff: a finisher lands harder on a primed target */
+  /* ----------------------------------------------------------------- combos
+     A combo is a state one skill puts on, that another skill takes off. The
+     payoff is never "more damage on this target" — it is a guaranteed crit,
+     an explosion, or a field that keeps burning. */
   let comboed=null;
-  if(sk&&sk.combo==='finisher'){
-    if(ailmentActive(e,'freeze')){ dmg*=1.6; comboed='shatter'; }
-    else if(ailmentActive(e,'stun')){ dmg*=1.45; comboed='stun'; }
-    else if(ailmentActive(e,'ignite')){ dmg*=1.4; comboed='detonate'; }
+  /* SHATTER: a shatter skill consumes the frozen state and blows the target
+     apart, hurting everything standing near it. */
+  if(sk&&sk.shatter&&ailmentActive(e,'freeze')){
+    e.ailT.freeze=0;
+    comboed='shatter';
   }
-  if(G.st.flags.shatterCrit && crit && ailmentActive(e,'freeze')) dmg*=1.4;
-  if(e.ailT.shock>0) dmg*=1+(e.shockMag||0.2);
+  /* CONSUME FULLY BROKEN: a guaranteed critical strike, and the armour goes
+     back on so you have to break it again. The crit multiplier is normally
+     applied upstream by critDamage(), so a hit promoted to a crit here has
+     to pay it in: without this the "guaranteed crit" was a label on a
+     non-crit hit. */
+  if(sk&&sk.consumes==='broken'&&e.broken>0){
+    consumeBroken(e);
+    if(!crit) dmg*=1+(sk.critDmg||0)/100;
+    crit=true;
+    comboed=comboed||'broken';
+  }
+  /* DETONATE: a fire skill cashes in an ignite as an explosion. */
+  if(sk&&sk.detonates&&e.dots.some(d=>d.kind==='ignite')) comboed=comboed||'detonate';
+  if(G.st.flags.shatterCrit && crit && ailmentActive(e,'freeze')) crit=true;
+  /* Perfect Agony trades hit damage for ailment magnitude on every crit */
+  if(crit && G.st.keys.perfect_agony) dmg*=0.65;
+  /* Point Blank reads the distance the hit actually travelled */
+  if(G.st.keys.point_blank && sk && !sk.isSpell && sk.speed>0){
+    const d=dist(G.player.x,G.player.y,e.x,e.y);
+    if(d<200) dmg*=1.45; else if(d>500) dmg*=0.65;
+  }
+  if(e.ailT.shock>0) dmg*=1+(e.shockMag||0.2)*(G.st.shockMult||1);
   if(e.shieldMax>0&&e.shield>0){
     dmg*=0.45;
     e.shield-=dmg;
     if(e.shield<=0){ e.shield=0; burst(e.x,e.y,14,'#cfe0ff',210,3.4,.5,true); }
   }
+  /* Armour stands in front of physical damage; once broken it lets more in */
+  if(dtype==='physical'&&e.armourMax>0) dmg*=1-armourSoak(e);
+  /* Every physical hit strips armour. So does a hit that used to be physical
+     before a support converted it, which is the whole point of pairing
+     Armour Explosion with a physical attack. */
+  const consumedBreak=(comboed==='broken');
+  const strips=!consumedBreak&&((dtype==='physical')||(sk&&sk.flags&&sk.flags.breakBoom&&sk.isAttack));
+  if(strips) breakArmour(e,base*0.55,sk);
+  if(strips&&sk&&sk.breakFlat) breakArmour(e,sk.breakFlat,sk);
   e.hp-=dmg;
   e.hurt=0.12;
   if(kx||ky){ e.knock.x+=kx; e.knock.y+=ky; }
@@ -3117,10 +3917,27 @@ function monsterTakeDamage(e,base,dtype,crit,sk,kx,ky){
   shakeCam(crit?5:1.6);
   sfx(crit?'crit':'hit');
   if(comboed==='shatter'){
-    burst(e.x,e.y,26,'#a8e0f0',300,4,.6,true);
-    e.ailT.freeze=0;
-    spawnFx({type:'shock',x:e.x,y:e.y,r:0,max:90,life:.35,maxLife:.35,color:'#a8e0f0'});
-  } else if(comboed==='detonate'){
+    /* the frozen body comes apart: area damage to everything nearby, not a
+       bonus on the one target */
+    const rad=150*(G.st.areaSize||1);
+    const boom=dmg*1.1*(G.st.keys.shatterborn?1.5:1);
+    burst(e.x,e.y,30,'#a8e0f0',320,4.4,.65,true);
+    spawnFx({type:'shock',x:e.x,y:e.y,r:0,max:rad,life:.4,maxLife:.4,color:'#a8e0f0'});
+    shakeCam(7); setHitStop(0.09); sfx('crit');
+    dmgNumber(e.x,e.y-e.r-16,0,false,'cold','SHATTER');
+    for(const o of nearbyEnemies(e.x,e.y,rad)){
+      if(o===e||o.dead||o.dying) continue;
+      o.hp-=boom; o.hurt=.12;
+      dmgNumber(o.x,o.y-o.r,boom,false,'cold');
+      addBuildup(o,'freeze',boom*0.45,boom);
+      if(o.hp<=0) killEnemy(o);
+    }
+  }
+  if(comboed==='broken'){
+    dmgNumber(e.x,e.y-e.r-16,0,false,'physical','SUNDERED');
+    shakeCam(8); setHitStop(0.1);
+  }
+  if(comboed==='detonate'){
     const d=e.dots.find(x=>x.kind==='ignite');
     if(d){
       const boom=d.dps*d.t*0.8;
@@ -3135,26 +3952,23 @@ function monsterTakeDamage(e,base,dtype,crit,sk,kx,ky){
       e.hp-=boom;
       dmgNumber(e.x,e.y-e.r-14,boom,false,'fire');
     }
-  } else if(comboed==='stun'){
-    shakeCam(6); setHitStop(0.09);
+    /* fire also sets alight any flammable ground the target is standing in */
+    igniteGroundAt(e.x,e.y,150);
   }
+  /* every fire hit can light flammable ground under the target */
+  if(dtype==='fire') igniteGroundAt(e.x,e.y,e.r+30);
   /* ailment buildup from this hit */
   if(sk && !sk.noAilment){
-    if(sk.ailment) addBuildup(e,sk.ailment,dmg*(sk.ailment==='bleed'?sk.bleedMult:sk.ailment==='poison'?sk.poisonMult:1),dmg);
-    if(dtype==='physical') addBuildup(e,'stun',dmg*0.55*(sk.stunMult||1),dmg);
-    else if(dtype==='fire'&&!sk.ailment) addBuildup(e,'ignite',dmg*0.3,dmg);
-    else if(dtype==='cold'&&!sk.ailment) addBuildup(e,'freeze',dmg*0.35,dmg);
-    else if(dtype==='lightning'&&!sk.ailment) addBuildup(e,'shock',dmg*0.3,dmg);
+    const ag=(crit&&G.st.keys.perfect_agony)?1.6:1;
+    if(sk.ailment) addBuildup(e,sk.ailment,dmg*ag*(sk.ailment==='bleed'?sk.bleedMult:sk.ailment==='poison'?sk.poisonMult:1),dmg);
+    if(dtype==='physical') addBuildup(e,'stun',dmg*0.55*ag*(sk.stunMult||1)*(e.broken>0?2.5:1),dmg);
+    else if(dtype==='fire'&&!sk.ailment) addBuildup(e,'ignite',dmg*0.3*ag,dmg);
+    else if(dtype==='cold'&&!sk.ailment&&comboed!=='shatter') addBuildup(e,'freeze',dmg*0.35*ag,dmg);
+    else if(dtype==='lightning'&&!sk.ailment) addBuildup(e,'shock',dmg*0.3*ag,dmg);
   }
   /* leech and meta triggers */
   if(sk&&sk.leech>0) healPlayer(dmg*sk.leech/100,true);
-  if(crit){
-    const ch=G.ch;
-    ch.gems.forEach((g,i)=>{
-      const def=GEMS[g.gem];
-      if(def&&def.trigger==='crit'&&ch.auras[i]) addEnergy(i,def);
-    });
-  }
+  if(crit) metaTrigger('crit');
   gainFlaskCharge(dmg);
   if(e.hp<=0) killEnemy(e);
   return dmg;
@@ -3166,13 +3980,15 @@ function killEnemy(e){
   burst(e.x,e.y,e.boss?70:(e.rarity===2?26:14),e.color,e.boss?420:240,e.boss?6:3.4,.7,true);
   if(e.boss){ shakeCam(24); setHitStop(0.12); return; }
   G.kills++; G.ch.kills++;
+  metaTrigger('kill');
   gainXp(e.xp);
   gainFlaskCharge(60);
   dropLoot(e);
   if(e.mods.indexOf('volatile')>=0){
     spawnFx({type:'shock',x:e.x,y:e.y,r:0,max:130,life:.42,maxLife:.42,color:'#ff9a45'});
     burst(e.x,e.y,30,'#ff9a45',340,4.4,.6,true);
-    if(d2(G.player.x,G.player.y,e.x,e.y)<130*130) damagePlayer(e.dmg*1.3,'fire',e);
+    /* an exploder's blast is telegraphed and large: no rolling through it */
+    if(d2(G.player.x,G.player.y,e.x,e.y)<130*130) damagePlayer(e.dmg*1.3,'fire',e,true);
     for(const o of nearbyEnemies(e.x,e.y,130)){
       if(o===e||o.dead||o.dying) continue;
       o.hp-=e.dmg*0.9; if(o.hp<=0) killEnemy(o);
@@ -3206,9 +4022,14 @@ function evadeRoll(){
   const chance=clamp(ev/(ev+acc),0,0.75);
   return Math.random()<chance;
 }
-function damagePlayer(amount,dtype,src){
+/* `heavy` marks a large telegraphed area: it ignores the roll's i-frames,
+   because those are the attacks you are meant to walk out of. */
+function damagePlayer(amount,dtype,src,heavy){
   const p=G.player,st=G.st;
-  if(!p||p.iframe>0||G.dead||G.paused) return;
+  if(!p||G.dead||G.paused) return;
+  if(p.iframe>0&&!heavy) return;
+  /* a hit taken while sprinting puts you on the floor */
+  const wasSprinting=p.sprint;
   if(evadeRoll()){
     dmgNumber(p.x,p.y-p.r-6,0,false,'physical','evaded');
     return;
@@ -3223,7 +4044,21 @@ function damagePlayer(amount,dtype,src){
     dmg*=1-r/100;
   }
   dmg=Math.max(1,dmg);
+  if(st.armourAllTypes&&dtype!=='physical'&&dtype!=='chaos'){
+    /* Runic Skin: armour applies in full to elemental hits as well */
+    const red=st.armour/(st.armour+10*Math.max(1,dmg));
+    dmg*=1-clamp(red,0,0.85);
+  }
   if(p.ailT.shock>0) dmg*=1+(p.shockMag||0.15);
+  dmg*=st.dmgTaken||1;
+  /* Mind over Matter takes its share out of mana, and stops when mana runs
+     out rather than silently going back to life */
+  if(st.mindMatter>0&&p.mana>0){
+    const want=dmg*st.mindMatter;
+    const paid=Math.min(p.mana,want);
+    p.mana-=paid; dmg-=paid;
+    if(paid>0) burst(p.x,p.y,6,'#6a9fd8',150,2.4,.3,true);
+  }
   /* whatever the attacker is enchanted with builds on the player */
   if(src){
     if(src.ailment) addPlayerBuildup(src.ailment,dmg*1.1,dmg);
@@ -3236,11 +4071,17 @@ function damagePlayer(amount,dtype,src){
   if(p.es>0){
     const absorb=Math.min(p.es,dmg);
     p.es-=absorb; dmg-=absorb;
-    p.esDelay=2.4;
+    if(!st.wardUninterrupted) p.esDelay=2.4*(st.esDelayMult||1);
     burst(p.x,p.y,8,'#96c8e6',170,2.8,.35,true);
   }
-  if(dmg>0){ p.life-=dmg; p.esDelay=2.4; }
+  if(dmg>0){ p.life-=dmg; if(!st.wardUninterrupted) p.esDelay=2.4*(st.esDelayMult||1); }
   p.iframe=0.34;
+  /* the stun gauge fills off how big the hit was relative to your life, so
+     heavy hits stagger and chip damage does not */
+  const share=dmg/Math.max(1,st.maxLife);
+  if(share>0.045) addPlayerBuildup('stun',dmg*(0.6+share*5),dmg);
+  /* Cast when Hit charges off how hard the hit was, not how often */
+  metaTrigger('hit',clamp(share*220,2,100));
   G.flash=Math.min(1,0.3+ (amount/Math.max(1,st.maxLife))*2.2);
   dmgNumber(p.x,p.y-p.r-6,amount,false,dtype);
   burst(p.x,p.y,11,'#c0402f',210,3.2,.42,true);
@@ -3251,6 +4092,7 @@ function damagePlayer(amount,dtype,src){
     src.hp=Math.min(src.maxHp,src.hp+amount*1.4);
     burst(src.x,src.y,9,'#e06a8a',150,3,.4,true);
   }
+  if(wasSprinting&&p.life>0) knockDown();
   if(p.life<=0){ p.life=0; onDeath(); }
 }
 function healPlayer(amount,quiet){
@@ -3298,7 +4140,7 @@ function gainXp(v){
   const ch=G.ch;
   ch.xp+=v;
   let leveled=0;
-  while(ch.xp>=xpForLevel(ch.level) && ch.level<40){
+  while(ch.xp>=xpForLevel(ch.level) && ch.level<MAX_LEVEL){
     ch.xp-=xpForLevel(ch.level);
     ch.level++;
     leveled++;
@@ -3352,6 +4194,67 @@ function respawn(){
 function canStand(x,y,r){
   const k=r*0.72;
   return walkable(x,y)&&walkable(x-k,y)&&walkable(x+k,y)&&walkable(x,y-k)&&walkable(x,y+k);
+}
+/* ==========================================================================
+   DODGE ROLL AND SPRINT
+   The roll is the responsiveness valve: it cancels whatever you were doing,
+   it costs nothing, and the invulnerability sits at the FRONT of it, so a
+   well-timed roll beats a projectile or a fast strike. What it does not beat
+   is a big telegraphed area — those you walk out of, and they are flagged
+   so they cut straight through the i-frames.
+   Sprinting is the opposite bargain: faster, but a hit while sprinting puts
+   you on the floor.
+   ========================================================================== */
+const ROLL_TIME = 0.30;        /* how long the roll lasts */
+const ROLL_IFRAME = 0.17;      /* invulnerable for the first 57% of it */
+const ROLL_DIST = 196;         /* total distance covered */
+const SPRINT_MULT = 1.45;
+const KNOCKDOWN_TIME = 1.1;
+function rolling(){ const p=G.player; return !!p&&p.roll>0; }
+function playerDown(){ const p=G.player; return !!p&&p.down>0; }
+function startRoll(){
+  const p=G.player;
+  if(!p||G.dead||G.paused||G.panel) return false;
+  if(p.roll>0) return false;              /* a roll cannot cancel a roll */
+  if(playerDown()) return false;          /* knocked down: get up first */
+  /* Frozen solid still stops you, but an ordinary stagger does not: the roll
+     is what you reach for when you have been staggered. */
+  if(p.ailT.freeze>0) return false;
+  const mv=moveInput();
+  /* roll where you are steering, or where you are facing if standing still */
+  const a=(mv.len>0.05)?Math.atan2(mv.y,mv.x):p.face;
+  p.roll=ROLL_TIME; p.rollMax=ROLL_TIME; p.rollA=a;
+  p.iframe=Math.max(p.iframe,ROLL_IFRAME);
+  p.sprint=false;
+  p.ailT.stun=0;                          /* the roll cancels the stagger */
+  p.hitR=3;                               /* near-zero hitbox: slip the pack */
+  burst(p.x,p.y,10,'#cfe0ff',150,2.6,.3,true);
+  sfx('ui');
+  return true;
+}
+function updateRoll(dt){
+  const p=G.player;
+  if(p.roll<=0) return false;
+  p.roll-=dt;
+  const sp=ROLL_DIST/ROLL_TIME;
+  moveEnt(p,Math.cos(p.rollA)*sp*dt,Math.sin(p.rollA)*sp*dt);
+  p.face=p.rollA;
+  if(Math.random()<dt*40) spawnPart(p.x+rnd(-8,8),p.y+rnd(-8,8),rnd(-20,20),rnd(-20,20),.3,2,'#b8c8dc',.9,false);
+  if(p.roll<=0){ p.roll=0; p.hitR=p.r; }
+  return true;
+}
+function knockDown(){
+  const p=G.player;
+  if(!p||p.down>0) return;
+  p.down=KNOCKDOWN_TIME;
+  p.sprint=false;
+  p.roll=0; p.hitR=p.r;
+  /* a knockdown is a heavy stun: the gauge goes straight to full */
+  p.ail.stun=playerThreshold();
+  p.ailT.stun=Math.max(p.ailT.stun,KNOCKDOWN_TIME);
+  burst(p.x,p.y,20,'#e8d8a0',220,3.4,.55,true);
+  shakeCam(16); setHitStop(0.1); sfx('stun');
+  toast('Knocked down \u2014 sprinting into a hit puts you on the floor.');
 }
 function moveEnt(e,dx,dy){
   if(dx){ const nx=e.x+dx; if(canStand(nx,e.y,e.r)) e.x=nx; }
@@ -3532,20 +4435,36 @@ function executeSkill(sk,ang,fromTouch){
       shakeCam(7);
     }
   } else if(type==='chain'){
-    /* hops from body to body, never revisiting one */
+    /* Lightning theme: a chain reaches half again as far to find a SHOCKED
+       body, and arrives 45% harder when it does. Shock is the enabler; the
+       chain is what cashes it in, and a shocked pack carries the bolt
+       through itself. */
     let src={x:p.x,y:p.y};
     const hitList=[];
     let hops=Math.max(1,sk.chains);
+    const base=sk.range||300;
     for(let h=0;h<hops;h++){
-      let best=null,bd=(sk.range||300)*(sk.range||300);
-      for(const e of nearbyEnemies(src.x,src.y,sk.range||300)){
+      const reach=base*1.5;
+      let best=null,bs=-1;
+      for(const e of nearbyEnemies(src.x,src.y,reach)){
         if(e.dead||e.dying||hitList.indexOf(e)>=0) continue;
-        const d=d2(src.x,src.y,e.x,e.y);
-        if(d<bd){bd=d;best=e;}
+        const d=Math.sqrt(d2(src.x,src.y,e.x,e.y));
+        const shocked=e.ailT.shock>0;
+        if(d>(shocked?reach:base)) continue;
+        /* closest wins, but a shocked target counts as much nearer */
+        const score=(shocked?reach:base)-d+(shocked?260:0);
+        if(score>bs){bs=score;best=e;}
       }
       if(!best) break;
-      spawnFx({type:'bolt',x1:src.x,y1:src.y,x2:best.x,y2:best.y,life:.22,maxLife:.22,color:col});
-      hitTarget(sk,best,Math.atan2(best.y-src.y,best.x-src.x),40,Math.pow(0.85,h));
+      const shocked=best.ailT.shock>0;
+      spawnFx({type:'bolt',x1:src.x,y1:src.y,x2:best.x,y2:best.y,life:.22,maxLife:.22,
+        color:shocked?'#fff2a0':col});
+      hitTarget(sk,best,Math.atan2(best.y-src.y,best.x-src.x),40,
+        Math.pow(0.85,h)*(shocked?1.45:1));
+      if(shocked){
+        burst(best.x,best.y,10,'#fff2a0',220,3,.4,true);
+        hops=Math.min(hops+1,(sk.chains||1)+3);   /* a shocked body passes it on */
+      }
       hitList.push(best);
       src={x:best.x,y:best.y};
     }
@@ -3558,12 +4477,17 @@ function executeSkill(sk,ang,fromTouch){
     let tx=p.x+Math.cos(ang)*md, ty=p.y+Math.sin(ang)*md;
     if(!walkable(tx,ty)){ tx=p.x+Math.cos(ang)*40; ty=p.y+Math.sin(ang)*40; }
     G.clouds.push({x:tx,y:ty,r:sk.radius||80,t:sk.duration||4,max:sk.duration||4,
-      dps:sk.dmg,dtype:sk.dtype,color:col,tick:0,sk:sk});
+      dps:sk.dmg,dtype:sk.dtype,color:col,tick:0,sk:sk,
+      flammable:!!sk.flammable,burnMult:sk.burnMult||3.2,burnTime:sk.burnTime||6,
+      ignited:false});
+    /* dropped into fire that is already burning? it catches at once */
+    if(sk.flammable) for(const c of G.clouds){ if(c.ignited&&d2(c.x,c.y,tx,ty)<(c.r+40)*(c.r+40)) igniteGroundAt(tx,ty,10); }
   } else if(type==='totem'){
     const md=Math.min(sk.range||200,dist(p.x,p.y,G.mouse.wx,G.mouse.wy));
     let tx=p.x+Math.cos(ang)*Math.max(40,md*0.6), ty=p.y+Math.sin(ang)*Math.max(40,md*0.6);
     if(!canStand(tx,ty,14)){ tx=p.x; ty=p.y; }
     G.totems.push({x:tx,y:ty,r:14,t:sk.duration||8,max:sk.duration||8,cd:0,sk:sk,
+      mult:G.st.totemMult||1,
       color:col,rot:0,spirit:sk.spirit||0});
     recalc();
     burst(tx,ty,14,col,150,3,.5,true);
@@ -3591,14 +4515,69 @@ function toggleAura(gemIdx){
   markDirty();
   buildSlotUI();
 }
+/* Casts from somewhere other than where the player is standing.
+   executeSkill() reads the player's position throughout, so the position is
+   lent to it and handed straight back. Movement skills are refused rather
+   than teleporting the player to the duplicate. */
+function castFrom(x,y,sk,ang){
+  const p=G.player;
+  if(sk.type==='dash') return false;
+  const sx=p.x, sy=p.y, sf=p.face;
+  p.x=x; p.y=y;
+  try{ executeSkill(sk,ang,true); }
+  finally{ p.x=sx; p.y=sy; p.face=sf; }
+  return true;
+}
+const CONVERT_CYCLE=['fire','cold','lightning'];
+let convertIdx=0;
 function fireMetaGem(gemIdx){
   const ch=G.ch, g=ch.gems[gemIdx];
+  const mdef=GEMS[g.gem];
   if(g.link==null||!ch.gems[g.link]) return;
-  const sk=skillStats(ch.gems[g.link],g.link);
+  /* the trigger gem's own supports ride along on the skill it casts */
+  const lent=g.sockets.filter(Boolean);
+  const sk=skillStats(ch.gems[g.link],g.link,lent);
   if(!sk.usable) return;
   const p=G.player;
   const t=nearestEnemy(p.x,p.y,700);
   const ang=t?Math.atan2(t.y-p.y,t.x-p.x):p.face;
+  const transform=mdef&&mdef.transform;
+  if(transform==='clone'&&sk.type!=='dash'){
+    /* a duplicate of you, standing where you were, casting from there */
+    const back=p.lastX!=null?{x:p.lastX,y:p.lastY}:{x:p.x-Math.cos(ang)*70,y:p.y-Math.sin(ang)*70};
+    const cx=canStand(back.x,back.y,10)?back.x:p.x;
+    const cy=canStand(back.x,back.y,10)?back.y:p.y;
+    const ca=t?Math.atan2(t.y-cy,t.x-cx):ang;
+    G.mirrors.push({x:cx,y:cy,t:0.55,max:0.55,a:ca});
+    castFrom(cx,cy,sk,ca);
+    spawnFx({type:'shock',x:cx,y:cy,r:0,max:80,life:.3,maxLife:.3,color:'#b090d8'});
+    return;
+  }
+  if(transform==='twin'&&t){
+    /* twice, from two points flanking the target, at 70% each */
+    const half=Object.assign({},sk,{dmg:sk.dmg*0.7});
+    const perp=ang+Math.PI/2;
+    const off=86;
+    for(const sgn of [1,-1]){
+      const cx=t.x-Math.cos(ang)*150+Math.cos(perp)*off*sgn;
+      const cy=t.y-Math.sin(ang)*150+Math.sin(perp)*off*sgn;
+      const ok=canStand(cx,cy,10);
+      const fx=ok?cx:p.x, fy=ok?cy:p.y;
+      const fa=Math.atan2(t.y-fy,t.x-fx);
+      G.mirrors.push({x:fx,y:fy,t:0.4,max:0.4,a:fa});
+      castFrom(fx,fy,half,fa);
+    }
+    spawnFx({type:'shock',x:t.x,y:t.y,r:0,max:120,life:.3,maxLife:.3,color:'#9fd8ee'});
+    return;
+  }
+  if(transform==='convert'){
+    /* the same skill, answering a different resistance each time */
+    const dt=CONVERT_CYCLE[convertIdx++%CONVERT_CYCLE.length];
+    const conv=Object.assign({},sk,{dtype:dt,addFire:0,addCold:0,addLight:0});
+    executeSkill(conv,ang,true);
+    spawnFx({type:'shock',x:p.x,y:p.y,r:0,max:90,life:.3,maxLife:.3,color:DCOLOR[dt]});
+    return;
+  }
   /* triggered casts are free and ignore their own cooldown */
   executeSkill(sk,ang,true);
   spawnFx({type:'shock',x:p.x,y:p.y,r:0,max:70,life:.28,maxLife:.28,color:'#c8a96e'});
@@ -3606,6 +4585,8 @@ function fireMetaGem(gemIdx){
 function useSkill(slot,fromTouch){
   const p=G.player,ch=G.ch,st=G.st;
   if(!p||G.paused||G.dead||G.panel) return;
+  if(p.roll>0||p.down>0) return;          /* the roll and the floor own the frame */
+  p.sprint=false;                          /* any skill breaks the sprint */
   if(playerStunned()) return;
   const sk=activeSkills()[slot];
   if(!sk) return;
@@ -3617,6 +4598,7 @@ function useSkill(slot,fromTouch){
   }
   if(!sk.usable){ toast(sk.reason); return; }
   if(p.cds[slot]>0) return;
+  metaTrigger('skilluse');
   const costLife=!!st.keys.blood_magic;
   if(costLife){
     if(p.life<=sk.mana+1){ toast('Not enough life.'); return; }
@@ -3658,7 +4640,6 @@ function addToInv(item){
   markDirty();
   return true;
 }
-function invCount(){ return G.ch.inv.length; }
 function countCurrency(key){
   let n=0;
   for(const it of G.ch.inv) if(it.cur===key) n+=it.n;
@@ -3878,6 +4859,11 @@ function updateEnemies(dt){
       if(Math.abs(e.knock.y)<2) e.knock.y=0;
     }
     e.moving=false;
+    if(e.broken>0) e.broken-=dt;
+    else if(e.armourMax>0&&e.armour<e.armourMax){
+      /* armour knits back slowly once the pressure comes off */
+      e.armour=Math.min(e.armourMax,e.armour+e.armourMax*0.09*dt);
+    }
     if(e.ailT.freeze>0||e.ailT.stun>0) continue;   /* frozen solid or staggered */
     const d=dist(e.x,e.y,p.x,p.y);
     if(d>1400) continue;
@@ -3886,7 +4872,7 @@ function updateEnemies(dt){
     if(e.kind==='melee'){
       if(d>e.r+p.r-4){ moveEnt(e,Math.cos(ang)*e.speed*dt,Math.sin(ang)*e.speed*dt); e.moving=true; }
       if(e.touchCd>0) e.touchCd-=dt;
-      if(d<e.r+p.r+2&&e.touchCd<=0){ e.touchCd=a.touchCd; damagePlayer(e.dmg,e.dtype,e); }
+      if(d<e.r+(p.hitR||p.r)+2&&e.touchCd<=0){ e.touchCd=a.touchCd; damagePlayer(e.dmg,e.dtype,e); }
     } else if(e.kind==='exploder'){
       if(d>e.r+p.r){ moveEnt(e,Math.cos(ang)*e.speed*dt,Math.sin(ang)*e.speed*dt); e.moving=true; }
       if(d<a.radius*0.55||e.fuse>0){
@@ -3895,7 +4881,7 @@ function updateEnemies(dt){
         if(e.fuse>=a.fuse){
           spawnFx({type:'shock',x:e.x,y:e.y,r:0,max:a.radius,life:.4,maxLife:.4,color:e.color});
           burst(e.x,e.y,26,e.color,320,4,.6,true);
-          if(d2(p.x,p.y,e.x,e.y)<a.radius*a.radius) damagePlayer(e.dmg,e.dtype,e);
+          if(d2(p.x,p.y,e.x,e.y)<a.radius*a.radius) damagePlayer(e.dmg,e.dtype,e,true);
           e.hp=0; killEnemy(e);
           shakeCam(9);
           continue;
@@ -3934,7 +4920,7 @@ function updateEnemies(dt){
         if(e.cd<=0&&d<keep*1.5){ e.cd=a.shotCd*rnd(.85,1.2); e.tele=0.34; e.teleMax=0.34; e.aim=ang; }
       }
       if(e.touchCd>0) e.touchCd-=dt;
-      if(d<e.r+p.r&&e.touchCd<=0){ e.touchCd=1; damagePlayer(e.dmg*0.6,e.dtype,e); }
+      if(d<e.r+(p.hitR||p.r)&&e.touchCd<=0){ e.touchCd=1; damagePlayer(e.dmg*0.6,e.dtype,e); }
     }
     enemySeparate(e,dt);
   }
@@ -3985,13 +4971,14 @@ function bossFire(b,kind){
     const ox=(b.windupAt&&b.windupAt.x!=null)?b.windupAt.x:p.x;
     const oy=(b.windupAt&&b.windupAt.y!=null)?b.windupAt.y:p.y;
     spawnFx({type:'shock',x:ox,y:oy,r:0,max:170,life:.45,maxLife:.45,color:b.rim});
-    if(d2(p.x,p.y,ox,oy)<170*170) damagePlayer(b.dmg*1.2,'physical',b);
+    /* the boss slam is the archetypal walk-out-of-it attack */
+    if(d2(p.x,p.y,ox,oy)<170*170) damagePlayer(b.dmg*1.2,'physical',b,true);
     shakeCam(14);
   } else if(kind==='beam'){
     const len=760;
     const ex=b.x+Math.cos(ang)*len, ey=b.y+Math.sin(ang)*len;
     spawnFx({type:'beam',x:b.x,y:b.y,x2:ex,y2:ey,life:.4,maxLife:.4,color:b.rim,w:20});
-    if(distToSeg(p.x,p.y,b.x,b.y,ex,ey)<p.r+24) damagePlayer(b.dmg*1.1,'lightning',b);
+    if(distToSeg(p.x,p.y,b.x,b.y,ex,ey)<(p.hitR||p.r)+24) damagePlayer(b.dmg*1.1,'lightning',b);
     shakeCam(10);
   } else if(kind==='ring'){
     /* a ring of standing fire, centred where the telegraph was */
@@ -4019,6 +5006,8 @@ function updateBoss(dt){
   if(b.dead) return;
   b.rot+=dt*0.7;
   if(b.hurt>0) b.hurt-=dt;
+  if(b.broken>0) b.broken-=dt;
+  else if(b.armourMax>0&&b.armour<b.armourMax) b.armour=Math.min(b.armourMax,b.armour+b.armourMax*0.05*dt);
   tickAilments(b,dt);
   tickDots(b,dt);
   if(b.dead||b.dying) return;
@@ -4046,7 +5035,7 @@ function updateBoss(dt){
       spawnFx({type:'shock',x:b.x,y:b.y,r:0,max:120,life:.35,maxLife:.35,color:b.rim});
     } else {
       burst(b.x,b.y,3,b.rim,80,3,.3,true);
-      if(d<b.r+p.r+8&&b.touchCd<=0){ b.touchCd=.7; damagePlayer(b.dmg*1.1,'physical',b); }
+      if(d<b.r+(p.hitR||p.r)+8&&b.touchCd<=0){ b.touchCd=.7; damagePlayer(b.dmg*1.1,'physical',b); }
       if(b.dash&&b.dash.t<=0) b.dash=null;
     }
   } else if(b.windup){
@@ -4074,7 +5063,7 @@ function updateBoss(dt){
     }
   }
   if(b.touchCd>0) b.touchCd-=dt;
-  if(!b.dash&&d<b.r+p.r&&b.touchCd<=0){ b.touchCd=.9; damagePlayer(b.dmg*.7,'physical',b); }
+  if(!b.dash&&d<b.r+(p.hitR||p.r)&&b.touchCd<=0){ b.touchCd=.9; damagePlayer(b.dmg*.7,'physical',b); }
 }
 function onBossDead(){
   const b=G.boss;
@@ -4117,11 +5106,35 @@ function moveInput(){
 function updatePlayer(dt){
   const p=G.player,st=G.st,ch=G.ch;
   tickPlayerAilments(dt);
+  if(p.down>0){
+    /* on the floor: nothing but the clocks run */
+    p.down-=dt;
+    for(let i=0;i<5;i++) if(p.cds[i]>0) p.cds[i]-=dt;
+    if(p.iframe>0) p.iframe-=dt;
+    if(p.esDelay>0) p.esDelay-=dt;
+    if(p.down<=0){ p.ailT.stun=0; p.ail.stun=0; }
+    updatePrompt();
+    return;
+  }
+  /* The roll owns the frame while it lasts. Cooldowns and pools keep
+     ticking, but nothing else gets a say. */
+  if(updateRoll(dt)){
+    for(let i=0;i<5;i++) if(p.cds[i]>0) p.cds[i]-=dt;
+    if(p.iframe>0) p.iframe-=dt;
+    if(p.esDelay>0) p.esDelay-=dt;
+    else if(p.es<st.maxES) p.es=Math.min(st.maxES,p.es+st.maxES*0.28*dt);
+    if(p.mana<st.maxMana) p.mana=Math.min(st.maxMana,p.mana+st.manaRegen*dt);
+    p.moving=true;
+    updatePrompt();
+    return;
+  }
   const frozen=playerStunned();
   const mv=frozen?{x:0,y:0,len:0}:moveInput();
   p.moving=false;
+  /* sprint: held, and only while actually moving */
+  if(p.sprint&&(frozen||mv.len<=0.05)) p.sprint=false;
   if(mv.len>0.05){
-    const sp=st.moveSpeed;
+    const sp=st.moveSpeed*(p.sprint?SPRINT_MULT:1);
     moveEnt(p,mv.x*sp*dt,mv.y*sp*dt);
     p.walkT+=dt*mv.len*9;
     p.moving=true;
@@ -4138,6 +5151,11 @@ function updatePlayer(dt){
   }
   for(let i=0;i<5;i++) if(p.cds[i]>0) p.cds[i]-=dt;
   if(p.iframe>0) p.iframe-=dt;
+  /* Cast on Interval keeps its own clock */
+  metaTrigger('interval',null,dt);
+  /* Doppelganger needs to know where you were a moment ago to stand there */
+  p.trackT=(p.trackT||0)-dt;
+  if(p.trackT<=0){ p.trackT=0.3; p.lastX=p.x; p.lastY=p.y; }
   /* energy shield recharges only after a quiet spell */
   if(p.esDelay>0) p.esDelay-=dt;
   else if(p.es<st.maxES) p.es=Math.min(st.maxES,p.es+st.maxES*0.28*dt);
@@ -4150,7 +5168,7 @@ function updatePlayer(dt){
   if(G.keys['q']) useSkill(1,false);
   if(G.keys['e']) useSkill(2,false);
   if(G.keys['r']) useSkill(3,false);
-  if(G.keys[' ']) useSkill(4,false);
+  if(G.keys['t']) useSkill(4,false);
   /* fog-free map still records where you have been, for the map overlay */
   const tx=(p.x/TILE)|0, ty=(p.y/TILE)|0;
   for(let y=ty-4;y<=ty+4;y++) for(let x=tx-4;x<=tx+4;x++){
@@ -4294,7 +5312,7 @@ function updateClouds(dt){
     if(c.tick<=0){
       c.tick=0.35;
       if(c.hostile){
-        if(d2(p.x,p.y,c.x,c.y)<c.r*c.r) damagePlayer(c.dps*0.35,c.dtype,null);
+        if(d2(p.x,p.y,c.x,c.y)<c.r*c.r) damagePlayer(c.dps*0.35,c.dtype,null,true);
       } else {
         for(const e of nearbyEnemies(c.x,c.y,c.r+40)){
           if(e.dead||e.dying) continue;
@@ -4303,11 +5321,60 @@ function updateClouds(dt){
         }
       }
     }
-    if(Math.random()<dt*22){
+    if(Math.random()<dt*(c.ignited?46:22)){
       const a=rnd(0,TAU),rr=Math.random()*c.r;
       spawnPart(c.x+Math.cos(a)*rr,c.y+Math.sin(a)*rr,rnd(-8,8),rnd(-26,-8),.6,rnd(1.6,3.4),c.color,.94,true);
     }
     if(c.t<=0) G.clouds.splice(i,1);
+  }
+}
+/* ==========================================================================
+   GROUND EFFECTS AND IGNITION
+   Some skills leave a field on the floor. A flammable field does very little
+   on its own; put fire into it and it becomes a burning area that lasts far
+   longer and hurts far more. Two skills, one result neither gives alone.
+   ========================================================================== */
+function igniteGroundAt(x,y,r){
+  let lit=0;
+  for(const c of G.clouds){
+    if(c.hostile||!c.flammable||c.ignited) continue;
+    if(d2(x,y,c.x,c.y)>(c.r+r)*(c.r+r)) continue;
+    c.ignited=true;
+    c.dtype='fire';
+    c.dps*=c.burnMult||3.2;
+    c.t=Math.max(c.t,c.burnTime||6);
+    c.max=c.t;
+    c.color='#e07a3c';
+    c.tick=0;
+    burst(c.x,c.y,24,'#f0a050',260,4,.6,true);
+    spawnFx({type:'shock',x:c.x,y:c.y,r:0,max:c.r*1.3,life:.4,maxLife:.4,color:'#f0a050'});
+    sfx('cast');
+    lit++;
+  }
+  return lit;
+}
+/* Short-lived duplicates left behind by Doppelganger and Twinned Echo. They
+   are pure decoration: the cast already happened from their position. */
+function updateMirrors(dt){
+  for(let i=G.mirrors.length-1;i>=0;i--){
+    const m=G.mirrors[i];
+    m.t-=dt;
+    if(m.t<=0) G.mirrors.splice(i,1);
+  }
+}
+function drawMirrors(){
+  for(const m of G.mirrors){
+    if(!inView(m.x,m.y,40)) continue;
+    const f=m.t/m.max;
+    ctx.save();
+    ctx.globalAlpha=f*0.55;
+    ctx.drawImage(glowSprite('#b090d8'),m.x-26,m.y-26,52,52);
+    ctx.translate(m.x,m.y);
+    ctx.fillStyle='rgba(176,144,216,'+(f*0.75).toFixed(2)+')';
+    poly(0,0,13,3,m.a); ctx.fill();
+    ctx.strokeStyle='rgba(216,196,240,'+(f*0.8).toFixed(2)+')';
+    ctx.lineWidth=1.4; ctx.stroke();
+    ctx.restore();
   }
 }
 function updateTotems(dt){
@@ -4323,7 +5390,7 @@ function updateTotems(dt){
         const crit=rollCrit(t.sk);
         spawnShot({x:t.x+Math.cos(a)*12,y:t.y+Math.sin(a)*12,
           vx:Math.cos(a)*420,vy:Math.sin(a)*420,
-          dmg:critDamage(t.sk,t.sk.dmg*0.6,crit),dtype:t.sk.dtype,color:t.color,
+          dmg:critDamage(t.sk,t.sk.dmg*0.6*(t.mult||1),crit),dtype:t.sk.dtype,color:t.color,
           from:'player',r:6,life:1.6,crit:crit,sk:t.sk});
       } else t.cd=0.3;
     }
@@ -4401,6 +5468,7 @@ function update(dt){
   updateShots(dt);
   updateClouds(dt);
   updateTotems(dt);
+  updateMirrors(dt);
   updatePickups(dt);
 }
 function visualUpdate(dt){
@@ -4428,7 +5496,9 @@ function loop(ts){
   } else if(G.running){
     visualUpdate(Math.min(dt,0.02));
   }
-  if(G.running){ render(); updateHUD(); }
+  /* every panel covers the screen, so the world behind it is wasted work */
+  if(G.running&&!G.panel){ render(); updateHUD(); }
+  else if(G.running&&G.panel==='death') { render(); updateHUD(); }
   if(G.panel==='tree') renderTree();
   if(G.panel==='map') renderMapOverlay();
 }
@@ -4495,6 +5565,56 @@ function drawAilmentMeters(e){
     y-=4;
   }
 }
+/* Armour reads as pips under the life bar, one per fifth. They go red and
+   hollow the moment the target is Fully Broken. */
+function drawArmourPips(e){
+  if(e.armourMax<=0) return;
+  const broke=e.broken>0;
+  const frac=armourFrac(e);
+  const N=5, pw=6, gap=2;
+  const total=N*pw+(N-1)*gap;
+  const x0=e.x-total/2;
+  const y=e.y-e.r-(e.rarity>0||e.boss?5:7);
+  for(let i=0;i<N;i++){
+    const on=!broke && frac>i/N;
+    ctx.fillStyle = broke? 'rgba(214,72,58,.85)' : on? 'rgba(206,192,164,.9)' : 'rgba(255,255,255,.13)';
+    ctx.fillRect(x0+i*(pw+gap),y,pw,2.5);
+  }
+  if(broke){
+    ctx.strokeStyle='rgba(224,104,88,'+(0.4+0.35*Math.sin(e.pulse*3))+')';
+    ctx.lineWidth=1.4;
+    ctx.beginPath(); ctx.arc(e.x,e.y,e.r+5,0,TAU); ctx.stroke();
+  }
+}
+/* Shock arcs and a poison stack count, so both states read on the body. */
+function drawStateMarks(e){
+  if(e.ailT.shock>0){
+    ctx.strokeStyle='rgba(232,216,96,.8)';
+    ctx.lineWidth=1.4;
+    for(let i=0;i<3;i++){
+      const a=e.pulse*2.4+i*TAU/3;
+      const r1=e.r+3, r2=e.r+10;
+      ctx.beginPath();
+      ctx.moveTo(e.x+Math.cos(a)*r1,e.y+Math.sin(a)*r1);
+      ctx.lineTo(e.x+Math.cos(a+0.28)*r2,e.y+Math.sin(a+0.28)*r2);
+      ctx.lineTo(e.x+Math.cos(a+0.52)*r1,e.y+Math.sin(a+0.52)*r1);
+      ctx.stroke();
+    }
+  }
+  if(e.dots.some(d=>d.kind==='ignite')){
+    const f=0.6+0.4*Math.sin(e.pulse*5);
+    ctx.globalAlpha=f;
+    ctx.drawImage(glowSprite('#e07a3c'),e.x-e.r*1.1,e.y-e.r*2.2,e.r*2.2,e.r*2.2);
+    ctx.globalAlpha=1;
+  }
+  if(e.poisonStacks>0&&e.dots.some(d=>d.kind==='poison')){
+    ctx.fillStyle='rgba(176,112,200,.95)';
+    ctx.font='9px Cinzel, serif';
+    ctx.textAlign='left'; ctx.textBaseline='middle';
+    ctx.fillText('\u2716'+e.poisonStacks,e.x+e.r+4,e.y-e.r);
+    ctx.textAlign='center'; ctx.textBaseline='alphabetic';
+  }
+}
 function drawEnemy(e){
   const a=Math.atan2(G.player.y-e.y,G.player.x-e.x);
   let scale=1,alpha=1;
@@ -4508,7 +5628,9 @@ function drawEnemy(e){
   ctx.drawImage(glowSprite(e.color),-gr,-gr,gr*2,gr*2);
   ctx.globalAlpha=alpha;
   let col=e.hurt>0?'#ffffff':e.color;
-  if(e.ailT.freeze>0) col='#9fd8ee';
+  /* winding up something that cannot be rolled through: flash red */
+  if(e.tele>0&&Math.sin(G.time*26)>-0.1) col='#e0503c';
+  else if(e.ailT.freeze>0) col='#9fd8ee';
   else if(e.ailT.ignite>0) col=shadeHex(e.color,30);
   ctx.fillStyle=col;
   ctx.strokeStyle=rgba(shadeHex(e.color,60),.9);
@@ -4547,9 +5669,9 @@ function drawEnemy(e){
   if(e.tele>0){
     const t=1-e.tele/e.teleMax;
     ctx.save();
-    ctx.globalAlpha=.25+.5*t;
-    ctx.strokeStyle=rgba(e.color,.85);
-    ctx.lineWidth=1.5;
+    ctx.globalAlpha=.3+.6*t;
+    ctx.strokeStyle='rgba(224,80,60,.9)';
+    ctx.lineWidth=2;
     if(e.kind==='exploder'){
       ctx.beginPath(); ctx.arc(e.x,e.y,ARCH.exploder.radius*t,0,TAU); ctx.stroke();
     } else {
@@ -4564,6 +5686,8 @@ function drawEnemy(e){
   }
   if(e.dying<=0){
     if(e.rarity>0) bar(e.x,e.y-e.r-11,36,3,e.hp/e.maxHp,e.rarity===2?'#c87838':'#6a8fc8');
+    drawArmourPips(e);
+    drawStateMarks(e);
     drawAilmentMeters(e);
   }
 }
@@ -4593,9 +5717,10 @@ function drawBoss(){
   if(b.windup){
     const t=1-b.windup.t/b.windup.total;
     ctx.save();
-    ctx.globalAlpha=.3+.55*t;
-    ctx.strokeStyle=rgba(b.rim,.9);
-    ctx.lineWidth=2.5;
+    /* red, because none of these can be rolled through */
+    ctx.globalAlpha=.35+.6*t;
+    ctx.strokeStyle='rgba(224,80,60,.92)';
+    ctx.lineWidth=2.8;
     const p=G.player;
     if(b.windup.kind==='dash'||b.windup.kind==='beam'){
       const a=Math.atan2(p.y-b.y,p.x-b.x);
@@ -4617,7 +5742,7 @@ function drawBoss(){
     }
     ctx.restore();
   }
-  if(b.dying<=0) drawAilmentMeters(b);
+  if(b.dying<=0){ drawArmourPips(b); drawStateMarks(b); drawAilmentMeters(b); }
 }
 function drawPlayer(){
   const p=G.player,st=G.st;
@@ -4636,7 +5761,17 @@ function drawPlayer(){
   }
   ctx.globalAlpha=.5;
   ctx.drawImage(glowSprite(G.theme.rim),-p.r*2.6,-p.r*2.6,p.r*5.2,p.r*5.2);
-  ctx.globalAlpha=p.iframe>0?(.45+.55*Math.abs(Math.sin(G.time*30))):1;
+  if(p.roll>0){
+    /* a streak behind the roll, and the body low and small */
+    const t=p.roll/p.rollMax;
+    ctx.globalAlpha=.28;
+    for(let i=1;i<=3;i++){
+      const d=i*16*t;
+      ctx.drawImage(glowSprite('#9fd8ee'),p.x-Math.cos(p.rollA)*d-14,p.y-Math.sin(p.rollA)*d-14,28,28);
+    }
+    ctx.globalAlpha=1;
+  }
+  ctx.globalAlpha=p.down>0?.55:(p.iframe>0?(.45+.55*Math.abs(Math.sin(G.time*30))):1);
   ctx.rotate(p.face);
   ctx.fillStyle='#e8dfc9';
   ctx.beginPath();
@@ -4951,6 +6086,7 @@ function render(){
   drawFx();
   drawParts();
   drawTotems();
+  drawMirrors();
   drawShots();
   for(const e of G.enemies) if(inView(e.x,e.y,e.r+40)) drawEnemy(e);
   drawBoss();
@@ -5016,9 +6152,47 @@ function buildSlotUI(){
 /* one standing badge wherever the tree is reachable, while points are unspent */
 /* the player's own ailment buildup, mirroring the monster meters */
 let pailBuilt=false;
+let metaRows=null;
+function updateMetaBar(){
+  const ch=G.ch, p=G.player, host=$('metabar');
+  if(!host||!ch||!p) return;
+  const armed=[];
+  for(let i=0;i<ch.gems.length;i++){
+    const def=GEMS[ch.gems[i].gem];
+    if(def&&def.trigger&&ch.auras[i]) armed.push({i:i,def:def});
+  }
+  const sig=armed.map(a=>a.i).join(',');
+  if(metaRows!==sig){
+    metaRows=sig;
+    host.innerHTML=armed.map(a=>'<div class="mg" data-g="'+a.i+'"><b>'+esc(a.def.name)+
+      '</b><div class="mb"><i></i></div></div>').join('');
+  }
+  setElClass(host,'on',armed.length>0);
+  if(!armed.length) return;
+  for(const el of host.children){
+    const i=+el.dataset.g;
+    const def=GEMS[ch.gems[i].gem];
+    const v=clamp((p.energy[i]||0)/Math.max(1,def.energyMax),0,1);
+    const linked=ch.gems[i].link!=null&&ch.gems[i].link<ch.gems.length;
+    setElClass(el,'ready',v>=0.999||!linked);
+    setElStyle(el.lastElementChild.firstElementChild,'width',(Math.round(v*1000)/10)+'%');
+  }
+}
+function updateStunGauge(){
+  const p=G.player;
+  const el=$('stungauge');
+  if(!el||!p) return;
+  const staggered=p.ailT.stun>0||p.down>0;
+  const v=staggered?1:clamp((p.ail.stun||0)/playerThreshold(),0,1);
+  setElClass(el,'on',v>0.02||staggered);
+  setElClass(el,'full',staggered);
+  if(v>0.02||staggered) setElStyle($('stun-fill'),'width',(Math.round(v*1000)/10)+'%');
+}
 function updatePlayerAilHud(){
   const host=$('pail'), p=G.player;
   if(!host||!p) return;
+  updateStunGauge();
+  updateMetaBar();
   if(!pailBuilt){
     host.innerHTML=AILMENTS.map(k=>'<div class="m" data-a="'+k+'"><i></i><b>'+k.toUpperCase()+'</b></div>').join('');
     pailBuilt=true;
@@ -5151,6 +6325,9 @@ function updateHUD(){
   if(b&&b.awake&&!b.dead){
     setElClass($('bossbar'),'on',true);
     setStyle('boss-fill','width',(Math.round(clamp(b.hp/b.maxHp,0,1)*1000)/10)+'%');
+    const broke=b.broken>0;
+    setStyle('boss-armour-fill','width',broke?'100%':(Math.round(armourFrac(b)*1000)/10)+'%');
+    setElClass($('boss-armour'),'broke',broke);
     setText('boss-nm',b.name+'  ·  PHASE '+b.phase);
   } else setElClass($('bossbar'),'on',false);
 }
@@ -5161,6 +6338,7 @@ function updateHUD(){
 const PANEL_IDS={inv:'panel-inv',tree:'panel-tree',skills:'panel-skills',sheet:'panel-sheet',
   map:'panel-map',menu:'panel-menu',npc:'panel-npc',death:'panel-death'};
 function openPanel(kind){
+  if(DRAG) endDrag();
   for(const k in PANEL_IDS) $(PANEL_IDS[k]).classList.remove('on');
   G.panel=kind;
   $(PANEL_IDS[kind]).classList.add('on');
@@ -5185,6 +6363,7 @@ function openPanel(kind){
   if(kind==='map') resizeCanvas();
 }
 function closePanel(){
+  if(DRAG) endDrag();
   for(const k in PANEL_IDS) $(PANEL_IDS[k]).classList.remove('on');
   G.panel=null;
   G.tool=null; G.stashTab=G.stashTab||0;
@@ -5282,6 +6461,16 @@ function showTip(it,x,y,extra){
 function hideTip(){ $('tooltip').classList.remove('on'); }
 
 /* ---- tooltip bodies for everything that is not an item ---- */
+/* The combo line: what this skill puts on a target, and what it takes off.
+   It is the first thing a player needs and it used to be nowhere. */
+function comboLines(def){
+  let h='';
+  if(def.applies) h+='<div class="up">Applies: '+esc(def.applies)+'</div>';
+  if(def.consumesLabel) h+='<div class="rune">Consumes: '+esc(def.consumesLabel)+'</div>';
+  if(!def.applies&&!def.consumesLabel&&def.type!=='aura'&&def.type!=='meta')
+    h+='<div class="hint">No state applied or consumed.</div>';
+  return h;
+}
 function gemTipHtml(g,idx){
   const ch=G.ch, def=GEMS[g.gem];
   const sk=skillStats(g,idx);
@@ -5296,7 +6485,7 @@ function gemTipHtml(g,idx){
   h+='<div class="mod">Requires '+def.req+' '+esc(attrName)+'</div>';
   if(def.wep) h+='<div class="mod">Weapon: '+esc(def.wep.map(k=>WEAPON_KINDS[k].name.toLowerCase()).join(', '))+'</div>';
   if(def.spirit) h+='<div class="rune">Reserves '+def.spirit+' spirit while active</div>';
-  if(def.combo) h+='<div class="up">Combo '+esc(def.combo)+(def.ailment?'  ·  builds '+esc(def.ailment):'')+'</div>';
+  h+=comboLines(def);
   const sups=g.sockets.filter(Boolean);
   if(sups.length){
     h+='<div class="cmp"><div style="color:#5f5b53;margin-bottom:3px">Supports</div>';
@@ -5312,6 +6501,7 @@ function gemDefTipHtml(key){
   let h='<div class="tnm" style="color:#e3d6b8">'+esc(def.name)+'</div>';
   h+='<div class="tb2">'+esc(def.type.replace('_',' '))+'  ·  unlocks at level '+def.lvlReq+'</div>';
   h+='<div class="mod">'+esc(def.mech||'')+'</div>';
+  h+=comboLines(def);
   h+='<div class="imp">'+esc(gemSummary(def))+'</div>';
   if(def.spirit) h+='<div class="rune">Reserves '+def.spirit+' spirit while active</div>';
   h+='<div class="hint">'+esc(def.desc)+'</div>';
@@ -5422,18 +6612,255 @@ function showStackTip(it,x,y,extra){
   if(extra) html+='<div class="hint">'+extra+'</div>';
   showTipHtml(html,x,y);
 }
+/* ==========================================================================
+   DRAG CONTROLLER
+   One controller owns every drag; item elements hold no drag state of their
+   own. An item's pointerdown records intent and nothing more, and the move
+   and up listeners live on WINDOW for exactly as long as the drag lasts.
+   Pointer capture is requested as an optimisation and allowed to fail
+   silently: correctness never depends on it. Depending on it is what used
+   to strand an item on the cursor, because once the pointer left the item
+   element neither of its own handlers fired again.
+   ========================================================================== */
+const DRAG_SLOP=6;          /* px of travel before a press becomes a drag */
+let DRAG=null;              /* the one live drag, or null */
+
+/* Grids register themselves as they render, so the drop resolver can find
+   whichever one the pointer is over — including one in a different panel,
+   which is what makes bag <-> stash transfers work. */
+const GRIDS=[];
+function registerGrid(g){
+  for(let i=GRIDS.length-1;i>=0;i--)
+    if(GRIDS[i].host===g.host||!GRIDS[i].host.isConnected) GRIDS.splice(i,1);
+  GRIDS.push(g);
+}
+function gridFor(host){ for(const g of GRIDS) if(g.host===host) return g; return null; }
+function inRect(r,cx,cy){ return cx>=r.left&&cx<=r.right&&cy>=r.top&&cy<=r.bottom; }
+function gridUnder(cx,cy){
+  for(const g of GRIDS){
+    if(!g.host.isConnected) continue;
+    if(inRect(g.host.getBoundingClientRect(),cx,cy)) return g;
+  }
+  return null;
+}
+function slotUnder(cx,cy){
+  const els=document.querySelectorAll('[data-eq]');
+  for(let i=0;i<els.length;i++){
+    const el=els[i];
+    if(el.offsetParent&&inRect(el.getBoundingClientRect(),cx,cy)) return el;
+  }
+  return null;
+}
+/* Where the item's top-left cell lands in this grid. Measured from the grab
+   offset, not the cursor, so the item keeps the grip you picked it up by. */
+function dragCell(g,cx,cy){
+  const r=g.host.getBoundingClientRect();
+  return {x:Math.round((cx-DRAG.ox-r.left)/g.cs), y:Math.round((cy-DRAG.oy-r.top)/g.cs)};
+}
+function ghostEl(){
+  let el=$('dragghost');
+  if(!el){ el=document.createElement('div'); el.id='dragghost'; document.body.appendChild(el); }
+  return el;
+}
+function fitBoxEl(){
+  let el=$('fitbox');
+  if(!el){ el=document.createElement('div'); el.id='fitbox'; document.body.appendChild(el); }
+  return el;
+}
+function hideFitBox(){ const f=$('fitbox'); if(f) f.className=''; }
+/* Highlights the cells the footprint would occupy, green if it fits there
+   and red if it does not. */
+function showFitBox(g,x,y,iw,ih,ok){
+  const r=g.host.getBoundingClientRect();
+  const f=fitBoxEl();
+  f.className='on '+(ok?'ok':'bad');
+  f.style.left=(r.left+x*g.cs)+'px';
+  f.style.top=(r.top+y*g.cs)+'px';
+  f.style.width=(iw*g.cs)+'px';
+  f.style.height=(ih*g.cs)+'px';
+}
+function dropZoneEl(){
+  let el=$('dropzone');
+  if(!el){
+    el=document.createElement('div'); el.id='dropzone';
+    el.textContent='Release here to drop on the ground';
+    document.body.appendChild(el);
+  }
+  return el;
+}
+/* Can this item go in this particular slot? '' means yes. */
+function equipWhyNot(it,slotKey){
+  if(isStack(it)) return 'Currency cannot be equipped.';
+  const ch=G.ch, b=BASES[it.b];
+  const want = b.slot==='ring'? ['ring1','ring2'] : [b.slot];
+  if(want.indexOf(slotKey)<0) return b.name+' does not go in that slot.';
+  if(!it.idf) return 'Identify it first.';
+  if(itemLevelReq(it)>ch.level) return 'Requires level '+itemLevelReq(it)+'.';
+  if(slotKey==='offhand'&&twoHandEquipped()) return 'Both hands are on your weapon.';
+  if(slotKey==='offhand'&&G.st&&G.st.keys&&G.st.keys.iron_grip) return 'Iron Grip leaves no hand for an offhand.';
+  return '';
+}
+function canGroundDrop(list){
+  return list===G.ch.inv || list===G.save.stash[G.stashTab||0];
+}
+function beginDrag(it,list,host,el,ev,onClick){
+  const r=el.getBoundingClientRect();
+  DRAG={it:it, list:list, host:host, el:el, onClick:onClick,
+    ox:ev.clientX-r.left, oy:ev.clientY-r.top,
+    sx:ev.clientX, sy:ev.clientY, pid:ev.pointerId,
+    live:false, hl:[], slot:null, target:null, zone:false};
+  window.addEventListener('pointermove',onDragMove,true);
+  window.addEventListener('pointerup',onDragUp,true);
+  window.addEventListener('pointercancel',onDragCancel,true);
+  window.addEventListener('blur',onDragCancel);
+}
+function dragGoLive(){
+  const d=DRAG;
+  d.live=true;
+  hideTip(); clearSlotHighlight();
+  d.el.classList.add('dragging');
+  const g=gridFor(d.host);
+  const cs=g?g.cs:itemCellSize();
+  const gh=ghostEl();
+  gh.className=d.el.className.replace(/\bdragging\b/,'')+' on';
+  gh.style.width=(itemW(d.it)*cs-2)+'px';
+  gh.style.height=(itemH(d.it)*cs-2)+'px';
+  gh.innerHTML=d.el.innerHTML;
+  if(canGroundDrop(d.list)) dropZoneEl().classList.add('on');
+}
+function clearDragHl(){
+  hideFitBox();
+  ghostEl().classList.remove('fit','unfit');
+  const d=DRAG;
+  if(!d) return;
+  for(const el of d.hl) el.classList.remove('target','nope');
+  d.hl.length=0;
+}
+function onDragMove(ev){
+  const d=DRAG;
+  if(!d) return;
+  if(d.pid!=null&&ev.pointerId!=null&&ev.pointerId!==d.pid) return;
+  if(!d.live){
+    if(Math.abs(ev.clientX-d.sx)<DRAG_SLOP&&Math.abs(ev.clientY-d.sy)<DRAG_SLOP) return;
+    dragGoLive();
+  }
+  if(ev.cancelable) ev.preventDefault();
+  const gh=ghostEl();
+  gh.style.left=(ev.clientX-d.ox)+'px';
+  gh.style.top=(ev.clientY-d.oy)+'px';
+  clearDragHl();
+  d.slot=null; d.target=null; d.zone=false;
+  const zone=dropZoneEl();
+  if(zone.classList.contains('on')&&inRect(zone.getBoundingClientRect(),ev.clientX,ev.clientY)){
+    zone.classList.add('hot'); d.zone=true; return;
+  }
+  zone.classList.remove('hot');
+  const slot=slotUnder(ev.clientX,ev.clientY);
+  if(slot){
+    d.slot=slot.dataset.eq;
+    slot.classList.add(equipWhyNot(d.it,d.slot)?'nope':'target');
+    d.hl.push(slot);
+    return;
+  }
+  const g=gridUnder(ev.clientX,ev.clientY);
+  if(!g) return;
+  const c=dragCell(g,ev.clientX,ev.clientY);
+  const ok=gridFits(g.list,d.it,c.x,c.y,g.w,g.h,g.list===d.list?d.it:null);
+  d.target={g:g,x:c.x,y:c.y,ok:ok};
+  const cx=clamp(c.x,0,g.w-itemW(d.it)), cy=clamp(c.y,0,g.h-itemH(d.it));
+  showFitBox(g,cx,cy,itemW(d.it),itemH(d.it),ok);
+  gh.classList.add(ok?'fit':'unfit');
+}
+function onDragUp(ev){
+  const d=DRAG;
+  if(!d) return;
+  if(d.pid!=null&&ev.pointerId!=null&&ev.pointerId!==d.pid) return;
+  finishDrag();
+}
+function onDragCancel(){ if(DRAG) endDrag(); }
+/* Tears the drag down without resolving it: the item never moved, so there
+   is nothing to put back. Safe to call from anywhere, any number of times. */
+function endDrag(){
+  const d=DRAG;
+  DRAG=null;
+  window.removeEventListener('pointermove',onDragMove,true);
+  window.removeEventListener('pointerup',onDragUp,true);
+  window.removeEventListener('pointercancel',onDragCancel,true);
+  window.removeEventListener('blur',onDragCancel);
+  if(d){
+    for(const el of d.hl) el.classList.remove('target','nope');
+    d.el.classList.remove('dragging');
+    try{ d.el.releasePointerCapture(d.pid); }catch(err){}
+  }
+  hideFitBox();
+  ghostEl().classList.remove('on','fit','unfit');
+  const z=dropZoneEl();
+  z.classList.remove('on','hot');
+}
+/* Every drop outcome is decided here and nowhere else. */
+function finishDrag(){
+  const d=DRAG;
+  if(!d) return;
+  const live=d.live, it=d.it, src=d.list, onClick=d.onClick;
+  const zone=d.zone, slot=d.slot, target=d.target;
+  endDrag();
+  if(!live){ onClick&&onClick(it); return; }          /* a press, not a drag */
+  if(zone){ dropItem(it,src); return; }               /* onto the ground */
+  if(slot){                                            /* onto an equip slot */
+    if(src!==G.ch.inv){ toast('Move it to your bag first.'); return; }
+    const why=equipWhyNot(it,slot);
+    if(why){ toast(why); return; }
+    equipItem(it,slot);
+    return;
+  }
+  if(!target) return;                                  /* nowhere: snaps back */
+  if(!target.ok){ toast('It does not fit there.'); return; }
+  if(target.g.list===src){                             /* within one grid */
+    it.pos.x=target.x; it.pos.y=target.y;
+    markDirty();
+    /* one element moves; the cell layer and every other item are untouched */
+    const el=target.g.els.get(it);
+    if(el){ el.style.left=(it.pos.x*target.g.cs)+'px'; el.style.top=(it.pos.y*target.g.cs)+'px'; }
+    else target.g.redraw();
+    return;
+  }
+  transferItem(it,src,target.g,target.x,target.y);     /* bag <-> stash */
+}
+function transferItem(it,src,g,x,y){
+  const i=src.indexOf(it);
+  if(i<0) return;
+  src.splice(i,1);
+  it.pos={x:x,y:y};
+  g.list.push(it);
+  markDirty(); sfx('ui');
+  for(const gg of GRIDS.slice()) if(gg.host.isConnected) gg.redraw();
+}
 function renderGrid(host,list,w,h,onClick,onDragEnd){
   const cs=itemCellSize();
   host.style.width=(cs*w)+'px';
   host.style.height=(cs*h)+'px';
-  host.innerHTML='';
-  for(let y=0;y<h;y++) for(let x=0;x<w;x++){
-    const c=document.createElement('div');
-    c.className='cell';
-    c.style.left=(x*cs)+'px'; c.style.top=(y*cs)+'px';
-    c.style.width=cs+'px'; c.style.height=cs+'px';
-    host.appendChild(c);
+  /* The empty cells never change unless the grid shape or the cell size does,
+     so they live in their own layer that is built once and then left alone;
+     only the item elements after it are replaced on a re-render. */
+  const sig=w+'x'+h+'@'+cs;
+  let cells=host.firstElementChild;
+  if(!cells||cells.className!=='cells'||cells.__sig!==sig){
+    host.innerHTML='';
+    cells=document.createElement('div');
+    cells.className='cells';
+    for(let y=0;y<h;y++) for(let x=0;x<w;x++){
+      const c=document.createElement('div');
+      c.className='cell';
+      c.style.left=(x*cs)+'px'; c.style.top=(y*cs)+'px';
+      c.style.width=cs+'px'; c.style.height=cs+'px';
+      cells.appendChild(c);
+    }
+    cells.__sig=sig;
+    host.appendChild(cells);
+  } else {
+    while(host.lastElementChild&&host.lastElementChild!==cells) host.removeChild(host.lastElementChild);
   }
+  const els=new Map();
   for(const it of list){
     const stack=isStack(it);
     const el=document.createElement('div');
@@ -5444,50 +6871,25 @@ function renderGrid(host,list,w,h,onClick,onDragEnd){
     if(stack) el.innerHTML='<span class="ab">'+esc(curAbbr(it.cur))+'</span><span class="ct">'+it.n+'</span>';
     else el.textContent=it.idf?itemName(it):('? '+BASES[it.b].name);
     el.addEventListener('pointerenter',ev=>{
+      if(DRAG) return;
       tipFor(it,ev.clientX,ev.clientY,gridHint(it));
       if(!stack) highlightSlotFor(it);
     });
-    el.addEventListener('pointerleave',()=>{ hideTip(); clearSlotHighlight(); });
+    el.addEventListener('pointerleave',()=>{ if(DRAG) return; hideTip(); clearSlotHighlight(); });
     el.addEventListener('contextmenu',ev=>{ ev.preventDefault(); dropItem(it,list); });
-    let moved=false,sx=0,sy=0;
+    /* This is the whole of the item's involvement in a drag: record intent
+       and hand off to the controller. No move or up handler lives here. */
     el.addEventListener('pointerdown',ev=>{
-      if(ev.button===2) return;
-      ev.preventDefault();
-      moved=false; sx=ev.clientX; sy=ev.clientY;
+      if(ev.button===2||DRAG) return;
+      if(ev.cancelable) ev.preventDefault();
       try{ el.setPointerCapture(ev.pointerId); }catch(err){}
-      G.drag={it:it,list:list,w:w,h:h,cs:cs,el:el,host:host,px:it.pos.x,py:it.pos.y,out:false};
-      el.classList.add('drag');
+      beginDrag(it,list,host,el,ev,onClick);
     });
-    el.addEventListener('pointermove',ev=>{
-      if(!G.drag||G.drag.it!==it) return;
-      if(Math.abs(ev.clientX-sx)>6||Math.abs(ev.clientY-sy)>6) moved=true;
-      const r=host.getBoundingClientRect();
-      const gx=Math.round((ev.clientX-r.left-(itemW(it)*cs)/2)/cs);
-      const gy=Math.round((ev.clientY-r.top-(itemH(it)*cs)/2)/cs);
-      el.style.left=(clamp(gx,0,w-itemW(it))*cs)+'px';
-      el.style.top=(clamp(gy,0,h-itemH(it))*cs)+'px';
-      G.drag.gx=clamp(gx,0,w-itemW(it)); G.drag.gy=clamp(gy,0,h-itemH(it));
-      /* dragged clear of the grid: this is the drop gesture */
-      const out=ev.clientX<r.left-24||ev.clientX>r.right+24||ev.clientY<r.top-24||ev.clientY>r.bottom+24;
-      G.drag.out=out;
-      el.classList.toggle('dropping',out);
-    });
-    el.addEventListener('pointerup',ev=>{
-      el.classList.remove('drag','dropping');
-      hideTip(); clearSlotHighlight();
-      if(!G.drag||G.drag.it!==it){ G.drag=null; return; }
-      const d=G.drag; G.drag=null;
-      if(!moved){ onClick&&onClick(it); return; }
-      if(d.out){ dropItem(it,list); return; }
-      if(d.gx!=null&&gridFits(list,it,d.gx,d.gy,w,h,it)){
-        it.pos.x=d.gx; it.pos.y=d.gy;
-        markDirty();
-      }
-      onDragEnd&&onDragEnd();
-      renderInvBodies();
-    });
+    els.set(it,el);
     host.appendChild(el);
   }
+  registerGrid({host:host,list:list,w:w,h:h,cs:cs,els:els,
+    redraw:()=>renderGrid(host,list,w,h,onClick,onDragEnd)});
 }
 /* an item can always leave the bag: drag it out, or right-click it */
 function dropItem(it,list){
@@ -5495,7 +6897,10 @@ function dropItem(it,list){
   const src=list||ch.inv;
   const i=src.indexOf(it);
   if(i<0) return;
-  if(src!==ch.inv&&src!==G.save.stash[G.stashTab||0]){ return; }
+  if(src!==ch.inv&&src!==G.save.stash[G.stashTab||0]){
+    toast('Only the bag and the open stash tab can drop to the ground.'); return;
+  }
+  if(!G.player){ toast('Nowhere to drop it.'); return; }
   src.splice(i,1);
   if(G.player){
     if(isStack(it)) spawnGroundCurrency(it.cur,G.player.x+rnd(-30,30),G.player.y+rnd(-30,30),it.n);
@@ -5521,13 +6926,21 @@ function highlightSlotFor(it){
 function clearSlotHighlight(){
   document.querySelectorAll('.eqslot.target').forEach(e=>e.classList.remove('target'));
 }
-function equipItem(it){
+/* forceSlot names the slot to use — set when the player dropped the item on
+   a particular slot. Without it the slot is chosen the way a click does. */
+function equipItem(it,forceSlot){
   if(isStack(it)){ toast('Currency cannot be equipped.'); return; }
   const ch=G.ch, b=BASES[it.b];
   if(itemLevelReq(it)>ch.level){ toast('Requires level '+itemLevelReq(it)+'.'); return; }
   if(!it.idf){ toast('Identify it first.'); return; }
   let slot=b.slot, target=null;
-  if(slot==='weapon'||slot==='offhand'){
+  if(forceSlot){
+    if(equipWhyNot(it,forceSlot)){ toast(equipWhyNot(it,forceSlot)); return; }
+    slot=forceSlot;
+    target = (slot==='weapon')? ch.sets[ch.activeSet].weapon
+           : (slot==='offhand')? ch.sets[ch.activeSet].offhand
+           : ch.equip[slot];
+  } else if(slot==='weapon'||slot==='offhand'){
     const s=ch.sets[ch.activeSet];
     if(slot==='weapon'&&s.weapon) target=s.weapon;
     if(slot==='offhand'&&s.offhand) target=s.offhand;
@@ -5656,6 +7069,8 @@ const EQ_LAYOUT=[
   ['gloves','Gloves'],['body','Body'],['ring1','Ring'],['ring2','Ring'],
   ['belt','Belt'],['boots','Boots']
 ];
+const EQ_LABEL={};
+for(const [k,l] of EQ_LAYOUT) EQ_LABEL[k]=l;
 function eqItemFor(key){
   const ch=G.ch;
   if(key==='weapon') return ch.sets[ch.activeSet].weapon;
@@ -5680,7 +7095,8 @@ function eqSlotHtml(key,label){
 function renderInv(){
   const ch=G.ch;
   let html='<div class="ptitle">Inventory</div>';
-  html+='<div class="pnote">Click an item to equip it, drag to move, drag out of the bag to drop.<br>'+
+  html+='<div class="pnote">Click to equip. Drag to rearrange, onto a slot to equip it there, '+
+    'or onto the bar at the bottom of the screen to drop it. Right-click also drops.<br>'+
     '<span style="color:#5f5b53">'+esc(ch.name)+' \u00b7 level '+ch.level+' '+esc(CLASSES[ch.cls].name)+'</span></div>';
   html+='<div class="invwrap"><div>';
   html+='<div class="sect">Equipped</div>';
@@ -5704,14 +7120,15 @@ function renderInv(){
   }));
   body.querySelectorAll('[data-eq]').forEach(el=>{
     const key=el.dataset.eq;
-    const it=eqItemFor(key);
     el.addEventListener('click',()=>{
+      const it=eqItemFor(key);
       if(it&&G.tool){
         if(!toolApplies(it)){ toast(toolWhyNot(it)); return; }
         applyTool(it);
       } else if(it) unequipSlot(key);
     });
-    el.addEventListener('contextmenu',ev=>{ ev.preventDefault(); if(it) unequipSlot(key); });
+    el.addEventListener('contextmenu',ev=>{ ev.preventDefault(); if(eqItemFor(key)) unequipSlot(key); });
+    const it=eqItemFor(key);
     if(it){
       el.addEventListener('pointerenter',ev=>tipFor(it,ev.clientX,ev.clientY,
         G.tool?gridHint(it):'Click to unequip'));
@@ -5751,13 +7168,24 @@ function renderInvBodies(){
       kv('Spirit',st.spiritUsed+' / '+st.spiritMax)+
       kv('Shards',countCurrency('shard'))+kv('Essence',countCurrency('essence'));
   }
+  refreshEqSlots();
+}
+/* Rewrites each paper-doll slot in place. Equipping used to leave the doll
+   showing the previous item until the whole panel was rebuilt. */
+function refreshEqSlots(){
   const eq=$('inv-body');
-  if(eq&&G.panel==='inv'){
-    eq.querySelectorAll('[data-eq]').forEach(el=>{
-      const it=eqItemFor(el.dataset.eq);
-      el.classList.toggle('dim',!!(G.tool&&it&&!toolApplies(it)));
-    });
-  }
+  if(!eq||G.panel!=='inv') return;
+  eq.querySelectorAll('[data-eq]').forEach(el=>{
+    const key=el.dataset.eq;
+    const it=eqItemFor(key);
+    const label=(EQ_LABEL[key]||key);
+    const blocked=(key==='offhand'&&twoHandEquipped());
+    el.className='eqslot slot-'+key+(it?' filled r'+it.r:'')+(blocked?' blocked':'')+
+      (G.tool&&it&&!toolApplies(it)?' dim':'');
+    el.innerHTML=(it
+      ? '<div class="it" style="color:'+RARITY_COLOR[it.r]+'">'+esc(it.idf?itemName(it):'? '+BASES[it.b].name)+'</div>'
+      : '<span class="lbl">'+esc(label)+'</span>')+(blocked?'<span class="x">two-handed</span>':'');
+  });
 }
 function kv(k,v){ return '<div class="kv"><span>'+esc(k)+'</span><span>'+esc(v)+'</span></div>'; }
 
@@ -5767,6 +7195,7 @@ function carveSkill(gemKey){
   const ch=G.ch;
   if(!takeCurrency('uncut_skill',1)) { toast('You have no uncut skill gems.'); return; }
   ch.gems.push({gem:gemKey,level:1,sockets:[null,null,null,null,null],link:null});
+  invalidateSkills();
   toast('Carved '+GEMS[gemKey].name+'.');
   markDirty(); renderSkills();
 }
@@ -5782,10 +7211,12 @@ function bindSkill(gemIdx,slot){
   const lo=ch.loadout[ch.activeSet];
   for(let i=0;i<5;i++) if(lo[i]===gemIdx) lo[i]=null;
   lo[slot]=gemIdx;
+  invalidateSkills();
   markDirty(); buildSlotUI(); renderSkills();
 }
 function unbindSlot(slot){
   G.ch.loadout[G.ch.activeSet][slot]=null;
+  invalidateSkills();
   markDirty(); buildSlotUI(); renderSkills();
 }
 function socketSupport(gemIdx,sockIdx,supKey){
@@ -5950,6 +7381,7 @@ function renderSkills(){
   b.querySelectorAll('[data-link]').forEach(el=>el.addEventListener('click',()=>{
     const [gi,oi]=el.dataset.link.split(':').map(Number);
     ch.gems[gi].link = ch.gems[gi].link===oi? null : oi;
+    invalidateSkills();
     markDirty(); renderSkills();
   }));
   b.querySelectorAll('[data-sock]').forEach(el=>el.addEventListener('click',()=>{
@@ -6152,6 +7584,13 @@ function canAllocate(id){
   }
   return false;
 }
+/* Allocation without the UI side effects: used by the mirror's refund maths
+   and by anything that needs to walk a route. */
+function allocateSilent(id){
+  if(!canAllocate(id)) return false;
+  G.ch.passives[id]=G.tree.set;
+  return true;
+}
 function allocate(id){
   const ch=G.ch;
   if(!canAllocate(id)){
@@ -6216,10 +7655,16 @@ function screenToTree(sx,sy){
 }
 function nodeAtScreen(sx,sy){
   const p=screenToTree(sx,sy);
+  /* the nine buckets around the pointer, not all 606 nodes */
+  const cx=Math.floor(p.x/TREE.cell), cy=Math.floor(p.y/TREE.cell);
   let best=null,bd=1e9;
-  for(const n of TREE.list){
-    const d=d2(p.x,p.y,n.x,n.y);
-    if(d<bd){bd=d;best=n;}
+  for(let oy=-1;oy<=1;oy++) for(let ox=-1;ox<=1;ox++){
+    const arr=TREE.grid.get((cy+oy)*100000+(cx+ox));
+    if(!arr) continue;
+    for(const n of arr){
+      const d=d2(p.x,p.y,n.x,n.y);
+      if(d<bd){bd=d;best=n;}
+    }
   }
   const rr=(best&&best.type==='keystone')?30:best&&best.type==='notable'?22:16;
   return bd<=(rr+10)*(rr+10)?best:null;
@@ -6254,7 +7699,7 @@ function renderTree(){
     const otherSet=alloc&&setTag&&setTag!==(ch.activeSet+1);
     if(otherSet&&t.filterSet) continue;
     const mine=start&&isStartNode(n.id);
-    let r = n.type==='keystone'?15:n.type==='notable'?11:7;
+    let r = n.type==='keystone'?15:n.type==='notable'?11:n.type==='travel'?5:7;
     if(start) r=17;
     r*=t.z;
     const match=search&&(n.name.toLowerCase().indexOf(search)>=0||
@@ -6355,6 +7800,19 @@ function renderMenu(){
   html+='<button class="btn ghost" id="m-skills">Skills</button>';
   html+='<button class="btn ghost" id="m-tree">Passive Tree</button>';
   html+='<button class="btn ghost" id="m-sheet">Character</button>';
+  html+='<div class="sect">Controls</div>';
+  html+='<div class="summary">'+
+    kv('Move','WASD, or hold right mouse')+
+    kv('Sprint','hold Shift (a hit knocks you down)')+
+    kv('Dodge roll','Space \u2014 free, and invulnerable at the start')+
+    kv('Skills','left click, Q, E, R, T')+
+    kv('Flasks','1 and 2')+
+    kv('Weapon set','X')+
+    kv('Panels','I bag, P tree, C sheet, Tab map, H hideout')+
+    '</div>';
+  html+='<div class="pnote" style="font-size:13.5px">A roll cancels anything except another roll, '+
+    'and shrinks you to almost nothing while it lasts. It will not save you from a '+
+    '<b style="color:#e0503c">red telegraph</b> \u2014 walk out of those.</div>';
   html+='<button class="btn ghost" id="m-sound">Sound: '+(SND.on?'On':'Off')+'</button>';
   html+='<button class="btn ghost" id="m-exit">Save and Leave</button>';
   $('menu-body').innerHTML=html;
@@ -6776,6 +8234,16 @@ function migrateCharacter(ch){
   ch.flasks=ch.flasks||{life:3,mana:3};
   ch.zonesCleared=ch.zonesCleared||{};
   ch.seenGems=ch.seenGems||[];
+  /* The passive tree was rebuilt from six radial spokes into a 600-node web,
+     so no saved allocation points at a node that still exists. Refund the lot
+     rather than silently dropping the stats: the points come back, and the
+     player re-spends them on the new tree. */
+  let staleTree=false;
+  for(const id in ch.passives){ if(!TREE.nodes[id]){ staleTree=true; break; } }
+  if(staleTree){
+    ch.passives={};
+    ch.treeRefunded=true;
+  }
   if(!ch.loadout) ch.loadout=[[null,null,null,null,null],[null,null,null,null,null]];
   if(!ch.sets) ch.sets=[{weapon:null,offhand:null},{weapon:null,offhand:null}];
   if(ch.waypoints.indexOf('hideout')<0) ch.waypoints.unshift('hideout');
@@ -6810,6 +8278,12 @@ function startCharacter(slot){
   G.ch=G.save.chars[slot];
   const ch=migrateCharacter(G.ch);
   G.save.v=SAVE_VERSION;
+  /* the tree view is per-character: recentre it on this class's own start
+     rather than wherever the last character left the camera */
+  G.tree.x=0; G.tree.y=0; G.tree.z=0.62; G.tree.drag=false;
+  G.tree.sel=null; G.tree.set=0; G.tree.search='';
+  G.tree.filterSet=null; G.tree.centred=false; G.tree.dirty=true;
+  invalidateSkills();
   G.player=null;
   G.kills=0;
   G.running=true;
@@ -6821,6 +8295,11 @@ function startCharacter(slot){
   enterZone(ch.zone&&ZONES[ch.zone]?ch.zone:'town');
   closePanel();
   toast('Welcome back, '+ch.name+'.');
+  if(ch.treeRefunded){
+    ch.treeRefunded=false;
+    markDirty();
+    setTimeout(()=>toast('The passive tree has been rebuilt. All your points were refunded.'),2600);
+  }
 }
 
 /* ==========================================================================
@@ -6865,12 +8344,19 @@ window.addEventListener('keydown',e=>{
   if(k==='f'){ interact(); return; }
   if(k==='1'){ useFlask('life'); return; }
   if(k==='2'){ useFlask('mana'); return; }
+  /* Space is the dodge roll. The fifth skill moved to T. */
+  if(k===' '){ e.preventDefault(); startRoll(); return; }
+  if(k==='shift'){ G.player&&(G.player.sprint=true); return; }
   if(k==='q') useSkill(1,false);
   if(k==='e') useSkill(2,false);
   if(k==='r') useSkill(3,false);
-  if(k===' '){ e.preventDefault(); useSkill(4,false); }
+  if(k==='t') useSkill(4,false);
 });
-window.addEventListener('keyup',e=>{ G.keys[e.key.toLowerCase()]=false; });
+window.addEventListener('keyup',e=>{
+  const k=e.key.toLowerCase();
+  G.keys[k]=false;
+  if(k==='shift'&&G.player) G.player.sprint=false;
+});
 window.addEventListener('blur',()=>{ G.keys=Object.create(null); G.mouse.left=false; G.mouse.right=false; });
 cv.addEventListener('mousemove',e=>{
   const r=cv.getBoundingClientRect();
@@ -6962,6 +8448,28 @@ function setupTouch(){
   const doSwap=ev=>{ ev.preventDefault(); ev.stopPropagation(); swapSet(); };
   sw.addEventListener('touchstart',doSwap,{passive:false});
   sw.addEventListener('mousedown',doSwap);
+  /* the roll is a tap; the sprint is a hold, exactly as on the keyboard */
+  const rb=$('tbroll');
+  if(rb){
+    const go=ev=>{ ev.preventDefault(); ev.stopPropagation();
+      rb.classList.add('down'); startRoll();
+      setTimeout(()=>rb.classList.remove('down'),140); };
+    rb.addEventListener('touchstart',go,{passive:false});
+    rb.addEventListener('mousedown',go);
+  }
+  const sp=$('tbsprint');
+  if(sp){
+    const on=ev=>{ ev.preventDefault(); ev.stopPropagation(); sp.classList.add('down');
+      if(G.player) G.player.sprint=true; };
+    const off=ev=>{ ev.preventDefault(); ev.stopPropagation(); sp.classList.remove('down');
+      if(G.player) G.player.sprint=false; };
+    sp.addEventListener('touchstart',on,{passive:false});
+    sp.addEventListener('touchend',off,{passive:false});
+    sp.addEventListener('touchcancel',off,{passive:false});
+    sp.addEventListener('mousedown',on);
+    sp.addEventListener('mouseup',off);
+    sp.addEventListener('mouseleave',off);
+  }
   const hb=$('tb-hide');
   if(hb){
     const go=ev=>{ ev.preventDefault(); ev.stopPropagation(); goHideout(); };
