@@ -18,9 +18,9 @@
   --line:#1c2230; --line2:#2a3446; --line3:#3d4a61;
   --tx:#d9dfea; --tx2:#98a2b5; --tx3:#6b7486;
   --gold:#e8bd63; --good:#54d391; --bad:#ff6257; --warn:#ffa23c;
-  --ember:#ff6a3c; --frost:#4fb9ff; --gale:#b98cff; --stone:#74cf4a; --volt:#ffd23c;
+  --cinder:#ff6a3c; --frost:#4fb9ff; --gale:#b98cff; --stone:#74cf4a; --volt:#ffd23c;
   --neutral:#c8d1e0;
-  --ember-d:#3a1a12; --frost-d:#0e2c44; --gale-d:#2a1f43; --stone-d:#18330f; --volt-d:#3a3010;
+  --cinder-d:#3a1a12; --frost-d:#0e2c44; --gale-d:#2a1f43; --stone-d:#18330f; --volt-d:#3a3010;
   --fui:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
   --fnum:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,"Liberation Mono",monospace;
   --hud-h:86px; --tab-h:58px;
@@ -42,9 +42,9 @@ button.slot,button.trial,button.spellrow,button.srow{display:grid;align-items:ce
 .num{font-family:var(--fnum);font-variant-numeric:tabular-nums;font-feature-settings:"tnum" 1}
 
 /* ---------- element colour utilities ---------- */
-.e-ember{color:var(--ember)} .e-frost{color:var(--frost)} .e-gale{color:var(--gale)}
+.e-cinder{color:var(--cinder)} .e-frost{color:var(--frost)} .e-gale{color:var(--gale)}
 .e-stone{color:var(--stone)} .e-volt{color:var(--volt)} .e-neutral{color:var(--neutral)}
-.bg-ember{background:var(--ember)} .bg-frost{background:var(--frost)} .bg-gale{background:var(--gale)}
+.bg-cinder{background:var(--cinder)} .bg-frost{background:var(--frost)} .bg-gale{background:var(--gale)}
 .bg-stone{background:var(--stone)} .bg-volt{background:var(--volt)} .bg-neutral{background:var(--neutral)}
 
 /* ---------- rarity ---------- */
@@ -237,6 +237,9 @@ button.slot,button.trial,button.spellrow,button.srow{display:grid;align-items:ce
 .idrow .rl span{font-family:var(--fnum);font-size:9.5px;color:var(--tx3)}
 .idrow .rl .rb{width:50px;height:3px;background:#1a2028}
 .idrow .rl .rb i{display:block;height:100%}
+.combatbox{padding:9px 12px;background:#0a1a16;border-top:1px solid #1f5c4d;border-bottom:1px solid #1f5c4d}
+.combatbox .mt{font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:#54d391;font-weight:800}
+.combatbox .cb{font-size:13px;color:#cfe6dc;margin-top:3px;line-height:1.45}
 .major{padding:9px 12px;background:#1a1408;border-bottom:1px solid #3e3112;border-top:1px solid #3e3112}
 .major .mt{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--gold);font-weight:800}
 .major .mn{font-size:14px;font-weight:700;margin-top:2px}
@@ -324,6 +327,8 @@ button.slot,button.trial,button.spellrow,button.srow{display:grid;align-items:ce
 .spellrow .sd{font-size:10.5px;color:var(--tx3);margin-top:1px}
 .spellrow .sv{font-family:var(--fnum);font-size:14px;font-weight:700;text-align:right}
 .spellrow .sv small{display:block;font-size:9.5px;color:var(--tx3);font-weight:400}
+.slotno{display:inline-flex;width:15px;height:15px;align-items:center;justify-content:center;margin-right:5px;
+  border:1px solid var(--line3);color:var(--tx3);font-size:9px;font-weight:700;vertical-align:1px}
 .tag{display:inline-block;font-size:9px;letter-spacing:.1em;text-transform:uppercase;
   border:1px solid var(--line2);padding:1px 4px;color:var(--tx3);margin-right:3px}
 .tag.ab{border-color:#5f4a1c;color:var(--gold)}
@@ -393,10 +398,10 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:0}
    Pure model layer. No DOM below this line until ==ENGINE-END==.
    ================================================================ */
 
-const ELEMS = ["ember","frost","gale","stone","volt"];
-const ALLBUCKETS = ["neutral","ember","frost","gale","stone","volt"];
+const ELEMS = ["cinder","frost","gale","stone","volt"];
+const ALLBUCKETS = ["neutral","cinder","frost","gale","stone","volt"];
 const EL = {
-  ember:{name:"Ember", letter:"E", col:"#ff6a3c", school:"burn"},
+  cinder:{name:"Cinder", letter:"C", col:"#ff6a3c", school:"burn"},
   frost:{name:"Frost", letter:"F", col:"#4fb9ff", school:"chill"},
   gale :{name:"Gale",  letter:"G", col:"#b98cff", school:"cut"},
   stone:{name:"Stone", letter:"S", col:"#74cf4a", school:"crush"},
@@ -434,7 +439,7 @@ const T_HP     = [[20,9.00],[20,7.00],[30,4.00],[Infinity,2.00]];
 const T_DODGE  = [[20,0.35],[20,0.22],[30,0.12],[Infinity,0.05]];
 
 const ELEM_EFFECT = {
-  ember:{key:"hp",    label:"max health",        fmt:p=>"+"+Math.round(tiered(p,T_HP))+" HP",         table:T_HP},
+  cinder:{key:"hp",    label:"max health",        fmt:p=>"+"+Math.round(tiered(p,T_HP))+" HP",         table:T_HP},
   frost:{key:"cost",  label:"spell cost",        fmt:p=>"−"+tiered(p,T_COST).toFixed(1)+"% cost",     table:T_COST},
   gale :{key:"dodge", label:"dodge chance",      fmt:p=>"+"+tiered(p,T_DODGE).toFixed(1)+"% dodge",   table:T_DODGE},
   stone:{key:"strike",label:"strike damage",     fmt:p=>"+"+tiered(p,T_STRIKE).toFixed(1)+"% strike", table:T_STRIKE},
@@ -526,6 +531,7 @@ function buildContext(state){
     nodes.push(n);
     addAll(agg, n.stats, n.name, "node", n.id);
     if(n.major) add(agg, "major."+n.major, 1, n.name, "node", n.id);
+    if(n.rule)  add(agg, "major."+n.rule,  1, n.name, "node", n.id);
   }
 
   /* major IDs: static rule-changes fold into the aggregate here so
@@ -533,6 +539,7 @@ function buildContext(state){
      flags for the simulator. */
   const flags = {};
   for(const k in agg.total) if(k.startsWith("major.") && agg.total[k]>0) flags[k.slice(6)] = true;
+  if(g(agg,"noHeal") > 0) flags.noHeal = true;
   if(flags.sever){        add(agg,"critMult", 80, "Sever", "major","sever");  add(agg,"critHalve",1,"Sever","major","sever"); }
   if(flags.graveresolve){ for(const e of ELEMS) add(agg,"res."+e, 30, "Grave Resolve","major","graveresolve"); add(agg,"noDodge",1,"Grave Resolve","major","graveresolve"); }
   if(flags.anchor){       add(agg,"mult.all", 35, "Anchor","major","anchor"); add(agg,"dmgTaken", 20, "Anchor","major","anchor"); }
@@ -559,15 +566,40 @@ function buildContext(state){
   let dodge = g(agg,"noDodge")>0 ? 0 : clamp(g(agg,"dodge"), 0, 70);
 
   /* spell list: tree ability nodes add or replace */
-  let spells = cls.spells.map(s=>Object.assign({}, s));
+  const clone = o=>JSON.parse(JSON.stringify(o||{}));
+  let spells = cls.spells.map(s=>Object.assign({}, s, {fx:clone(s.fx)}));
+  /* 1. ability nodes swap out the spell sitting on a button */
   for(const n of nodes){
-    if(n.addSpell) spells.push(Object.assign({}, n.addSpell, {fromNode:n.name}));
+    if(n.addSpell) spells.push(Object.assign({}, n.addSpell, {fx:clone(n.addSpell.fx), fromNode:n.name}));
     if(n.replaceSpell){
       const [target, repl] = n.replaceSpell;
       const ix = spells.findIndex(s=>s.id===target);
-      if(ix>=0) spells[ix] = Object.assign({}, spells[ix], repl, {id:repl.id||target, replacedBy:n.name});
+      if(ix>=0){
+        const base = spells[ix];
+        spells[ix] = Object.assign({}, base, repl, {id:target, slot:base.slot, replacedBy:n.name,
+          fx: mergeFx(repl.fxReset ? {} : base.fx, clone(repl.fx))});
+      }
     }
     if(n.removeSpell) spells = spells.filter(s=>s.id!==n.removeSpell);
+  }
+  /* 2. modifier nodes rewrite behaviour on whatever now occupies that button.
+        Every fxMod runs before every fxAdd, so an amplifier never depends on
+        the order the player happened to allocate in. */
+  const spellById = {}; for(const sp of spells) spellById[sp.id] = sp;
+  for(const n of nodes) if(n.fxMod) for(const sid in n.fxMod){ if(spellById[sid]) mergeFx(spellById[sid].fx, clone(n.fxMod[sid])); }
+  for(const n of nodes) if(n.fxAdd) for(const sid in n.fxAdd){ if(spellById[sid]) addFx(spellById[sid].fx, n.fxAdd[sid]); }
+  /* 3. a replacement marked fxReset deliberately discards the branch's own
+        modifiers — it has to be re-asserted after them, or the branch would
+        quietly undo the keystone the player committed to. */
+  for(const n of nodes){
+    if(!n.replaceSpell || !n.replaceSpell[1].fxReset) continue;
+    const sp = spellById[n.replaceSpell[0]];
+    if(sp) sp.fx = mergeFx({}, clone(n.replaceSpell[1].fx));
+  }
+  for(const n of nodes) if(n.utilAdd) for(const sid in n.utilAdd){
+    const sp = spellById[sid]; if(!sp || !sp.util) continue;
+    sp.util = Object.assign({}, sp.util);
+    for(const k in n.utilAdd[sid]) sp.util[k] = Math.max(k==="cd"?0.5:0, (sp.util[k]||0) + n.utilAdd[sid][k]);
   }
 
   return {
@@ -659,6 +691,7 @@ function computeAttack(ctx, atk, opt){
 
   // 6. CRIT ----------------------------------------------------
   let cc = ctx.critChance, cm = ctx.critMult;
+  if(ctx.flags.nocrit) cc = 0;
   if(ctx.flags.fissure){ if(kind==="strike") cc = 0; else cc = 100; }
   if(opt.critOverride != null) cc = opt.critOverride;
   let hit = 0; for(const k of ALLBUCKETS) hit += b[k];
@@ -702,7 +735,7 @@ function effectiveHp(ctx, profile){
   if(inc.total<=0) return ctx.maxHp*20;
   return ctx.maxHp * (raw/inc.total);
 }
-const REF_PROFILE = {neutral:20, ember:20, frost:20, gale:20, stone:20, volt:20};
+const REF_PROFILE = {neutral:20, cinder:20, frost:20, gale:20, stone:20, volt:20};
 
 /* ================================================================
    ROTATION + SIMULATION
@@ -724,6 +757,46 @@ function strikeDef(ctx){
   return {id:"strike", name:(w?w.strikeName:"Strike"), kind:"strike", mult:1, cost:0,
           time:Math.max(0.15, iv), flatScale:(w?w.speed:1.0)/0.8};
 }
+/* ----------------------------------------------------------------
+   SPELL BEHAVIOUR (fx)
+   A spell is not just a damage number. Everything in this block is
+   something you can watch happen in a fight, which is exactly the
+   bar a modifier node has to clear to be called a modifier.
+   ---------------------------------------------------------------- */
+const FX_KINDS = ["direct","bleed","zone","minion","blast","counter","shatter","execute"];
+const ADD_VALUE_DEFAULT = 0.35;
+function emptyFx(){ return {}; }
+function mergeFx(fx, patch){
+  for(const k in patch){
+    const v = patch[k];
+    if(v && typeof v === "object" && !Array.isArray(v)) fx[k] = Object.assign({}, fx[k]||{}, v);
+    else fx[k] = v;
+  }
+  return fx;
+}
+const FX_DEFAULT = {hits:1, pierce:0, chain:0, addValue:ADD_VALUE_DEFAULT};
+function addFx(fx, patch){
+  for(const path in patch){
+    const bits = path.split(".");
+    if(bits.length === 1){
+      const base = fx[bits[0]] != null ? fx[bits[0]] : FX_DEFAULT[bits[0]];
+      if(base != null) fx[bits[0]] = base + patch[path];
+      continue;
+    }
+    const o = fx[bits[0]];
+    if(o && o[bits[1]] != null) o[bits[1]] += patch[path];
+  }
+  return fx;
+}
+/* how many things a cast actually touches */
+function targetsFor(sp, enemy){
+  const adds = enemy.adds || 0, fx = sp.fx || {};
+  let n = 1 + (fx.pierce||0) + (fx.chain||0);
+  if(fx.aoe || fx.pull || sp.aoe) n = 1 + adds;
+  return Math.max(1, Math.min(1 + adds, n));
+}
+const ADD_VALUE = ADD_VALUE_DEFAULT;   // an extra target is worth a third of the primary
+
 function attackTable(ctx){
   const out = [];
   const st = strikeDef(ctx);
@@ -741,11 +814,42 @@ function simulate(ctx, enemy, opts){
   const A = ctx.agg;
   const T = enemy.timeLimit, dt = 0.05;
   const table = attackTable(ctx);
-  const dmgActs = table.filter(a=>a.res.effective>0 && !a.util);
   const utils   = table.filter(a=>a.util);
   const strike  = table[0];
   const manaSteal = g(A,"manaSteal"), lifesteal = g(A,"lifesteal"), spellLeech = g(A,"spellLeech");
   const thorns = g(A,"thorns");
+  const noDirect = ctx.flags.nodirect;
+
+  /* resisted damage each action lands on the primary target */
+  function landedDirect(a){ return applyResist(a.res.buckets, enemy.res).total; }
+  for(const a of table){
+    a.fx = a.sp.fx || {};
+    a.targets = targetsFor(a.sp, enemy);
+    a.tmul = 1 + (a.targets - 1) * (a.fx.addValue != null ? a.fx.addValue : ADD_VALUE);
+    /* rawDirect is what the swing is worth; it still sets the size of every
+       behaviour hanging off it even when the swing itself is switched off */
+    a.rawDirect = landedDirect(a) * (a.fx.hits || 1) * a.tmul;
+    a.direct = noDirect ? 0 : a.rawDirect;
+  }
+  const directPct = 1 + g(A,"directPct")/100;
+  const strikeDps = strike.time > 0 ? strike.rawDirect / strike.time : 0;
+  /* a Totem or a Summon deals nothing on cast, but its behaviour still needs
+     a magnitude; use what a basic attack would have done in the same time */
+  for(const a of table) a.basis = a.rawDirect > 0 ? a.rawDirect : Math.max(1, strikeDps * Math.max(0.5, a.time) * 1.25);
+  /* the rotation must value a spell by what it eventually does, not by
+     the number that appears the instant it is cast */
+  const shatterBest = Math.max(0, ...table.map(x=>x.fx.shatter ? x.direct*(x.fx.shatter.pct||0)/100 : 0));
+  for(const a of table){
+    const fx = a.fx; let extra = 0;
+    if(fx.freeze && shatterBest > 0) extra += shatterBest;   // a setup cast is worth what it sets up
+    if(fx.dot)    extra += a.basis * fx.dot.pct/100 * (fx.dot.dur||3) * (fx.dot.stacks?Math.min(2,fx.dot.stacks):1);
+    if(fx.zone)   extra += a.basis * fx.zone.pct/100 * (fx.zone.dur||3);
+    if(fx.summon) extra += strikeDps * fx.summon.pct/100 * (fx.summon.count||1) * Math.min(10, fx.summon.dur||8);
+    if(fx.guard)  extra += (fx.guard.counter||0)/100 * a.direct * 2;
+    if(fx.mark)   extra += a.direct * (fx.mark.pct/100) * 0.6;
+    a.value = a.direct + extra;
+  }
+  const dmgActs = table.filter(a=>(a.value > 0 || a.fx.summon || a.fx.mark) && !a.util);
 
   let hp = ctx.maxHp, mana = ctx.maxMana, t = 0;
   let enemyHp = enemy.hp, ward = 0, wardEndsAt = -1, wardDeadline = -1;
@@ -753,118 +857,239 @@ function simulate(ctx, enemy, opts){
   const regenBase = ctx.manaRegen;
 
   let acting = null, actEnds = 0, castCount = 0;
-  let dealt = 0, dealtBy = {}, takenBy = {}, curve = [], manaCurve = [], hpSeries = [];
+  let dealt = 0, dealtBy = {}, byKind = {}, takenBy = {}, curve = [], manaCurve = [], hpSeries = [];
   let starvedTime = 0, strikeTime = 0, totalTime = 0, lastHitAt = -99;
   let wardBreaks = 0, wardFails = 0, wardDealt = 0, wardNeeded = 0, bestWardPush = 0, wardAbsorbed = 0, failPush = 0;
   let healedBack = 0, drained = 0, deathAt = -1, killAt = -1, secBucket = 0, secT = 0;
-  const buffs = {}; const cds = {};
+  const cds = {};
+
+  /* live behaviour state — this is what makes nodes visible in a fight */
+  const dots = [], zones = [], minions = [];
+  let mark = 0, markT = 0, weaken = 0, weakenT = 0, frozenT = 0, rootPct = 0, rootT = 0;
+  let blockPct = 0, blockT = 0, counterPct = 0, counterAll = false, counterDot = null;
+  let maxStacks = 0, minionPeak = 0, freezes = 0, shatters = 0, blasts = 0, counters = 0;
+  const log = [], logged = {};
+  function say(kind, text, once){
+    if(once){ if(logged[once]) return; logged[once] = 1; }
+    if(log.length < 60) log.push({t:+t.toFixed(1), kind, text});
+  }
+  function hurt(amount, kind, label){
+    if(amount <= 0) return;
+    let v = amount * (1 + mark/100);
+    if(ward > 0){
+      const w = Math.min(ward, v); ward -= w; wardDealt += w; wardAbsorbed += w; v -= w;
+      if(ward <= 0){ wardBreaks++; wardEndsAt = t; bestWardPush = Math.max(bestWardPush, enemy.ward.hp);
+                     say("ward","Ward broken"); }
+    }
+    enemyHp -= v;
+    dealt += amount;
+    byKind[kind] = (byKind[kind]||0) + amount;
+    dealtBy[label] = (dealtBy[label]||0) + amount;
+    secBucket += amount;
+  }
+  function takeHit(buckets, why){
+    const inc = playerIncoming(ctx, buckets);
+    let d = inc.total;
+    if(blockT > 0){
+      d *= (1 - blockPct/100);
+      if(counterPct > 0){
+        let c = strike.direct * counterPct/100;
+        if(counterAll) c *= 1 + (enemy.adds||0)*ADD_VALUE;
+        hurt(c, "counter", "Counter"); counters++;
+        if(counterDot) applyDot(counterDot, c);
+        say("counter","Counter-attack for "+fmt(c), counters>2?"ctr":null);
+      }
+    }
+    for(const k in inc.buckets) takenBy[k] = (takenBy[k]||0) + inc.buckets[k]*(blockT>0?(1-blockPct/100):1);
+    if(shield > 0){ const s = Math.min(shield, d); shield -= s; d -= s; }
+    if(d > 0){ hp -= d; lastHitAt = t; }
+  }
 
   const policy = opts.policy || ctx.policy || "debt";
   function pick(){
     for(const u of utils){
       const cd = cds[u.sp.id] || 0;
       if(t < cd || mana < u.cost) continue;
-      /* a pure heal on a full health bar is a wasted cast; a shield or a
-         defensive buff is worth having up regardless */
-      const healOnly = u.util.heal && !u.util.shield && !u.util.dodge;
+      const healOnly = u.util.heal && !u.util.shield && !u.util.dodge && !u.fx.guard;
       if(healOnly && hp > ctx.maxHp*0.85) continue;
       if(ctx.flags.noHeal && healOnly) continue;
       return u;
     }
     if(policy === "strike") return strike;
+    /* "set up, then spend" is a plausible plan and no single-score heuristic
+       can express it: a freeze is worth nothing until something shatters it. */
+    if(policy === "combo"){
+      for(const a of dmgActs){
+        if(a.cost > mana) continue;
+        if(a.fx.freeze && frozenT <= 0 && shatterBest > 0) return a;
+        if(a.fx.mark && a.fx.mark.pct > 0 && markT <= 0.3) return a;
+        if(a.fx.weaken && a.fx.weaken.pct >= 20 && weakenT <= 0.3 && a.direct > 0) return a;
+      }
+    }
     let best = null, bestScore = -1;
     const wardUp = ward > 0;
     for(const a of dmgActs){
       if(a.cost > mana) continue;
-      const land = landed(a);
+      if(a.fx.summon && minions.length >= (a.fx.summon.cap || 99)) continue;
+      if(a.fx.mark && markT > 1.5 && !a.direct) continue;
+      let v = a.value;
+      if(wardUp) v = a.direct;                       // a ward only cares about what lands now
       let score;
-      if(wardUp || policy === "burst") score = land / a.time;
-      else if(policy === "permana") score = a.cost>0 ? land / a.cost : land / a.time * 0.0001 + 1e-6;
+      if(wardUp || policy === "burst" || policy === "combo") score = v / a.time;
+      else if(policy === "permana") score = a.cost>0 ? v / a.cost : v / a.time * 1e-4 + 1e-6;
       else {
         const debt = regenBase > 0 ? Math.max(0, a.cost - regenBase*a.time)/regenBase : (a.cost>0?99:0);
-        score = land / (a.time + debt);
+        score = v / (a.time + debt);
       }
       if(score > bestScore){ bestScore = score; best = a; }
     }
     return best || strike;
   }
-  function landed(a){
-    let mul = 1;
-    if(ctx.flags.bloodrite && hp < ctx.maxHp*0.5) mul *= 1.4;
-    if(ctx.flags.tempo && a.sp.kind==="spell" && (castCount % 4)===3) mul *= 2;
-    if(enemy.executeGate && enemyHp < enemy.hp*0.35) mul *= 1 + g(A,"execute")/100;
-    const r = applyResist(a.res.buckets, enemy.res);
-    let v = r.total * mul;
-    if(a.sp.aoe && enemy.adds) v *= 1 + enemy.adds*0.28;
-    if(ctx.flags.ricochet && a.sp.kind==="spell" && enemy.adds) v *= 1.25;
-    return v;
+
+  function applyDot(d, basis, spread){
+    const key = d.name || "Bleed";
+    let e = dots.find(x=>x.key===key);
+    const perStack = basis*d.pct/100 * (spread && enemy.adds ? 1 + enemy.adds*ADD_VALUE : 1);
+    if(!e){ e = {key, name:key, elem:d.elem||"neutral", per:perStack, stacks:0, remaining:0, max:d.stacks||1};
+            dots.push(e); }
+    e.per = perStack; e.max = d.stacks||1;
+    e.stacks = Math.min(e.max, e.stacks+1);
+    e.remaining = d.dur || 4;
+    maxStacks = Math.max(maxStacks, e.stacks);
+    say("dot", key+" applied"+(e.max>1? " ("+e.stacks+"/"+e.max+" stacks)":""), e.stacks<e.max?("dot"+key+e.stacks):null);
+    if(spread && enemy.adds) say("dot", key+" spread to "+enemy.adds+" other targets","spread"+key);
+  }
+  function resolve(a){
+    const fx = a.fx;
+    let direct = a.direct * directPct;
+    if(ctx.flags.focusfire) direct *= (markT > 0 ? 1.6 : 0.6);
+    if(ctx.flags.bloodrite && hp < ctx.maxHp*0.5) direct *= 1.4;
+    if(ctx.flags.tempo && a.sp.kind==="spell" && (castCount % 4)===3) direct *= 2;
+    if(fx.execute && enemyHp < enemy.hp*0.35) direct *= 1 + (fx.execute.pct + g(A,"execute"))/100;
+    if(frozenT > 0 && fx.shatter){
+      const bonus = direct * fx.shatter.pct/100;
+      hurt(bonus, "shatter", "Shatter"); shatters++;
+      frozenT = 0;
+      say("shatter","Frozen target shattered for "+fmt(bonus), shatters>2?"sh":null);
+    }
+    if(direct > 0) hurt(direct, "direct", a.sp.name);
+
+    if(fx.dot) applyDot(fx.dot, a.basis, fx.spread);
+    if(fx.detonate && dots.length){
+      let boom = 0;
+      for(const e of dots){ boom += e.per*e.stacks*(e.remaining||0)*fx.detonate.pct/100; e.stacks=0; e.remaining=0; }
+      if(boom>0){ hurt(boom,"blast","Detonation"); blasts++; say("blast","Detonated every stack for "+fmt(boom)); }
+    }
+    if(fx.zone){
+      const z = fx.zone;
+      zones.push({name:z.name||"Ground", elem:z.elem||"neutral",
+                  dps:a.basis*z.pct/100, remaining:z.dur||4});
+      say("zone", (z.name||"Ground")+" laid down for "+(z.dur||4)+"s", "z"+(z.name||"g"));
+    }
+    if(fx.summon){
+      const s = fx.summon, n = s.count||1;
+      if(ctx.flags.symbiosis) hp -= ctx.maxHp*0.11*n;
+      for(let i=0;i<n;i++) minions.push({remaining: s.perm? 1e9 : (s.dur||10),
+        dps: strikeDps*s.pct/100, explode: s.explode||0});
+      minionPeak = Math.max(minionPeak, minions.length);
+      say("minion", n+" "+(n>1?"minions":"minion")+" summoned ("+minions.length+" out)", "sum"+minions.length);
+    }
+    if(fx.mark){ mark = fx.mark.pct; markT = fx.mark.dur;
+                 say("mark","Target marked — taking +"+fx.mark.pct+"% damage","mk"); }
+    if(fx.weaken){ weaken = fx.weaken.pct; weakenT = fx.weaken.dur;
+                   say("debuff","Enemy weakened — dealing −"+fx.weaken.pct+"% damage","wk"); }
+    if(fx.freeze){ frozenT = fx.freeze.dur; freezes++;
+                   say("freeze","Target frozen for "+fx.freeze.dur+"s", freezes>2?"fz":null); }
+    if(fx.root){ rootPct = fx.root.pct||30; rootT = fx.root.dur||3;
+                 say("root","Rooted — its damage cut "+rootPct+"% for "+rootT+"s","rt"); }
+    if(fx.guard){ blockPct = fx.guard.block||30; blockT = fx.guard.dur||3; counterPct = fx.guard.counter||0;
+                  counterAll = !!fx.guard.counterAll; counterDot = fx.guard.counterDot||null;
+                  say("guard","Guard up — "+blockPct+"% blocked"+(counterPct?", countering":""),"gd"); }
+    if(fx.drain){ mana = Math.min(ctx.maxMana, mana + (fx.drain.mana||0));
+                  if(!ctx.flags.noHeal) hp = Math.min(ctx.maxHp, hp + ctx.maxHp*(fx.drain.heal||0)/100);
+                  say("drain","Siphoned "+(fx.drain.mana||0)+" mana","dr"); }
   }
 
   while(t < T){
-    /* ---- world tick ---- */
-    if(enemy.dps){
-      const inc = playerIncoming(ctx, scaleB(enemy.dps, dt));
-      for(const k in inc.buckets){ takenBy[k]=(takenBy[k]||0)+inc.buckets[k]; }
-      let d = inc.total;
-      if(shield>0){ const s = Math.min(shield, d); shield-=s; d-=s; }
-      if(d>0){ hp -= d; lastHitAt = t; }
+    /* ---- behaviour ticks ---- */
+    for(let i=dots.length-1;i>=0;i--){
+      const e = dots[i];
+      if(e.stacks>0 && e.remaining>0){
+        let v = e.per*e.stacks*dt;
+        if(enemy.res && enemy.res[e.elem]) v *= 1;   // already resisted at source
+        hurt(v, "bleed", e.name);
+      }
+      e.remaining -= dt;
+      if(e.remaining <= 0){ e.stacks = 0; }
     }
+    for(let i=zones.length-1;i>=0;i--){
+      const z = zones[i];
+      hurt(z.dps*dt, "zone", z.name);
+      z.remaining -= dt;
+      if(z.remaining <= 0) zones.splice(i,1);
+    }
+    for(let i=minions.length-1;i>=0;i--){
+      const m = minions[i];
+      hurt(m.dps*dt, "minion", "Minions");
+      m.remaining -= dt;
+      if(m.remaining <= 0){
+        minions.splice(i,1);
+        if(m.explode){ const b = strikeDps*m.explode/100; hurt(b,"blast","Minion blast"); blasts++;
+                       say("blast","A minion died and detonated for "+fmt(b), blasts>2?"bl":null); }
+      }
+    }
+    if(markT>0){ markT-=dt; if(markT<=0) mark=0; }
+    if(weakenT>0){ weakenT-=dt; if(weakenT<=0) weaken=0; }
+    if(rootT>0){ rootT-=dt; if(rootT<=0) rootPct=0; }
+    if(frozenT>0) frozenT-=dt;
+    if(blockT>0) blockT-=dt;
+
+    /* ---- what the enemy does ---- */
+    const softener = (1 - weaken/100) * (1 - rootPct/100);
+    if(enemy.dps) takeHit(scaleB(enemy.dps, dt*softener));
     if(enemy.spike && t>0 && Math.abs((t % enemy.spike.every)) < dt*0.999 && t>=enemy.spike.every-1e-9){
-      const inc = playerIncoming(ctx, enemy.spike.dmg);
-      for(const k in inc.buckets){ takenBy[k]=(takenBy[k]||0)+inc.buckets[k]; }
-      let d = inc.total;
-      if(shield>0){ const s=Math.min(shield,d); shield-=s; d-=s; }
-      hp -= d; lastHitAt = t;
+      takeHit(scaleB(enemy.spike.dmg, softener));
+      say("hit","Its burst lands", "spk");
     }
     if(enemy.drain){ mana = Math.max(0, mana - enemy.drain*dt); drained += enemy.drain*dt; }
     if(enemy.regen && enemyHp>0 && enemyHp<enemy.hp){
       const h = Math.min(enemy.regen*dt, enemy.hp-enemyHp); enemyHp += h; healedBack += h;
     }
-    /* ward cycles */
     if(enemy.ward){
       if(ward<=0 && t >= (wardEndsAt<0 ? enemy.ward.first : wardEndsAt + enemy.ward.every)){
         ward = enemy.ward.hp; wardDeadline = t + enemy.ward.window; wardNeeded += enemy.ward.hp; wardDealt = 0;
+        say("ward","Ward up — "+fmt(enemy.ward.hp)+" in "+enemy.ward.window+"s","wd");
       }
       if(ward>0 && t > wardDeadline){
         wardFails++; wardEndsAt = t; ward = 0;
         bestWardPush = Math.max(bestWardPush, wardDealt);
         failPush = Math.max(failPush, wardDealt);
         const h = Math.min(enemy.ward.healOnFail, enemy.hp-enemyHp); enemyHp += h; healedBack += h;
-        const inc = playerIncoming(ctx, enemy.ward.failDmg);
-        for(const k in inc.buckets) takenBy[k]=(takenBy[k]||0)+inc.buckets[k];
-        hp -= inc.total; lastHitAt = t;
+        takeHit(enemy.ward.failDmg);
+        say("ward","Ward resealed — it heals "+fmt(h));
       }
     }
-    /* regen */
     let mr = regenBase;
     if(ctx.flags.lucid && (t - lastHitAt) > 3) mr *= 2;
     mana = Math.min(ctx.maxMana, mana + mr*dt);
     if(!ctx.flags.noHeal && ctx.hpRegen) hp = Math.min(ctx.maxHp, hp + ctx.hpRegen*dt);
-
+    if(ctx.flags.symbiosis && minions.length && !ctx.flags.noHeal)
+      hp = Math.min(ctx.maxHp, hp + minions.length*ctx.maxHp*0.02*dt);
     if(hp <= 0){ deathAt = t; break; }
 
-    /* ---- action resolution ---- */
+    /* ---- actions ---- */
     if(acting && t >= actEnds - 1e-9){
       const a = acting; acting = null;
-      const dmg = landed(a);
-      dealt += dmg; dealtBy[a.sp.id] = (dealtBy[a.sp.id]||0) + dmg;
-      secBucket += dmg;
-      if(ward>0){ const w = Math.min(ward, dmg); ward -= w; wardDealt += w; wardAbsorbed += w; const over = dmg-w; enemyHp -= over;
-        if(ward<=0){ wardBreaks++; wardEndsAt = t; bestWardPush = Math.max(bestWardPush, enemy.ward.hp); } }
-      else enemyHp -= dmg;
-      if(a.sp.kind==="strike"){ mana = Math.min(ctx.maxMana, mana + manaSteal); if(!ctx.flags.noHeal) hp = Math.min(ctx.maxHp, hp+lifesteal); }
+      resolve(a);
+      if(a.sp.kind==="strike"){ mana = Math.min(ctx.maxMana, mana + manaSteal);
+                                if(!ctx.flags.noHeal) hp = Math.min(ctx.maxHp, hp+lifesteal); }
       else { castCount++; if(!ctx.flags.noHeal) hp = Math.min(ctx.maxHp, hp+spellLeech); }
       if(a.util){
         cds[a.sp.id] = t + (a.util.cd || a.util.dur || 6);
         if(a.util.heal && !ctx.flags.noHeal) hp = Math.min(ctx.maxHp, hp + ctx.maxHp*a.util.heal/100);
         if(a.util.shield) shield += ctx.maxHp*a.util.shield/100;
       }
-      if(thorns){ const back = dmg*thorns/100; /* reflected damage is dealt, not taken */ enemyHp -= 0; }
-      if(enemy.thorns){
-        const inc = playerIncoming(ctx, {neutral: dmg*enemy.thorns/100});
-        for(const k in inc.buckets) takenBy[k]=(takenBy[k]||0)+inc.buckets[k];
-        hp -= inc.total; lastHitAt = t;
-      }
+      if(enemy.thorns){ takeHit({neutral: a.direct*enemy.thorns/100}); }
       if(enemyHp <= 0 && ward<=0){ killAt = t; break; }
     }
     if(!acting){
@@ -887,19 +1112,21 @@ function simulate(ctx, enemy, opts){
   const dur = killAt>=0 ? killAt : (deathAt>=0 ? deathAt : T);
   return {
     win: killAt>=0, killAt, deathAt, dur:Math.max(0.05,dur), dealt,
-    dps: dealt/Math.max(0.05,dur), dealtBy, takenBy,
+    dps: dealt/Math.max(0.05,dur), dealtBy, byKind, takenBy,
     taken: Object.values(takenBy).reduce((a,b)=>a+b,0),
     hpLeft:Math.max(0,hp), hpPct: Math.max(0,hp)/ctx.maxHp,
     enemyHpLeft: Math.max(0, enemyHp), enemyPct: 1 - Math.max(0,enemyHp)/enemy.hp,
     curve, manaCurve, hpSeries, starvedTime, strikeTime, totalTime, healedBack, drained,
     wardBreaks, wardFails, wardNeeded, bestWardPush, failPush, wardAbsorbed,
+    log, maxStacks, minionPeak, freezes, shatters, blasts, counters,
+    targets: Math.max(...table.map(a=>a.targets)),
     effDps: Math.max(0, dealt - wardAbsorbed)/Math.max(0.05,dur), enemy, ctx
   };
 }
 
 /* the headline numbers: a 0-resist dummy with infinite health */
 const DUMMY = {id:"dummy", name:"Test Dummy", hp:1e12, res:{}, timeLimit:24, dps:null};
-const POLICIES = ["debt","burst","permana","strike"];
+const POLICIES = ["debt","burst","permana","strike","combo"];
 /* Which rotation does this build actually want? Rather than assert one
    heuristic and hope, run the plausible ones and keep whichever deals the
    most damage. The UI names the winner so the player can see the choice. */
@@ -914,7 +1141,8 @@ function pickPolicy(ctx){
   return best;
 }
 const POLICY_NAME = {debt:"spend only what you regenerate", burst:"cast the biggest thing you can afford",
-                     permana:"cast the most damage per point of mana", strike:"basic attacks only"};
+                     permana:"cast the most damage per point of mana", strike:"basic attacks only",
+                     combo:"keep your setup running, then spend"};
 function dummyRun(ctx){ pickPolicy(ctx); return simulate(ctx, DUMMY); }
 
 /* burst is the most damage this build can put out in the window, so it is
@@ -1097,51 +1325,73 @@ function fmt(n){
    ================================================================ */
 const CLASSES = {
   warden:{
-    id:"warden", name:"Warden", weaponType:"maul", tagline:"Maul · Stone / Ember",
-    blurb:"Slow, heavy, and built to be hit. Wardens turn incoming damage into a resource and their own health into a currency.",
-    hp:800, mana:108, manaRegen:5.4, crit:5, critMult:2.0,
+    id:"warden", name:"Warden", weaponType:"greataxe", tagline:"Greataxe · Stone / Cinder",
+    blurb:"Heavy melee at arm's length. A Warden's tree turns getting hit into a damage source, turns a wound into a stack, and turns the floor into a weapon.",
+    themes:"Block-and-counter · Bleed stacking · Area control",
+    hp:820, mana:108, manaRegen:5.4, crit:5, critMult:2.0,
     base:{"armor":5,"res.stone":5},
     spells:[
-      {id:"rend",   name:"Rend",         cost:22, time:0.85, mult:1.75, flatScale:0.95, text:"A downward split that opens the target up."},
-      {id:"quake",  name:"Earthshatter", cost:40, time:1.50, mult:3.10, flatScale:1.45, aoe:true, text:"Drives the head into the ground. Hits everything standing on it."},
-      {id:"reck",   name:"Reckoning",    cost:55, time:1.90, mult:4.60, flatScale:1.75, text:"One enormous overhead. Nothing clever about it."},
-      {id:"vow",    name:"Iron Vow",     cost:30, time:0.70, mult:0.40, flatScale:0.35, util:{dur:6, cd:6, heal:8, shield:10}, text:"Brace. Shields for 10% of max health and heals 8% over the swing."}
+      {id:"cleave", slot:1, name:"Cleave",      cost:20, time:0.80, mult:1.70, flatScale:0.90,
+       fx:{pierce:1}, text:"A wide arc that carries through the target into whatever is behind it."},
+      {id:"charge", slot:2, name:"Charge",      cost:24, time:0.60, mult:1.40, flatScale:0.70,
+       fx:{weaken:{pct:12,dur:4}}, text:"Close the gap shoulder-first. Whatever you hit swings weaker for a while."},
+      {id:"slam",   slot:3, name:"Ground Slam", cost:36, time:1.30, mult:2.80, flatScale:1.35,
+       fx:{aoe:true}, text:"Drive the head into the floor. Everything standing on it feels it."},
+      {id:"guard",  slot:4, name:"Guard",       cost:22, time:0.50, mult:0.00, flatScale:0,
+       util:{dur:4, cd:5}, fx:{guard:{block:40, dur:4, counter:0}},
+       text:"Brace behind the haft. Blocks 40% of everything for four seconds."}
     ]
   },
-  arcwright:{
-    id:"arcwright", name:"Arcwright", weaponType:"rod", tagline:"Rod · Volt / Frost",
-    blurb:"A fast, fragile caster whose damage arrives in a thousand small pieces — or in one, if you build for it.",
-    hp:540, mana:130, manaRegen:6.5, crit:5, critMult:2.0,
-    base:{"res.volt":5},
+  skyward:{
+    id:"skyward", name:"Skyward", weaponType:"bow", tagline:"Bow · Gale / Volt",
+    blurb:"Ranged and never standing still. Skyward decides between many arrows and one, and the tree will not let you have both.",
+    themes:"Crit and single target · Multishot · Hit-and-run",
+    hp:620, mana:120, manaRegen:6.2, crit:9, critMult:2.25,
+    base:{"dodge":5,"res.gale":5},
     spells:[
-      {id:"bolt",   name:"Arc Bolt",     cost:14, time:0.50, mult:1.20, flatScale:0.60, text:"Cheap, fast, and the backbone of every Arcwright rotation."},
-      {id:"chain",  name:"Chain Surge",  cost:32, time:1.10, mult:2.40, flatScale:1.10, aoe:true, text:"Jumps between targets, losing nothing on the way."},
-      {id:"thead",  name:"Thunderhead",  cost:60, time:2.20, mult:5.20, flatScale:2.00, text:"A long, expensive channel that ends in a single column of charge."},
-      {id:"step",   name:"Phase Step",   cost:0,  time:0.30, mult:0.00, flatScale:0,    util:{dur:4, cd:8, dodge:30}, text:"Free. Displaces you for four seconds."}
+      {id:"storm", slot:1, name:"Arrow Storm", cost:28, time:1.00, mult:3.15, flatScale:1.05,
+       fx:{aoe:true}, text:"A volley across a whole front. Wide, and thin where it lands."},
+      {id:"dash",  slot:2, name:"Dash",        cost:0,  time:0.30, mult:0.00, flatScale:0,
+       util:{dur:4, cd:7, dodge:30}, fx:{}, text:"Free, short, and the reason you are still alive."},
+      {id:"pin",   slot:3, name:"Pin Shot",    cost:20, time:0.70, mult:2.60, flatScale:0.85,
+       fx:{root:{pct:25,dur:3}}, text:"One arrow through something load-bearing. It stops moving and hits softer."},
+      {id:"mark",  slot:4, name:"Mark",        cost:16, time:0.40, mult:0.30, flatScale:0.20,
+       fx:{mark:{pct:28,dur:8}}, text:"Almost no damage. Everything you do to a marked target hits harder."}
     ]
   },
-  tidecaller:{
-    id:"tidecaller", name:"Tidecaller", weaponType:"censer", tagline:"Censer · Frost / Gale",
-    blurb:"The mana class. Tidecallers do not run out; the question is what they buy with what they never stop having.",
-    hp:625, mana:145, manaRegen:7.2, crit:5, critMult:2.0,
-    base:{"res.frost":5},
+  ember:{
+    id:"ember", name:"Ember", weaponType:"staff", tagline:"Staff · Cinder / Frost",
+    blurb:"The fragile one. Ember's tree is about what your damage turns into on the way out — fire that lingers, ice that breaks, mana that is not yours.",
+    themes:"Element conversion · Damage over time · Mana burn",
+    hp:545, mana:150, manaRegen:7.0, crit:5, critMult:2.0,
+    base:{"res.cinder":5},
     spells:[
-      {id:"lance",  name:"Rime Lance",      cost:18, time:0.70, mult:1.50, flatScale:0.80, text:"A thrown spar of black ice."},
-      {id:"under",  name:"Undertow",        cost:34, time:1.20, mult:2.65, flatScale:1.15, aoe:true, text:"Pulls the floor out from under a whole rank."},
-      {id:"verdict",name:"Glacial Verdict", cost:50, time:1.70, mult:4.30, flatScale:1.60, text:"Closes the target in ice, then closes the ice."},
-      {id:"well",   name:"Wellspring",      cost:25, time:0.90, mult:0.00, flatScale:0,    util:{dur:6, cd:6, heal:14}, text:"Heals 14% of max health. Costs mana you were going to regenerate anyway."}
+      {id:"bolt",   slot:1, name:"Firebolt", cost:14, time:0.50, mult:1.25, flatScale:0.60,
+       fx:{}, text:"Cheap and quick. Everything else in this tree is built on top of it."},
+      {id:"blink",  slot:2, name:"Blink",    cost:0,  time:0.25, mult:0.00, flatScale:0,
+       util:{dur:3, cd:6, dodge:28}, fx:{}, text:"Three seconds of being somewhere else."},
+      {id:"nova",   slot:3, name:"Nova",     cost:34, time:1.10, mult:2.45, flatScale:1.10,
+       fx:{aoe:true}, text:"A ring of fire leaving you in every direction."},
+      {id:"siphon", slot:4, name:"Siphon",   cost:0,  time:0.90, mult:0.70, flatScale:0.38,
+       fx:{drain:{mana:22}}, text:"Pulls mana out of whatever you point it at. Costs nothing, returns 22."}
     ]
   },
-  shrike:{
-    id:"shrike", name:"Shrike", weaponType:"daggers", tagline:"Daggers · Gale / Ember",
-    blurb:"Almost no health and almost no mana, spending both faster than anything else in the game. Crit is not a bonus here; it is the plan.",
-    hp:500, mana:100, manaRegen:5.4, crit:8, critMult:2.0,
-    base:{"dodge":4},
+  thornbound:{
+    id:"thornbound", name:"Thornbound", weaponType:"idol", tagline:"Idol · Stone / Gale",
+    blurb:"Slow, and rarely doing the hitting. A Thornbound wins by having more things on the field than the fight has answers for.",
+    themes:"Minion count · Sustain · Debuff auras",
+    hp:640, mana:135, manaRegen:6.4, crit:5, critMult:2.0,
+    base:{"hpRegen":4,"res.stone":4},
     spells:[
-      {id:"lac",    name:"Lacerate",     cost:16, time:0.45, mult:1.05, flatScale:0.50, text:"Two cuts, close together."},
-      {id:"shear",  name:"Windshear",    cost:30, time:0.90, mult:2.25, flatScale:0.95, aoe:true, text:"A flat arc of pressurised air."},
-      {id:"mark",   name:"Killing Mark", cost:48, time:1.40, mult:3.90, flatScale:1.40, execute:true, text:"Hits harder the less there is left to hit."},
-      {id:"vanish", name:"Vanish",       cost:20, time:0.40, mult:0.00, flatScale:0, util:{dur:5, cd:7, dodge:45, crit:25}, text:"Five seconds of not being where you were."}
+      {id:"summon", slot:1, name:"Summon", cost:30, time:1.20, mult:0.00, flatScale:0,
+       fx:{summon:{count:1, pct:44, dur:14, cap:4}}, text:"One thorn-thing, for fourteen seconds. It fights while you do not."},
+      {id:"root",   slot:2, name:"Root",   cost:18, time:0.60, mult:0.90, flatScale:0.45,
+       fx:{root:{pct:30,dur:4}}, text:"Holds it in place and cuts what it can put out by a third."},
+      {id:"drain",  slot:3, name:"Drain",  cost:22, time:0.90, mult:1.55, flatScale:0.80,
+       fx:{drain:{heal:4}}, text:"Takes from it and gives to you."},
+      {id:"totem",  slot:4, name:"Totem",  cost:34, time:1.00, mult:0.00, flatScale:0,
+       fx:{zone:{name:"Totem", pct:30, dur:10, elem:"stone"}, weaken:{pct:15, dur:10}},
+       text:"Plant it and leave it. It grinds at whatever stands near it and blunts what that thing swings."}
     ]
   }
 };
@@ -1177,72 +1427,72 @@ I({id:"w_wd1",name:"Splitlog Maul",slot:"weapon",cls:"warden",rarity:"common",lv
 I({id:"w_wd2",name:"Terrace Hammer",slot:"weapon",cls:"warden",rarity:"uncommon",lvl:4,speed:1.25,strikeName:"Crush",
   req:{stone:12},dmgBase:{neutral:[26,38],stone:[10,18]},stats:{"dmg.stone":[6,12],"hp":[44,80]},lore:"Quarry issue, third terrace."});
 I({id:"w_wd3",name:"Slagfall",slot:"weapon",cls:"warden",rarity:"rare",lvl:7,speed:1.25,strikeName:"Crush",
-  req:{ember:20,stone:10},dmgBase:{neutral:[34,50],ember:[20,34]},
-  stats:{"dmg.ember":[12,20],"flat.ember":[10,18],"res.frost":[-8,-3]},lore:"Still warm. It has been cold for nine years."});
+  req:{cinder:20,stone:10},dmgBase:{neutral:[34,50],cinder:[20,34]},
+  stats:{"dmg.cinder":[12,20],"flat.cinder":[10,18],"res.frost":[-8,-3]},lore:"Still warm. It has been cold for nine years."});
 I({id:"w_wd4",name:"Gravebreaker",slot:"weapon",cls:"warden",rarity:"fabled",lvl:10,speed:1.25,strikeName:"Crush",
-  req:{stone:30,ember:14},dmgBase:{neutral:[50,70],stone:[38,58]},
+  req:{stone:30,cinder:14},dmgBase:{neutral:[50,70],stone:[38,58]},
   stats:{"flat.stone":[18,30],"mult.strike":[8,14],"hp":[130,218],"cost.all":[8,15]},lore:"Made for opening things that were closed on purpose."});
 I({id:"w_wd5",name:"Tectonic Verdict",slot:"weapon",cls:"warden",rarity:"mythic",lvl:13,speed:1.25,strikeName:"Crush",
-  req:{stone:44,ember:18},dmgBase:{neutral:[74,104],stone:[66,98]},
+  req:{stone:44,cinder:18},dmgBase:{neutral:[74,104],stone:[66,98]},
   stats:{"dmg.stone":[24,40],"mult.all":[6,11],"hp":[232,377],"cast":[-15,-8],"mana":[-30,-15]},
   lore:"The ruling was handed down once and has not needed repeating."});
 /* ---- WEAPONS: Arcwright (rod, 0.8s) ---- */
-I({id:"w_ac1",name:"Copper Divining Rod",slot:"weapon",cls:"arcwright",rarity:"common",lvl:1,speed:0.80,strikeName:"Lash",
-  dmgBase:{neutral:[7,12],volt:[3,7]},stats:{"mana":[8,16]},lore:"Finds water. Occasionally finds lightning."});
-I({id:"w_ac2",name:"Static Fork",slot:"weapon",cls:"arcwright",rarity:"uncommon",lvl:4,speed:0.80,strikeName:"Lash",
-  req:{volt:12},dmgBase:{neutral:[11,17],volt:[9,16]},stats:{"dmg.volt":[7,13],"manaRegen":[0.8,1.8]}});
-I({id:"w_ac3",name:"Stormwrit Rod",slot:"weapon",cls:"arcwright",rarity:"rare",lvl:7,speed:0.80,strikeName:"Lash",
-  req:{volt:22,frost:8},dmgBase:{neutral:[15,23],volt:[18,28]},
+I({id:"w_ac1",name:"Green Ash Shortbow",slot:"weapon",cls:"skyward",rarity:"common",lvl:1,speed:0.80,strikeName:"Loose",
+  dmgBase:{neutral:[11,20],volt:[5,11]},stats:{"mana":[8,16]},lore:"Finds water. Occasionally finds lightning."});
+I({id:"w_ac2",name:"Stormcut Bow",slot:"weapon",cls:"skyward",rarity:"uncommon",lvl:4,speed:0.80,strikeName:"Loose",
+  req:{volt:12},dmgBase:{neutral:[19,29],volt:[15,28]},stats:{"dmg.volt":[7,13],"manaRegen":[0.8,1.8]}});
+I({id:"w_ac3",name:"Stormwrit Longbow",slot:"weapon",cls:"skyward",rarity:"rare",lvl:7,speed:0.80,strikeName:"Loose",
+  req:{volt:22,frost:8},dmgBase:{neutral:[25,39],volt:[30,48]},
   stats:{"crit":[4,8],"dmg.volt":[12,20],"mana":[20,38]},lore:"Covered in a script that updates itself during storms."});
-I({id:"w_ac4",name:"Hailspine",slot:"weapon",cls:"arcwright",rarity:"fabled",lvl:10,speed:0.80,strikeName:"Lash",
-  req:{frost:26,volt:18},dmgBase:{neutral:[18,28],frost:[24,38],volt:[14,24]},
+I({id:"w_ac4",name:"Hailspine",slot:"weapon",cls:"skyward",rarity:"fabled",lvl:10,speed:0.80,strikeName:"Loose",
+  req:{frost:26,volt:18},dmgBase:{neutral:[30,48],frost:[40,64],volt:[24,40]},
   stats:{"mult.spell":[7,12],"dmg.frost":[14,24],"hp":[-50,-20]}});
-I({id:"w_ac5",name:"Nine-Volt Reliquary",slot:"weapon",cls:"arcwright",rarity:"mythic",lvl:13,speed:0.80,strikeName:"Lash",
-  req:{volt:42,frost:16},dmgBase:{neutral:[24,36],volt:[46,70]},
+I({id:"w_ac5",name:"Nine Volts",slot:"weapon",cls:"skyward",rarity:"mythic",lvl:13,speed:0.80,strikeName:"Loose",
+  req:{volt:42,frost:16},dmgBase:{neutral:[40,61],volt:[78,118]},
   stats:{"dmg.volt":[26,42],"crit":[8,14],"flat.volt":[18,30],"hp":[-90,-40],"res.volt":[-12,-5]},
   lore:"Nine saints, one jar, and a grounding problem."});
 /* ---- WEAPONS: Tidecaller (censer, 0.95s) ---- */
-I({id:"w_tc1",name:"Clay Censer",slot:"weapon",cls:"tidecaller",rarity:"common",lvl:1,speed:0.95,strikeName:"Swing",
+I({id:"w_tc1",name:"Ashwood Staff",slot:"weapon",cls:"ember",rarity:"common",lvl:1,speed:0.95,strikeName:"Sear",
   dmgBase:{neutral:[9,15]},stats:{"mana":[10,20]}});
-I({id:"w_tc2",name:"Brinewood Censer",slot:"weapon",cls:"tidecaller",rarity:"uncommon",lvl:4,speed:0.95,strikeName:"Swing",
+I({id:"w_tc2",name:"Cinderglass Staff",slot:"weapon",cls:"ember",rarity:"uncommon",lvl:4,speed:0.95,strikeName:"Sear",
   req:{frost:12},dmgBase:{neutral:[14,21],frost:[10,17]},stats:{"dmg.frost":[7,12],"manaRegen":[1,2]}});
-I({id:"w_tc3",name:"Saltglass Thurible",slot:"weapon",cls:"tidecaller",rarity:"rare",lvl:7,speed:0.95,strikeName:"Swing",
+I({id:"w_tc3",name:"Saltglass Stave",slot:"weapon",cls:"ember",rarity:"rare",lvl:7,speed:0.95,strikeName:"Sear",
   req:{frost:22,gale:8},dmgBase:{neutral:[18,27],frost:[20,31]},
   stats:{"mana":[30,55],"cost.all":[-8,-3],"dmg.frost":[10,18]}});
-I({id:"w_tc4",name:"Undertow Censer",slot:"weapon",cls:"tidecaller",rarity:"fabled",lvl:10,speed:0.95,strikeName:"Swing",
+I({id:"w_tc4",name:"Hoarfrost Stave",slot:"weapon",cls:"ember",rarity:"fabled",lvl:10,speed:0.95,strikeName:"Sear",
   req:{frost:30,gale:14},dmgBase:{neutral:[22,33],frost:[32,48],gale:[12,20]},
   stats:{"conv.neutral.frost":[30,50],"dmg.frost":[16,26],"manaRegen":[2,4],"dmg.strike":[-25,-12]},
   lore:"The smoke goes down instead of up."});
-I({id:"w_tc5",name:"The Long Cold",slot:"weapon",cls:"tidecaller",rarity:"mythic",lvl:13,speed:0.95,strikeName:"Swing",
+I({id:"w_tc5",name:"The Last Warm Day",slot:"weapon",cls:"ember",rarity:"mythic",lvl:13,speed:0.95,strikeName:"Sear",
   req:{frost:44,gale:18},dmgBase:{neutral:[26,40],frost:[56,84]},
-  stats:{"mult.frost":[12,20],"flat.frost":[22,36],"manaRegen":[4,8],"hp":[-80,-35],"res.ember":[-16,-7]}});
+  stats:{"mult.frost":[12,20],"flat.frost":[22,36],"manaRegen":[4,8],"hp":[-80,-35],"res.cinder":[-16,-7]}});
 /* ---- WEAPONS: Shrike (daggers, 0.5s) ---- */
-I({id:"w_sh1",name:"Notched Knives",slot:"weapon",cls:"shrike",rarity:"common",lvl:1,speed:0.50,strikeName:"Slice",
-  dmgBase:{neutral:[5,9]},stats:{"crit":[2,4]}});
-I({id:"w_sh2",name:"Quickfang",slot:"weapon",cls:"shrike",rarity:"uncommon",lvl:4,speed:0.50,strikeName:"Slice",
-  req:{gale:12},dmgBase:{neutral:[8,13],gale:[5,10]},stats:{"crit":[3,6],"speed":[5,10]}});
-I({id:"w_sh3",name:"Windshear Pair",slot:"weapon",cls:"shrike",rarity:"rare",lvl:7,speed:0.50,strikeName:"Slice",
-  req:{gale:22},dmgBase:{neutral:[11,17],gale:[12,19]},stats:{"dmg.gale":[12,20],"dodge":[4,8],"crit":[4,7]}});
-I({id:"w_sh4",name:"Ashfeather",slot:"weapon",cls:"shrike",rarity:"fabled",lvl:10,speed:0.50,strikeName:"Slice",
-  req:{gale:26,ember:16},dmgBase:{neutral:[15,22],gale:[18,27],ember:[14,22]},
-  stats:{"crit":[7,12],"critMult":[20,36],"dmg.ember":[12,20],"hp":[-60,-25]}});
-I({id:"w_sh5",name:"Two Minutes to Dusk",slot:"weapon",cls:"shrike",rarity:"mythic",lvl:13,speed:0.50,strikeName:"Slice",
-  req:{gale:40,ember:22},dmgBase:{neutral:[19,29],gale:[30,46],ember:[22,34]},
+I({id:"w_sh1",name:"Whittled Idol",slot:"weapon",cls:"thornbound",rarity:"common",lvl:1,speed:1.10,strikeName:"Swing",
+  dmgBase:{neutral:[11,20]},stats:{"crit":[2,4]}});
+I({id:"w_sh2",name:"Bramble Fetish",slot:"weapon",cls:"thornbound",rarity:"uncommon",lvl:4,speed:1.10,strikeName:"Swing",
+  req:{gale:12},dmgBase:{neutral:[18,29],gale:[11,22]},stats:{"crit":[3,6],"speed":[5,10]}});
+I({id:"w_sh3",name:"Thornwood Idol",slot:"weapon",cls:"thornbound",rarity:"rare",lvl:7,speed:1.10,strikeName:"Swing",
+  req:{gale:22},dmgBase:{neutral:[24,37],gale:[26,42]},stats:{"dmg.gale":[12,20],"dodge":[4,8],"crit":[4,7]}});
+I({id:"w_sh4",name:"Bonegrove Idol",slot:"weapon",cls:"thornbound",rarity:"fabled",lvl:10,speed:1.10,strikeName:"Swing",
+  req:{gale:26,stone:16},dmgBase:{neutral:[33,48],gale:[40,59],stone:[31,48]},
+  stats:{"crit":[7,12],"critMult":[20,36],"dmg.stone":[12,20],"hp":[-60,-25]}});
+I({id:"w_sh5",name:"The Last Grove",slot:"weapon",cls:"thornbound",rarity:"mythic",lvl:13,speed:1.10,strikeName:"Swing",
+  req:{gale:40,stone:22},dmgBase:{neutral:[42,64],gale:[66,101],stone:[48,75]},
   stats:{"crit":[12,20],"critMult":[40,70],"execute":[30,55],"speed":[10,18],"hp":[-120,-55],"res.all":[-8,-3]},
   lore:"You are not meant to still be holding these at dusk."});
 
 /* ---- HELMS ---- */
 I({id:"h_hodmask",name:"Hodsman's Mask",slot:"helm",rarity:"common",lvl:1,stats:{"hp":[22,44]}});
-I({id:"h_slagvisor",name:"Slag Visor",slot:"helm",rarity:"uncommon",lvl:3,req:{ember:8},
-  stats:{"dmg.ember":[6,11],"res.ember":[7,15],"hp":[29,58]}});
+I({id:"h_slagvisor",name:"Slag Visor",slot:"helm",rarity:"uncommon",lvl:3,req:{cinder:8},
+  stats:{"dmg.cinder":[6,11],"res.cinder":[7,15],"hp":[29,58]}});
 I({id:"h_rimecrown",name:"Rimeglass Crown",slot:"helm",rarity:"rare",lvl:6,req:{frost:16},
   stats:{"dmg.frost":[10,18],"mana":[15,28],"manaRegen":[1,2.5],"hp":[-30,-10]}});
 I({id:"h_coilhelm",name:"Coil Helm",slot:"helm",rarity:"rare",lvl:6,req:{volt:18},
   stats:{"crit":[3,6],"dmg.volt":[9,16],"elem.volt":[2,4],"hp":[-20,-5]},lore:"Grounded, mostly."});
 I({id:"h_loamhood",name:"Loamweave Hood",slot:"helm",rarity:"legendary",lvl:9,req:{stone:22,gale:8},
   stats:{"dmg.stone":[14,24],"flat.stone":[10,18],"hp":[80,138],"dodge":[3,6],"cost.all":[4,10]}});
-I({id:"h_ashsight",name:"Ashsight",slot:"helm",rarity:"fabled",lvl:11,req:{ember:30},major:"bloodrite",
-  stats:{"dmg.ember":[20,34],"res.ember":[17,31],"hp":[102,174],"hpRegen":[-10,-4]},
+I({id:"h_ashsight",name:"Ashsight",slot:"helm",rarity:"fabled",lvl:11,req:{cinder:30},major:"bloodrite",
+  stats:{"dmg.cinder":[20,34],"res.cinder":[17,31],"hp":[102,174],"hpRegen":[-10,-4]},
   lore:"You see best through the part of the fire that is already over."});
 I({id:"h_stillcrown",name:"The Still Crown",slot:"helm",rarity:"fabled",lvl:12,req:{frost:30,gale:12},major:"lucid",
   stats:{"manaRegen":[3,6],"dmg.frost":[16,28],"mult.spell":[5,9],"hp":[-80,-40]}});
@@ -1252,26 +1502,26 @@ I({id:"h_nullhelm",name:"Nullhelm",slot:"helm",rarity:"mythic",lvl:14,req:{gale:
 
 /* ---- CHESTS ---- */
 I({id:"c_padded",name:"Padded Jerkin",slot:"chest",rarity:"common",lvl:1,stats:{"hp":[36,65]}});
-I({id:"c_scoria",name:"Scoria Plate",slot:"chest",rarity:"uncommon",lvl:4,req:{ember:12},
-  stats:{"hp":[87,145],"res.ember":[14,24],"res.frost":[-8,-3],"dodge":[-4,-2]}});
+I({id:"c_scoria",name:"Scoria Plate",slot:"chest",rarity:"uncommon",lvl:4,req:{cinder:12},
+  stats:{"hp":[87,145],"res.cinder":[14,24],"res.frost":[-8,-3],"dodge":[-4,-2]}});
 I({id:"c_tidecloth",name:"Tidecloth Wrap",slot:"chest",rarity:"rare",lvl:6,req:{frost:18},
   stats:{"mana":[25,45],"manaRegen":[2,4],"dmg.frost":[8,15],"hp":[-20,0]}});
 I({id:"c_briarmail",name:"Briar Mail",slot:"chest",rarity:"rare",lvl:7,req:{stone:20},
   stats:{"hp":[130,218],"thorns":[8,15],"res.gale":[8,17],"speed":[-10,-4]}});
 I({id:"c_galevest",name:"Galewrought Vest",slot:"chest",rarity:"legendary",lvl:9,req:{gale:26},
   stats:{"dodge":[8,14],"dmg.gale":[14,24],"speed":[8,15],"hp":[-40,-10]}});
-I({id:"c_furnace",name:"Furnace Harness",slot:"chest",rarity:"fabled",lvl:11,req:{ember:28,stone:18},major:"thirst",
-  stats:{"hp":[203,334],"dmg.ember":[18,30],"hpRegen":[10,20],"mana":[-40,-20]},
+I({id:"c_furnace",name:"Furnace Harness",slot:"chest",rarity:"fabled",lvl:11,req:{cinder:28,stone:18},major:"thirst",
+  stats:{"hp":[203,334],"dmg.cinder":[18,30],"hpRegen":[10,20],"mana":[-40,-20]},
   lore:"The straps are on the inside."});
 I({id:"c_stormcarapace",name:"Storm Carapace",slot:"chest",rarity:"fabled",lvl:12,req:{volt:32},
   stats:{"dmg.volt":[22,36],"crit":[5,9],"mult.spell":[6,11],"res.volt":[20,34],"hp":[-60,-20]}});
-I({id:"c_gravebind",name:"Gravebind Cuirass",slot:"chest",rarity:"mythic",lvl:14,req:{stone:34,ember:22},major:"graveresolve",
+I({id:"c_gravebind",name:"Gravebind Cuirass",slot:"chest",rarity:"mythic",lvl:14,req:{stone:34,cinder:22},major:"graveresolve",
   stats:{"hp":[377,609],"res.all":[17,31],"thorns":[12,22],"dmg.all":[-10,-4],"speed":[-15,-8]}});
 
 /* ---- LEGS ---- */
 I({id:"l_roughspun",name:"Roughspun Leggings",slot:"legs",rarity:"common",lvl:1,stats:{"hp":[17,35]}});
-I({id:"l_cinderchaps",name:"Cinder Chaps",slot:"legs",rarity:"uncommon",lvl:3,req:{ember:8},
-  stats:{"dmg.ember":[6,12],"hp":[29,52]}});
+I({id:"l_cinderchaps",name:"Cinder Chaps",slot:"legs",rarity:"uncommon",lvl:3,req:{cinder:8},
+  stats:{"dmg.cinder":[6,12],"hp":[29,52]}});
 I({id:"l_stepwise",name:"Stepwise Greaves",slot:"legs",rarity:"rare",lvl:5,req:{gale:14},
   stats:{"dodge":[4,8],"speed":[6,11],"hp":[22,51]}});
 I({id:"l_conduit",name:"Conduit Skirt",slot:"legs",rarity:"rare",lvl:7,req:{volt:20,frost:10},
@@ -1279,7 +1529,7 @@ I({id:"l_conduit",name:"Conduit Skirt",slot:"legs",rarity:"rare",lvl:7,req:{volt
 I({id:"l_rootbound",name:"Rootbound Faulds",slot:"legs",rarity:"legendary",lvl:9,req:{stone:24},
   stats:{"hp":[116,203],"dmg.stone":[12,20],"res.stone":[14,24],"dodge":[-6,-3]}});
 I({id:"l_frostlock",name:"Frostlock Legguards",slot:"legs",rarity:"fabled",lvl:11,req:{frost:30},
-  stats:{"conv.neutral.frost":[25,40],"dmg.frost":[16,26],"mana":[30,55],"res.ember":[-14,-6]}});
+  stats:{"conv.neutral.frost":[25,40],"dmg.frost":[16,26],"mana":[30,55],"res.cinder":[-14,-6]}});
 I({id:"l_wanderer",name:"Wanderer's Ruin",slot:"legs",rarity:"fabled",lvl:12,req:{gale:30,volt:14},major:"tempo",
   stats:{"dodge":[10,17],"speed":[10,18],"dmg.gale":[14,24],"hp":[-90,-40]}});
 I({id:"l_mantlebreak",name:"Mantlebreak Cuisses",slot:"legs",rarity:"mythic",lvl:13,req:{stone:38},
@@ -1287,18 +1537,18 @@ I({id:"l_mantlebreak",name:"Mantlebreak Cuisses",slot:"legs",rarity:"mythic",lvl
 
 /* ---- BOOTS ---- */
 I({id:"b_hobnail",name:"Hobnail Boots",slot:"boots",rarity:"common",lvl:1,stats:{"hp":[14,29]}});
-I({id:"b_emberstep",name:"Emberstep",slot:"boots",rarity:"uncommon",lvl:4,req:{ember:10},
-  stats:{"dmg.ember":[7,13],"speed":[4,8]}});
+I({id:"b_cinderstep",name:"Cinderstep",slot:"boots",rarity:"uncommon",lvl:4,req:{cinder:10},
+  stats:{"dmg.cinder":[7,13],"speed":[4,8]}});
 I({id:"b_tidewalk",name:"Tidewalkers",slot:"boots",rarity:"rare",lvl:6,req:{frost:16},
   stats:{"manaRegen":[2,4],"mana":[18,32],"res.frost":[10,19]}});
 I({id:"b_stormheel",name:"Stormheel",slot:"boots",rarity:"rare",lvl:7,req:{volt:22},
   stats:{"crit":[4,8],"dmg.volt":[10,17],"speed":[6,12],"hp":[-20,-5]}});
-I({id:"b_gravetread",name:"Gravetread",slot:"boots",rarity:"legendary",lvl:9,req:{stone:22,ember:10},
+I({id:"b_gravetread",name:"Gravetread",slot:"boots",rarity:"legendary",lvl:9,req:{stone:22,cinder:10},
   stats:{"hp":[102,174],"thorns":[6,12],"res.all":[7,14],"speed":[-8,-3]}});
 I({id:"b_zephyr",name:"Zephyrbind Sandals",slot:"boots",rarity:"fabled",lvl:11,req:{gale:32},
   stats:{"dodge":[12,20],"speed":[14,24],"dmg.gale":[16,26],"hp":[-70,-30]}});
-I({id:"b_quench",name:"Quenchstep",slot:"boots",rarity:"fabled",lvl:12,req:{frost:26,ember:18},major:"cauterize",
-  stats:{"res.ember":[24,41],"res.frost":[24,41],"hp":[160,261],"manaRegen":[-2,-0.5]}});
+I({id:"b_quench",name:"Quenchstep",slot:"boots",rarity:"fabled",lvl:12,req:{frost:26,cinder:18},major:"cauterize",
+  stats:{"res.cinder":[24,41],"res.frost":[24,41],"hp":[160,261],"manaRegen":[-2,-0.5]}});
 I({id:"b_lastmile",name:"The Last Mile",slot:"boots",rarity:"mythic",lvl:14,req:{gale:28,volt:26},major:"sever",
   stats:{"crit":[10,18],"critMult":[30,55],"dodge":[8,15],"dmg.gale":[18,30],"hp":[-110,-50]}});
 
@@ -1306,15 +1556,15 @@ I({id:"b_lastmile",name:"The Last Mile",slot:"boots",rarity:"mythic",lvl:14,req:
 I({id:"r_tin",name:"Tin Band",slot:"ring",rarity:"common",lvl:1,stats:{"hp":[9,20]}});
 I({id:"r_sparkloop",name:"Spark Loop",slot:"ring",rarity:"common",lvl:2,stats:{"dmg.volt":[3,7]}});
 I({id:"r_seep",name:"Seepstone Ring",slot:"ring",rarity:"uncommon",lvl:3,req:{frost:6},stats:{"manaRegen":[0.8,1.8]}});
-I({id:"r_ashband",name:"Ashband",slot:"ring",rarity:"uncommon",lvl:3,req:{ember:6},stats:{"flat.ember":[4,9]}});
+I({id:"r_ashband",name:"Ashband",slot:"ring",rarity:"uncommon",lvl:3,req:{cinder:6},stats:{"flat.cinder":[4,9]}});
 I({id:"r_pebble",name:"Pebblecore Ring",slot:"ring",rarity:"uncommon",lvl:4,req:{stone:8},stats:{"hp":[36,65],"dmg.stone":[4,9]}});
 I({id:"r_windeye",name:"Windeye",slot:"ring",rarity:"rare",lvl:5,req:{gale:12},stats:{"dodge":[3,6],"dmg.gale":[7,13]}});
 I({id:"r_voltaic",name:"Voltaic Signet",slot:"ring",rarity:"rare",lvl:6,req:{volt:14},stats:{"crit":[3,6],"flat.volt":[6,11]}});
 I({id:"r_saltring",name:"Saltglass Ring",slot:"ring",rarity:"rare",lvl:6,req:{frost:14},stats:{"mana":[20,36],"cost.all":[-6,-2]}});
 I({id:"r_ironpromise",name:"Iron Promise",slot:"ring",rarity:"rare",lvl:7,req:{stone:16},
   stats:{"hp":[87,145],"hpRegen":[3,7],"dmg.all":[-4,-1]}});
-I({id:"r_emberoath",name:"Ember Oath",slot:"ring",rarity:"legendary",lvl:8,req:{ember:20},
-  stats:{"dmg.ember":[12,20],"flat.ember":[10,17],"res.frost":[-10,-4]}});
+I({id:"r_cinderoath",name:"Cinder Oath",slot:"ring",rarity:"legendary",lvl:8,req:{cinder:20},
+  stats:{"dmg.cinder":[12,20],"flat.cinder":[10,17],"res.frost":[-10,-4]}});
 I({id:"r_chainlink",name:"Chainlink",slot:"ring",rarity:"legendary",lvl:9,req:{volt:22},
   stats:{"dmg.volt":[12,20],"mult.spell":[4,8],"mana":[-25,-10]}});
 I({id:"r_riverbend",name:"Riverbend",slot:"ring",rarity:"legendary",lvl:9,req:{frost:20,gale:8},
@@ -1325,31 +1575,31 @@ I({id:"r_widow",name:"Widow's Arithmetic",slot:"ring",rarity:"fabled",lvl:11,req
   stats:{"crit":[8,14],"dmg.spell":[14,24],"hp":[-60,-25]},lore:"She counted the swings. The swings were never the point."});
 I({id:"r_overspill",name:"Overspill",slot:"ring",rarity:"fabled",lvl:12,req:{frost:28},major:"overflow",
   stats:{"manaRegen":[4,8],"dmg.frost":[14,24]}});
-I({id:"r_sunkcost",name:"Sunk Cost",slot:"ring",rarity:"mythic",lvl:13,req:{ember:26,stone:26},
-  stats:{"mult.all":[8,14],"flat.ember":[20,34],"hp":[130,232],"cost.all":[14,26]}});
+I({id:"r_sunkcost",name:"Sunk Cost",slot:"ring",rarity:"mythic",lvl:13,req:{cinder:26,stone:26},
+  stats:{"mult.all":[8,14],"flat.cinder":[20,34],"hp":[130,232],"cost.all":[14,26]}});
 
 /* ---- AMULETS ---- */
 I({id:"a_cord",name:"Braided Cord",slot:"amulet",rarity:"common",lvl:1,stats:{"hp":[14,26]}});
 I({id:"a_fetish",name:"Bone Fetish",slot:"amulet",rarity:"uncommon",lvl:3,stats:{"dmg.all":[4,8],"hp":[-10,0]}});
 I({id:"a_tidepearl",name:"Tidepearl",slot:"amulet",rarity:"rare",lvl:5,req:{frost:12},stats:{"mana":[25,45],"manaRegen":[1.5,3]}});
-I({id:"a_cinderlocket",name:"Cinder Locket",slot:"amulet",rarity:"rare",lvl:6,req:{ember:16},
-  stats:{"dmg.ember":[10,18],"hpRegen":[4,8]}});
+I({id:"a_cinderlocket",name:"Cinder Locket",slot:"amulet",rarity:"rare",lvl:6,req:{cinder:16},
+  stats:{"dmg.cinder":[10,18],"hpRegen":[4,8]}});
 I({id:"a_stormtooth",name:"Stormtooth",slot:"amulet",rarity:"rare",lvl:7,req:{volt:18,gale:8},
   stats:{"crit":[5,9],"critMult":[10,20]}});
 I({id:"a_earthheart",name:"Earthheart Pendant",slot:"amulet",rarity:"legendary",lvl:8,req:{stone:22},
   stats:{"hp":[145,246],"dmg.stone":[10,18],"res.stone":[10,20],"speed":[-8,-3]}});
-I({id:"a_leech",name:"Leechbone Torc",slot:"amulet",rarity:"legendary",lvl:9,req:{ember:18,stone:14},
+I({id:"a_leech",name:"Leechbone Torc",slot:"amulet",rarity:"legendary",lvl:9,req:{cinder:18,stone:14},
   stats:{"lifesteal":[8,16],"spellLeech":[5,10],"dmg.all":[6,11]}});
 I({id:"a_prism",name:"Prism Collar",slot:"amulet",rarity:"legendary",lvl:10,req:{frost:18,volt:18,gale:12},
   stats:{"dmg.frost":[9,15],"dmg.volt":[9,15],"dmg.gale":[9,15],"elem.frost":[2,4],"hp":[-40,-15]}});
 I({id:"a_ricochet",name:"Ricochet Charm",slot:"amulet",rarity:"fabled",lvl:11,req:{volt:26,gale:16},major:"ricochet",
   stats:{"dmg.aoe":[18,30],"dmg.volt":[12,20]}});
-I({id:"a_deadweight",name:"Deadweight",slot:"amulet",rarity:"fabled",lvl:12,req:{stone:30,ember:14},major:"anchor",
+I({id:"a_deadweight",name:"Deadweight",slot:"amulet",rarity:"fabled",lvl:12,req:{stone:30,cinder:14},major:"anchor",
   stats:{"hp":[261,420],"flat.stone":[18,30],"speed":[-12,-5]}});
 I({id:"a_manasplit",name:"Mana Split",slot:"amulet",rarity:"mythic",lvl:13,req:{frost:32,volt:20},
   stats:{"manaRegen":[6,11],"mana":[70,120],"mult.spell":[10,18],"dmg.strike":[-30,-15]}});
-I({id:"a_thornofnoon",name:"Thorn of Noon",slot:"amulet",rarity:"mythic",lvl:14,req:{ember:34,gale:20},
-  stats:{"mult.ember":[14,24],"flat.ember":[28,46],"crit":[6,12],"hpRegen":[-14,-6],"res.frost":[-18,-8]}});
+I({id:"a_thornofnoon",name:"Thorn of Noon",slot:"amulet",rarity:"mythic",lvl:14,req:{cinder:34,gale:20},
+  stats:{"mult.cinder":[14,24],"flat.cinder":[28,46],"crit":[6,12],"hpRegen":[-14,-6],"res.frost":[-18,-8]}});
 
 /* ================================================================
    ROLLING
@@ -1421,58 +1671,58 @@ function T(o){ return o; }
 const TRIALS = [
 T({n:1,  id:"t1", name:"Pit Dummy, Reinforced", arch:"bulwark", lvl:1,
    flavor:"A sack of gravel in a steel frame. It does not fight back. It only has to outlast you.",
-   hp:320, timeLimit:30, res:{"neutral":10}, dps:null}),
+   hp:390, timeLimit:30, res:{"neutral":10}, dps:null}),
 T({n:2,  id:"t2", name:"Ashmoth Swarm", arch:"pyre", lvl:2, adds:3,
    flavor:"Individually harmless. There are not, at any point, individually.",
-   hp:600, timeLimit:30, res:{"ember":35,"frost":-20}, dps:{"ember":8.7,"neutral":2}}),
+   hp:810, timeLimit:30, res:{"cinder":35,"frost":-20}, dps:{"cinder":26.7,"neutral":6.1}}),
 T({n:3,  id:"t3", name:"The Slab", arch:"bulwark", lvl:3,
    flavor:"Nine tonnes of quarried basalt with an opinion.",
-   hp:1180, timeLimit:32, res:{"neutral":25,"stone":30,"volt":-15}, dps:{"stone":24.5,"neutral":9.8}}),
+   hp:3260, timeLimit:32, res:{"neutral":25,"stone":30,"volt":-15}, dps:{"stone":24.7,"neutral":10.4}}),
 T({n:4,  id:"t4", name:"Kiln-Warden Orlo", arch:"pyre", lvl:4,
    flavor:"He has stood in the doorway of the same kiln for eleven years and is no longer entirely outside it.",
-   hp:2080, timeLimit:34, res:{"ember":50,"frost":-25,"neutral":10}, dps:{"ember":25.7,"neutral":4.8}}),
+   hp:8240, timeLimit:34, res:{"cinder":50,"frost":-25,"neutral":10}, dps:{"cinder":27.2,"neutral":5.2}}),
 T({n:5,  id:"t5", name:"Tallow Executioner", arch:"executioner", lvl:5,
    flavor:"Slow. Announces itself. Kills you anyway.",
-   hp:2330, timeLimit:34, res:{"neutral":20,"stone":15}, dps:{"neutral":6},
-   spike:{"every":6,"dmg":{"neutral":115,"stone":65}}}),
+   hp:7770, timeLimit:34, res:{"neutral":20,"stone":15}, dps:{"neutral":21.6},
+   spike:{"every":6,"dmg":{"neutral":419,"stone":235}}}),
 T({n:6,  id:"t6", name:"Sealed Reliquary", arch:"ward", lvl:6,
    flavor:"It reseals every eight seconds whether or not you were finished.",
-   hp:4100, timeLimit:36, res:{"neutral":15,"frost":20}, dps:{"frost":9.9,"neutral":3.6},
-   ward:{"hp":340,"window":4,"every":8,"first":5,"healOnFail":492,"failDmg":{"frost":38}}}),
+   hp:23960, timeLimit:36, res:{"neutral":15,"frost":20}, dps:{"frost":31.7,"neutral":10.4},
+   ward:{"hp":280,"window":4,"every":8,"first":5,"healOnFail":2875,"failDmg":{"frost":149}}}),
 T({n:7,  id:"t7", name:"Marrow Leech", arch:"leech", lvl:7,
    flavor:"It is not trying to kill you. It is trying to make you boring.",
-   hp:7220, timeLimit:38, res:{"neutral":20,"gale":25}, dps:{"gale":35.8,"neutral":15.0},
-   regen:46, drain:4.4}),
+   hp:38390, timeLimit:38, res:{"neutral":20,"gale":25}, dps:{"gale":5.6,"neutral":2.3},
+   regen:245, drain:3.7}),
 T({n:8,  id:"t8", name:"Glacier Gate", arch:"bulwark", lvl:8,
    flavor:"Two hundred metres of ice with a door in it. The door is the boss.",
-   hp:9540, timeLimit:40, res:{"frost":60,"neutral":30,"ember":-25}, dps:{"frost":36.0,"neutral":13.0}}),
+   hp:29940, timeLimit:40, res:{"frost":60,"neutral":30,"cinder":-25}, dps:{"frost":33.3,"neutral":12}}),
 T({n:9,  id:"t9", name:"The Nine Bells", arch:"ward", lvl:9,
    flavor:"Each bell is a ward. You are not expected to get all nine.",
-   hp:11930, timeLimit:40, res:{"neutral":25,"volt":20}, dps:{"volt":7.6,"neutral":3.1},
-   ward:{"hp":1080,"window":3.5,"every":7,"first":4,"healOnFail":1432,"failDmg":{"volt":22}}}),
+   hp:156800, timeLimit:40, res:{"neutral":25,"volt":20}, dps:{"volt":30.9,"neutral":13.3},
+   ward:{"hp":1970,"window":3.5,"every":7,"first":4,"healOnFail":18816,"failDmg":{"volt":92}}}),
 T({n:10,  id:"t10", name:"Cinder Choir", arch:"pyre", lvl:10, adds:4,
    flavor:"Seven voices, one lung, and it is on fire.",
-   hp:25580, timeLimit:40, res:{"ember":65,"neutral":25,"frost":-30}, dps:{"ember":23.0,"neutral":5.7},
-   spike:{"every":9,"dmg":{"ember":52}}}),
+   hp:259280, timeLimit:40, res:{"cinder":65,"neutral":25,"frost":-30}, dps:{"cinder":32.3,"neutral":7.9},
+   spike:{"every":9,"dmg":{"cinder":72}}}),
 T({n:11,  id:"t11", name:"Ossuary Warden", arch:"executioner", lvl:11,
    flavor:"It hits once every five seconds and it has never needed a second.",
-   hp:18580, timeLimit:42, res:{"neutral":35,"stone":35,"gale":-20}, dps:{"neutral":7.5,"stone":5.3},
-   spike:{"every":5,"dmg":{"neutral":163,"stone":66}}}),
+   hp:262210, timeLimit:42, res:{"neutral":35,"stone":35,"gale":-20}, dps:{"neutral":6.5,"stone":4.6},
+   spike:{"every":5,"dmg":{"neutral":140,"stone":57}}}),
 T({n:12,  id:"t12", name:"The Debt Collector", arch:"leech", lvl:12,
    flavor:"Every second you are not spending, it is.",
-   hp:24900, timeLimit:44, res:{"neutral":30,"frost":30,"volt":30}, dps:{"neutral":0.9,"frost":0.8}, thorns:3,
-   regen:217, drain:7.9}),
+   hp:204520, timeLimit:44, res:{"neutral":30,"frost":30,"volt":30}, dps:{"neutral":0,"frost":0}, thorns:3,
+   regen:1782, drain:8.6}),
 T({n:13,  id:"t13", name:"Anvil of Noon", arch:"bulwark", lvl:13,
    flavor:"Resists everything a little and one thing completely. Find out which.",
-   hp:23770, timeLimit:46, res:{"neutral":45,"ember":70,"stone":45,"frost":35,"gale":35,"volt":35}, dps:{"ember":1.5,"neutral":0.7}, thorns:4}),
+   hp:258910, timeLimit:46, res:{"neutral":45,"cinder":70,"stone":45,"frost":35,"gale":35,"volt":35}, dps:{"cinder":29.8,"neutral":13.4}, thorns:4}),
 T({n:14,  id:"t14", name:"The Hollow Verdict", arch:"ward", lvl:14,
    flavor:"A ward every six seconds, and it takes your health when it closes.",
-   hp:41210, timeLimit:48, res:{"neutral":40,"gale":40,"volt":40,"frost":25}, dps:{"gale":5.5,"neutral":3.5},
-   ward:{"hp":2130,"window":3,"every":6,"first":4,"healOnFail":4945,"failDmg":{"gale":41}}}),
+   hp:426610, timeLimit:48, res:{"neutral":40,"gale":40,"volt":40,"frost":25}, dps:{"gale":14.6,"neutral":10},
+   ward:{"hp":3060,"window":3,"every":6,"first":4,"healOnFail":51193,"failDmg":{"gale":116}}}),
 T({n:15,  id:"t15", name:"Null, Who Counts", arch:"executioner", lvl:15, adds:2,
    flavor:"It checks every defence you have, in order, and then adds them up.",
-   hp:50150, timeLimit:50, res:{"neutral":45,"ember":45,"frost":45,"gale":45,"stone":45,"volt":45}, dps:{"ember":0.8,"frost":0.8,"gale":0.8,"stone":0.8,"volt":0.8,"neutral":0.7}, executeGate:true,
-   spike:{"every":7,"dmg":{"neutral":10,"ember":5,"volt":3}}, ward:{"hp":3420,"window":3.5,"every":11,"first":9,"healOnFail":6018,"failDmg":{"neutral":7}}, regen:205, drain:5})
+   hp:519100, timeLimit:50, res:{"neutral":45,"cinder":45,"frost":45,"gale":45,"stone":45,"volt":45}, dps:{"cinder":0,"frost":0,"gale":0,"stone":0,"volt":0,"neutral":0}, executeGate:true,
+   spike:{"every":7,"dmg":{"neutral":0,"cinder":0,"volt":0}}, ward:{"hp":1870,"window":3.5,"every":11,"first":9,"healOnFail":62292,"failDmg":{"neutral":0}}, regen:2122, drain:5.6})
 ];
 const TRIAL_BY_ID = {}; for(const t of TRIALS) TRIAL_BY_ID[t.id]=t;
 
@@ -1501,394 +1751,649 @@ function mkTree(cls, title, subtitle, list){
 }
 
 /* ------------------------------------------------------------------
-   WARDEN — "The Long Argument"
-   QUARRY: stone, area, strike weight.   FORGE: health as ammunition.
+   WARDEN — "The Weight of It"
    BULWARK: being hit is the damage source.
+   RUIN: a wound is a stack, and stacks are the build.
+   TERRA: the floor is the weapon.
    ------------------------------------------------------------------ */
-mkTree("warden","The Long Argument","Quarry · Forge · Bulwark",[
-n("wd_root","Footing","stat",1,0,0,"",{"hp":30,"dmg.strike":4},"Where every Warden starts: not falling over."),
-n("wd_grip","Two-Hand Grip","stat",1,-1,1,"wd_root",{"dmg.strike":6}),
-n("wd_stance","Braced Stance","stat",1,1,1,"wd_root",{"res.all":3}),
-n("wd_heft","Heft","stat",1,0,2,"wd_grip wd_stance",{"flat.stone":4}),
-n("wd_gate","Weight Transfer","mod",2,0,3,"wd_heft",{"dmg.all":5},"Everything past this point assumes you have already committed to the swing."),
+mkTree("warden","The Weight of It","Bulwark · Ruin · Terra",[
+n("wd_root","Footing","stat",1,0,0,"",{"hp":40,"dmg.strike":4},"Where every Warden starts: not falling over."),
+n("wd_grip","Choked Grip","stat",1,-1,1,"wd_root",{"dmg.strike":7}),
+n("wd_set","Set Stance","stat",1,1,1,"wd_root",{"res.all":4}),
+n("wd_tl","Callused","stat",1,-2.4,1.6,"wd_grip",{"flat.stone":5,"hp":30}),
+n("wd_tr","Wind Up","stat",1,2.4,1.6,"wd_set",{"res.cinder":6,"hp":30}),
+n("wd_heft","Heft","stat",1,0,2,"wd_grip wd_set",{"flat.stone":6}),
+n("wd_commit","Full Commitment","mod",2,0,3,"wd_heft wd_tl wd_tr",{"dmg.all":5},
+  "Everything past here assumes you have already swung.",
+  {fxAdd:{cleave:{"pierce":1}}, combat:"Cleave carries through one more body before it stops."}),
 
-/* --- QUARRY (left, centre -3) --- */
-n("wd_q1","Fault Line","stat",1,-1.6,4,"wd_gate",{"dmg.stone":7}),
-n("wd_q2","Deep Set","stat",1,-4.2,5,"wd_q1",{"flat.stone":6}),
-n("wd_q3","Wide Arc","mod",2,-2.2,5,"wd_q1",{"dmg.aoe":12},"The head keeps travelling after the target stops."),
-n("wd_q4","Shelf Collapse","mod",2,-4.4,6.2,"wd_q2",{"dmg.s:quake":18}),
-n("wd_q5","Grind","stat",1,-2.1,6.25,"wd_q3",{"dmg.strike":10}),
-n("wd_q6","Bedrock","stat",1,-3.2,6.2,"wd_q2 wd_q3",{"hp":80,"res.stone":6}),
-n("wd_q7","Aftershock","ability",3,-3,7.6,"wd_q4 wd_q6 wd_q5",{},"A second, smaller impact arrives a beat after the first.",
-  {addSpell:{id:"aftershock",name:"Aftershock",cost:28,time:1.00,mult:2.20,flatScale:1.05,aoe:true,kind:"spell",
-   text:"Cheap area damage on a short swing. The Quarry rotation is built around it."}}),
-n("wd_q8","Percussive Maintenance","mod",2,-4.4,8.8,"wd_q4 wd_q7",{"mult.strike":6}),
-n("wd_q9","Tremor Lines","mod",2,-2.35,8.9,"wd_q5 wd_q7",{"dmg.aoe":16,"dmg.s:quake":10}),
-n("wd_q10","Quarryman's Back","stat",1,-3.1,9.9,"wd_q8 wd_q9",{"hp":90,"flat.stone":8}),
-n("wd_key_tec","TECTONIC","key",4,-3.1,11.2,"wd_q10",{"mult.stone":25,"cast":-25},
-  "Stone damage is multiplied by 1.25. Every spell you cast takes 25% longer.",{excl:"wd_top",major:null}),
-n("wd_q11","Sundered Earth","mod",2,-4.5,12.5,"wd_key_tec",{"conv.neutral.stone":35},
-  "Converts 35% of neutral damage to Stone — after scaling, so it keeps neutral's numbers and Stone's resistances."),
-n("wd_q12","Mass Over Speed","stat",1,-2.2,12.5,"wd_key_tec",{"flat.stone":16,"speed":-6}),
-n("wd_q13","Continental Shelf","ability",3,-3.2,13.8,"wd_q11 wd_q12",{},"Earthshatter stops being a spell and becomes a landscape event.",
-  {replaceSpell:["quake",{name:"Continental Shelf",cost:52,time:1.70,mult:4.60,flatScale:1.70,aoe:true,
-   text:"Replaces Earthshatter. Far more damage per cast, at a cost your mana pool has to answer for."}]}),
-n("wd_q14","Deadfall","stat",1,-4.6,15,"wd_q13",{"flat.stone":20}),
-n("wd_q15","Last Stratum","mod",2,-2.4,15,"wd_q13",{"mult.s:quake":14,"dmg.aoe":14}),
-n("wd_q16","The Quarry Floor","stat",1,-3.4,16.2,"wd_q14 wd_q15",{"dmg.stone":22,"hp":130}),
+/* ---- BULWARK: block and counter ---- */
+n("wd_b1","Answer in Kind","mod",2,-1.6,4,"wd_commit",{},
+  "A block is only half of the exchange.",
+  {fxMod:{guard:{guard:{counter:75}}}, combat:"Guard now counters: every hit you block returns 75% of a basic attack."}),
+n("wd_b2","Iron Jaw","stat",1,-4.2,5,"wd_b1",{"hp":130,"res.all":5}),
+n("wd_b3","Longer Brace","mod",2,-2.2,5,"wd_b1",{},"",
+  {fxAdd:{guard:{"guard.dur":2.5,"guard.block":8}}, combat:"Guard holds for 6.5 seconds instead of 4, and blocks 48%."}),
+n("wd_b4","Barbed Vambrace","mod",2,-4.4,6.2,"wd_b2",{},"",
+  {fxAdd:{guard:{"guard.counter":65}}, combat:"Counters land for 140% of a basic attack instead of 75%."}),
+n("wd_b5","Sweeping Counter","mod",2,-2.1,6.25,"wd_b3",{},"",
+  {fxMod:{guard:{guard:{counterAll:true}}}, combat:"Your counter swings wide — it answers every target, not just the one that hit you."}),
+n("wd_b6","Thorned Plate","stat",1,-3.1,6.2,"wd_b2 wd_b3",{"thorns":20,"hp":70}),
+n("wd_b7","Bulwark","ability",3,-3,7.6,"wd_b4 wd_b5 wd_b6",{},
+  "Guard stops being a flinch and becomes a position.",
+  {replaceSpell:["guard",{name:"Bulwark",cost:28,time:0.55,mult:0.60,flatScale:0.35,
+    util:{dur:6,cd:6,shield:14}, fx:{guard:{block:56,dur:6,counter:110}},
+    text:"Replaces Guard. Blocks 56% for six seconds, shields you for 14% of your health, and hits on the way up."}],
+   combat:"Guard becomes Bulwark: it blocks harder, lasts longer, puts a shield on you, and does damage as you plant it."}),
+n("wd_b8","Open the Guard","mod",2,-4.5,8.8,"wd_b4 wd_b7",{},"",
+  {fxMod:{guard:{guard:{counterDot:{name:"Bleed",elem:"neutral",pct:20,dur:5,stacks:4}}}},
+   combat:"Every counter opens a bleed on whatever it lands on."}),
+n("wd_b9","Unmoved","stat",1,-2.35,8.9,"wd_b5 wd_b7",{"res.all":9,"dodge":-8,"hp":90}),
+n("wd_b10","Set Against It","stat",1,-3.1,9.9,"wd_b8 wd_b9",{"hp":150,"flat.stone":12}),
+n("wd_key_mirror","MIRROR GUARD","key",4,-3.1,11.2,"wd_b10",{"hp":260,"mult.all":-14},
+  "Guard never comes down and counters everything, against every target. You lose Cleave entirely — you are not swinging any more, you are answering.",
+  {excl:"wd_top", removeSpell:"cleave",
+   replaceSpell:["guard",{name:"Mirror Guard",cost:34,time:0.55,mult:0.60,flatScale:0.35,
+     util:{dur:20,cd:20,shield:14}, fx:{guard:{block:58,dur:20,counter:165,counterAll:true}},
+     text:"Replaces Guard. Effectively permanent, and counters every incoming hit against every target."}],
+   combat:"Guard is up for twenty seconds at a time and answers every hit from every direction. Cleave is gone from your bar."}),
+n("wd_b11","Riposte Drill","mod",2,-4.6,12.5,"wd_key_mirror",{},"",
+  {fxAdd:{guard:{"guard.counter":80}}, combat:"Counters hit for another 80% of a basic attack."}),
+n("wd_b12","Shield Spikes","stat",1,-2.2,12.5,"wd_key_mirror",{"thorns":26,"res.all":8}),
+n("wd_b13","The Wall Answers","mod",2,-3.3,13.8,"wd_b11 wd_b12",{},"",
+  {fxAdd:{guard:{"guard.block":14,"guard.counter":70}}, combat:"Guard blocks 72% and counters for well over twice a basic attack."}),
+n("wd_b14","Deadbolt","stat",1,-4.7,15,"wd_b13",{"hp":230,"res.all":10}),
+n("wd_b15","Nothing Gets Past","mod",2,-2.3,15,"wd_b13",{"thorns":22},"",
+  {fxMod:{guard:{guard:{counterDot:{name:"Bleed",elem:"neutral",pct:34,dur:6,stacks:6}}}},
+   combat:"Counter bleeds stack six times and run six seconds."}),
+n("wd_b16","Still Standing","stat",1,-3.4,16.2,"wd_b14 wd_b15",{"hp":300,"hpRegen":12}),
 
-/* --- FORGE (middle, centre 0) --- */
-n("wd_f1","Banked Coals","stat",1,0,4,"wd_gate",{"dmg.ember":7}),
-n("wd_f2","Bellows","stat",1,-0.9,5,"wd_f1",{"flat.ember":6}),
-n("wd_f3","Open Wound","mod",2,0.9,5,"wd_f1",{"dmg.s:rend":20},"Rend hurts more when you are already bleeding."),
-n("wd_f4","Thick Blood","stat",1,-1,6.2,"wd_f2",{"hp":70,"hpRegen":5}),
-n("wd_f5","Ember Rend","ability",3,0.9,6.2,"wd_f3",{},"Rend now opens with fire instead of edge.",
-  {replaceSpell:["rend",{name:"Ember Rend",cost:26,time:0.80,mult:2.05,flatScale:0.95,
-   text:"Replaces Rend. Faster, hotter, and the anchor of every Forge rotation."}]}),
-n("wd_f6","Stoke","mod",2,0,7.4,"wd_f4 wd_f5",{"dmg.ember":14,"mult.spell":4}),
-n("wd_f7","Cauter","stat",1,-1.3,8.5,"wd_f4 wd_f6",{"hpRegen":9,"res.ember":8}),
-n("wd_f8","Blood Price","mod",2,1.3,8.5,"wd_f5 wd_f6",{"dmg.all":16,"hpRegen":-8},
-  "You are spending something. It is not mana."),
-n("wd_key_blood","BLOODFORGE","key",4,0,9.9,"wd_f7 wd_f8",{"mult.all":22,"hpPct":-30,"manaRegen":3},
-  "All damage is multiplied by 1.22 and mana regeneration rises by 3/s. Your maximum health drops by 30%.",{excl:"wd_top",major:"bloodrite"}),
-n("wd_f9","Furnace Lung","stat",1,-1.4,11.2,"wd_key_blood",{"hp":160,"hpRegen":12}),
-n("wd_f10","Second Wind","mod",2,1.4,11.2,"wd_key_blood",{"lifesteal":9,"spellLeech":5}),
-n("wd_f11","Whitehot","mod",2,0,12.4,"wd_f9 wd_f10",{"mult.ember":12,"res.frost":-15},
-  "Ember damage ×1.12. You are a worse place to be cold."),
-n("wd_f12","Slagheart","ability",3,-1.1,13.6,"wd_f11",{},"A standing column of heat that burns whatever holds still near it.",
-  {addSpell:{id:"slagheart",name:"Slagheart",cost:44,time:1.30,mult:3.40,flatScale:1.30,aoe:true,kind:"spell",
-   text:"Heavy area Ember damage on a mid-length swing."}}),
-n("wd_f13","Pyre Discipline","stat",1,1.2,13.6,"wd_f11",{"cost.all":-14,"dmg.ember":18}),
-n("wd_f14","Ash in the Lungs","stat",1,-1.5,15,"wd_f12",{"flat.ember":22}),
-n("wd_f15","No Coming Back","mod",2,1,15,"wd_f13",{"mult.all":10,"res.all":-10}),
-n("wd_f16","The Forge Answers","stat",1,-0.1,16.2,"wd_f14 wd_f15",{"dmg.ember":24,"hpRegen":14}),
+/* ---- RUIN: bleed stacking ---- */
+n("wd_r1","Serrated Edge","mod",2,0,4,"wd_commit",{},
+  "The cut matters less than what it leaves behind.",
+  {fxMod:{cleave:{dot:{name:"Bleed",elem:"neutral",pct:28,dur:5,stacks:3}}},
+   combat:"Cleave leaves a bleed that stacks three times and runs five seconds."}),
+n("wd_r2","Deep Cuts","mod",2,-0.9,5,"wd_r1",{},"",
+  {fxAdd:{cleave:{"dot.dur":3,"dot.pct":10}}, combat:"Bleeds run eight seconds instead of five, and bite harder."}),
+n("wd_r3","Hooked","mod",2,0.9,5,"wd_r1",{},"",
+  {fxAdd:{cleave:{"dot.stacks":2}}, combat:"Bleed stacks five times instead of three."}),
+n("wd_r4","Rake","ability",3,-1.1,6.2,"wd_r2",{},
+  "One swing, two edges.",
+  {replaceSpell:["cleave",{name:"Rake",cost:24,time:0.80,mult:1.15,flatScale:0.80, fx:{hits:2},
+    text:"Replaces Cleave. Two strikes per cast — so two bleed stacks per cast."}],
+   combat:"Cleave becomes Rake: it strikes twice per cast, applying two stacks at a time."}),
+n("wd_r5","Bloodscent","mod",2,0.9,6.2,"wd_r3",{},"",
+  {fxMod:{cleave:{spread:true}}, combat:"Bleeds spread from the target to everything else in reach."}),
+n("wd_r6","Opened Up","mod",2,0,7.4,"wd_r4 wd_r5",{},"",
+  {fxMod:{charge:{dot:{name:"Bleed",elem:"neutral",pct:24,dur:6,stacks:5}}},
+   combat:"Charge opens a bleed too, so you arrive already stacking."}),
+n("wd_r7","Exsanguinate","mod",2,-1.3,8.5,"wd_r4 wd_r6",{},"",
+  {fxMod:{slam:{detonate:{pct:65}}}, combat:"Ground Slam consumes every bleed on the field at once as a single blast."}),
+n("wd_r8","Wide Wounds","stat",1,1.3,8.5,"wd_r5 wd_r6",{"flat.stone":16,"dmg.all":8}),
+n("wd_key_vein","OPEN VEIN","key",4,0,9.9,"wd_r7 wd_r8",{"directPct":-50,"hp":120},
+  "Bleeds stack twelve deep and tick twice as hard. Everything you hit directly does half damage — the swing is now only a delivery mechanism.",
+  {excl:"wd_top",
+   fxMod:{cleave:{dot:{stacks:12}}, charge:{dot:{stacks:12}}},
+   fxAdd:{cleave:{"dot.pct":30}, charge:{"dot.pct":26}},
+   combat:"Bleeds stack to twelve and tick far harder; every direct hit you land is halved."}),
+n("wd_r9","Arterial","mod",2,-1.4,11.2,"wd_key_vein",{},"",
+  {fxAdd:{cleave:{"dot.pct":24}}, combat:"Each bleed stack ticks for considerably more."}),
+n("wd_r10","Won't Clot","mod",2,1.4,11.2,"wd_key_vein",{},"",
+  {fxAdd:{cleave:{"dot.dur":6},charge:{"dot.dur":6}}, combat:"Bleeds last six seconds longer, so stacks have time to pile up."}),
+n("wd_r11","Red Harvest","mod",2,0,12.4,"wd_r9 wd_r10",{"lifesteal":10},"",
+  {fxMod:{slam:{detonate:{pct:110}}}, combat:"The detonation is nearly twice as large."}),
+n("wd_r12","Flense","ability",3,-1.1,13.6,"wd_r11",{},
+  "The axe stops being an axe.",
+  {replaceSpell:["cleave",{name:"Flense",cost:26,time:0.70,mult:1.05,flatScale:0.70, fx:{hits:3,pierce:2},
+    text:"Replaces Cleave. Three strikes per cast across three targets."}],
+   combat:"Cleave becomes Flense: three cuts per cast, carrying through three targets — three stacks at a time, on everything."}),
+n("wd_r13","Blood Debt","stat",1,1.2,13.6,"wd_r11",{"hpRegen":16,"flat.stone":18}),
+n("wd_r14","Nothing Left In It","mod",2,-1.5,15,"wd_r12",{},"",
+  {fxMod:{cleave:{spread:true},charge:{spread:true}}, combat:"Every bleed you apply spreads to every other target immediately."}),
+n("wd_r15","Ruinous","stat",1,1,15,"wd_r13",{"dmg.all":18,"flat.stone":20}),
+n("wd_r16","Bled White","mod",2,-0.1,16.2,"wd_r14 wd_r15",{},"",
+  {fxAdd:{cleave:{"dot.stacks":6,"dot.pct":20}}, combat:"Bleeds stack another six deep and tick harder again."}),
 
-/* --- BULWARK (right, centre 3) --- */
-n("wd_b1","Shield Wall","stat",1,1.6,4,"wd_gate",{"res.all":5}),
-n("wd_b2","Studded","stat",1,2.2,5,"wd_b1",{"thorns":7}),
-n("wd_b3","Set Jaw","stat",1,4.2,5,"wd_b1",{"hp":90}),
-n("wd_b4","Riposte","ability",3,1.8,6.2,"wd_b2",{},"A short counter-swing off the back of a block.",
-  {addSpell:{id:"riposte",name:"Riposte",cost:18,time:0.55,mult:1.60,flatScale:0.70,kind:"spell",
-   text:"Cheap, fast, and unusually efficient per point of mana."}}),
-n("wd_b5","Spiked Boss","mod",2,3.4,6.2,"wd_b2 wd_b3",{"thorns":12,"res.stone":6}),
-n("wd_b6","Weight of Iron","stat",1,4.6,6.2,"wd_b3",{"hp":110,"speed":-5}),
-n("wd_b7","Punish","mod",2,2.4,7.6,"wd_b4 wd_b5",{"dmg.s:riposte":30,"cost.s:riposte":-20}),
-n("wd_b8","Unmoved","stat",1,4.2,7.6,"wd_b5 wd_b6",{"res.all":7,"dodge":-6}),
-n("wd_b9","Longer Argument","mod",2,3.2,8.8,"wd_b7 wd_b8",{"hp":150,"dmg.all":8}),
-n("wd_key_aegis","AEGIS","key",4,3.2,10.1,"wd_b9",{"res.all":22,"hp":220,"mult.all":-14,"thorns":18},
-  "All elemental defences +22, +220 health, thorns +18. All of your damage is multiplied by 0.86.",{excl:"wd_top"}),
-n("wd_b10","Hold the Line","stat",1,2.35,11.5,"wd_key_aegis",{"hp":180,"res.all":6}),
-n("wd_b11","Retribution","mod",2,4.4,11.4,"wd_key_aegis",{"thorns":20,"dmg.strike":18}),
-n("wd_b12","Iron Vow, Kept","mod",2,3.1,12.6,"wd_b10 wd_b11",{"dmg.s:vow":40,"cost.s:vow":-25}),
-n("wd_b13","Immovable","ability",3,1.9,13.9,"wd_b12",{},"You stop pretending you were ever going to move.",
-  {replaceSpell:["vow",{name:"Immovable",cost:26,time:0.60,mult:1.20,flatScale:0.60,
-   util:{dur:7,cd:7,heal:16,shield:22},text:"Replaces Iron Vow. Shields 22% of max health, heals 16%, and now hits."}]}),
-n("wd_b14","Counterweight","stat",1,4.4,13.9,"wd_b12",{"flat.stone":18,"res.all":8}),
-n("wd_b15","The Long Argument","mod",2,3.2,15.2,"wd_b13 wd_b14",{"mult.strike":16,"thorns":16}),
-n("wd_b16","Still Standing","stat",1,3.2,16.4,"wd_b15",{"hp":260,"hpRegen":10}),
+/* ---- TERRA: area control ---- */
+n("wd_t1","Fissure","mod",2,1.6,4,"wd_commit",{},
+  "The impact is the smaller half of a Ground Slam.",
+  {fxMod:{slam:{zone:{name:"Broken Ground",elem:"stone",pct:32,dur:5}}},
+   combat:"Ground Slam leaves broken ground that keeps grinding for five seconds."}),
+n("wd_t2","Cinderfall","mod",2,2.2,5,"wd_t1",{},"",
+  {fxMod:{slam:{zone:{name:"Burning Ground",elem:"cinder",pct:44,dur:6}}},
+   combat:"The ground it leaves is on fire, and burns for six seconds."}),
+n("wd_t3","Standing Room","stat",1,4.2,5,"wd_t1",{"hp":110,"res.stone":10}),
+n("wd_t4","Sinkhole","mod",2,1.8,6.2,"wd_t2",{},"",
+  {fxMod:{slam:{pull:true}}, combat:"The crater pulls everything into the middle of it, so the fire catches all of them."}),
+n("wd_t5","Wider Crater","mod",2,3.4,6.2,"wd_t2 wd_t3",{},"",
+  {fxAdd:{slam:{"zone.dur":4}}, combat:"Burning ground lasts ten seconds."}),
+n("wd_t6","Tremor Line","mod",2,4.7,6.2,"wd_t3",{},"",
+  {fxMod:{charge:{zone:{name:"Tremor Line",elem:"stone",pct:26,dur:5}}},
+   combat:"Charge tears a line of broken ground along the path you ran."}),
+n("wd_t7","Seismic Slam","ability",3,2.4,7.6,"wd_t4 wd_t5",{},
+  "Bigger, slower, and it re-lays the floor.",
+  {replaceSpell:["slam",{name:"Seismic Slam",cost:44,time:1.45,mult:3.60,flatScale:1.55,
+    fx:{aoe:true, zone:{name:"Burning Ground",elem:"cinder",pct:58,dur:9}},
+    text:"Replaces Ground Slam. Heavier, and the ground it leaves burns far hotter."}],
+   combat:"Ground Slam becomes Seismic Slam: a bigger impact and a much hotter, longer-lived fire."}),
+n("wd_t8","Deadweight","stat",1,4.3,7.6,"wd_t5 wd_t6",{"flat.stone":18,"speed":-6,"hp":100}),
+n("wd_t9","Undertow","mod",2,3.2,8.8,"wd_t7 wd_t8",{},"",
+  {fxMod:{charge:{pull:true}}, combat:"Charge drags everything it passes into the pile with you."}),
+n("wd_key_anvil","ANVIL STANCE","key",4,3.2,10.1,"wd_t9",{"dodge":-40,"res.all":-10,"hp":240},
+  "You plant for the swing and cannot move through it: Ground Slam lands twice. Every defence falls 10 and you dodge nothing at all.",
+  {excl:"wd_top", fxMod:{slam:{hits:2}},
+   combat:"Ground Slam hits twice per cast — and you are rooted in place while it happens, dodging nothing."}),
+n("wd_t10","Second Impact","mod",2,2.35,11.5,"wd_key_anvil",{},"",
+  {fxAdd:{slam:{"zone.pct":34}}, combat:"The ground the second impact leaves burns much hotter."}),
+n("wd_t11","Aftershock","mod",2,4.4,11.4,"wd_key_anvil",{},"",
+  {fxAdd:{slam:{"hits":1}}, combat:"Ground Slam lands a third time."}),
+n("wd_t12","The Floor Gives","mod",2,3.1,12.6,"wd_t10 wd_t11",{},"",
+  {fxMod:{slam:{weaken:{pct:24,dur:6}}}, combat:"Anything standing in the crater swings 24% softer for six seconds."}),
+n("wd_t13","Continental","ability",3,1.9,13.9,"wd_t12",{},
+  "A landscape event with a cooldown.",
+  {replaceSpell:["slam",{name:"Continental",cost:58,time:1.60,mult:5.20,flatScale:1.90,
+    fx:{aoe:true, pull:true, zone:{name:"Burning Ground",elem:"cinder",pct:86,dur:12}},
+    text:"Replaces Ground Slam. Pulls everything in, and leaves the ground burning for twelve seconds."}],
+   combat:"Ground Slam becomes Continental: it pulls the whole field into one place and sets that place on fire for twelve seconds."}),
+n("wd_t14","Bedrock","stat",1,4.4,13.9,"wd_t12",{"hp":260,"res.all":9}),
+n("wd_t15","Nowhere To Stand","mod",2,3.2,15.2,"wd_t13 wd_t14",{},"",
+  {fxAdd:{slam:{"zone.dur":6},charge:{"zone.dur":5}}, combat:"Every patch of ground you break stays dangerous for six seconds longer."}),
+n("wd_t16","The Quarry Floor","stat",1,3.2,16.4,"wd_t15",{"dmg.stone":26,"hp":200}),
 
-/* --- cross-links: expensive, and they cost you the capstone rows --- */
-n("wd_x1","Quarried Fire","mod",2,-1.6,10.6,"wd_q10 wd_f7",{"conv.stone.ember":30,"dmg.ember":10},
-  "A bridge between Quarry and Forge. Reaching it usually means neither of them finishes."),
-n("wd_x2","Hammer and Anvil","mod",2,1.7,10.4,"wd_f8 wd_b9",{"dmg.strike":20,"thorns":10}),
-n("wd_key_last","LAST WORD","key",4,0,17.6,"wd_q16 wd_f16 wd_b16",{"mult.all":30,"cost.all":40,"hpPct":-15},
-  "All damage ×1.30. Every spell costs 40% more and your maximum health drops 15%. Requires the bottom of any branch."),
-n("wd_t1","Callused","stat",1,-2.4,1.6,"wd_grip",{"dmg.strike":5,"hp":25}),
-n("wd_t2","Wind Up","stat",1,2.4,1.6,"wd_stance",{"flat.stone":4,"res.ember":4}),
-n("wd_t3","Follow Through","mod",2,-1.7,2.7,"wd_t1 wd_heft",{"dmg.strike":9},"The swing does not end where the target is."),
-n("wd_t4","Dug In","mod",2,1.7,2.7,"wd_t2 wd_heft",{"hp":60,"res.all":4}),
-n("wd_q17","Loose Scree","stat",1,-5.4,10.8,"wd_q8",{"dmg.aoe":12,"flat.stone":8}),
-n("wd_f17","Ember Bank","stat",1,1.6,9.3,"wd_f8",{"dmg.ember":13,"hpRegen":6}),
-n("wd_b17","Deadbolt","stat",1,5.5,9.0,"wd_b8",{"hp":120,"thorns":9})
+/* ---- cross-links ---- */
+n("wd_x1","Ground and Pound","mod",2,-1.6,10.6,"wd_b10 wd_r7",{},"",
+  {fxMod:{guard:{guard:{counterAll:true}}}, fxAdd:{guard:{"guard.counter":45}},
+   combat:"Counters answer every target, and harder."}),
+n("wd_x2","Burning Wounds","mod",2,1.7,10.4,"wd_r8 wd_t9",{},"",
+  {fxMod:{slam:{dot:{name:"Scorch",elem:"cinder",pct:22,dur:6,stacks:4}}},
+   combat:"Ground Slam leaves a scorch stack on everything it catches, on top of the fire on the floor."})
 ]);
 
 /* ------------------------------------------------------------------
-   ARCWRIGHT — "The Ladder"
-   CHAIN: many small hits, spread wide.  CHARGE: one enormous hit.
-   RIME: frost conversion and a mana economy that never blinks.
+   SKYWARD — "The Long Shot"
+   QUIVER: many arrows, and then deliberately one.
+   HUNTER: everything funnelled into a single marked target.
+   DRIFT: damage as a consequence of never being where it lands.
    ------------------------------------------------------------------ */
-mkTree("arcwright","The Ladder","Chain · Charge · Rime",[
-n("ac_root","Earthing Rod","stat",1,0,0,"",{"mana":12,"dmg.volt":4},"You have to be connected to something before you can discharge into it."),
-n("ac_pot","Potential","stat",1,-1,1,"ac_root",{"dmg.volt":6}),
-n("ac_ins","Insulation","stat",1,1,1,"ac_root",{"res.volt":6,"hp":25}),
-n("ac_coil","First Coil","stat",1,0,2,"ac_pot ac_ins",{"flat.volt":4}),
-n("ac_gate","Closed Circuit","mod",2,0,3,"ac_coil",{"dmg.spell":6,"manaRegen":0.8},"The current now has somewhere to go."),
+mkTree("skyward","The Long Shot","Quiver · Hunter · Drift",[
+n("sk_root","Nocking Point","stat",1,0,0,"",{"crit":3,"dmg.gale":4},"Everything starts with where the string sits."),
+n("sk_draw","Full Draw","stat",1,-1,1,"sk_root",{"dmg.spell":6}),
+n("sk_foot","Loose Footing","stat",1,1,1,"sk_root",{"dodge":5}),
+n("sk_tl","Fletching","stat",1,-2.4,1.6,"sk_draw",{"flat.gale":5}),
+n("sk_tr","Peripheral","stat",1,2.4,1.6,"sk_foot",{"dodge":5,"hp":40}),
+n("sk_stance","Steady","stat",1,0,2,"sk_draw sk_foot",{"crit":5}),
+n("sk_loose","Loose","mod",2,0,3,"sk_stance sk_tl sk_tr",{"dmg.all":5},
+  "The shot is the cheap part. Everything below is about where it goes.",
+  {fxAdd:{pin:{"root.dur":1.5}}, combat:"Pin Shot holds the target for 4.5 seconds instead of 3."}),
 
-/* --- CHAIN (left, centre -3) --- */
-n("ac_c1","Arc Gap","stat",1,-1.6,4,"ac_gate",{"dmg.aoe":10}),
-n("ac_c2","Low Resistance","stat",1,-4.2,5,"ac_c1",{"cost.all":-9}),
-n("ac_c3","Second Jump","mod",2,-2.2,5,"ac_c1",{"dmg.s:chain":20},"The surge finds a third target it was not promised."),
-n("ac_c4","Wide Mesh","mod",2,-4.4,6.2,"ac_c2",{"dmg.aoe":18}),
-n("ac_c5","Rapid Cycle","stat",1,-2.1,6.25,"ac_c3",{"cast":10}),
-n("ac_c6","Shared Ground","stat",1,-3.1,6.2,"ac_c2 ac_c3",{"flat.volt":7,"manaRegen":1.2}),
-n("ac_c7","Forked Surge","ability",3,-3,7.6,"ac_c4 ac_c5 ac_c6",{},"Chain Surge stops choosing.",
-  {replaceSpell:["chain",{name:"Forked Surge",cost:34,time:1.00,mult:2.95,flatScale:1.15,aoe:true,
-   text:"Replaces Chain Surge. More damage, faster cast, marginally more expensive."}]}),
-n("ac_c8","Conductor","mod",2,-4.5,8.8,"ac_c4 ac_c7",{"mult.spell":7}),
-n("ac_c9","Static Field","stat",1,-2.35,8.9,"ac_c5 ac_c7",{"dmg.volt":16}),
-n("ac_c10","Lattice","stat",1,-3.1,9.9,"ac_c8 ac_c9",{"dmg.aoe":20,"mana":30}),
-n("ac_key_lat","LATTICEWORK","key",4,-3.1,11.2,"ac_c10",{"dmg.aoe":45,"mult.all":-12,"cost.all":-18},
-  "Area damage +45% and all spells cost 18% less. Every attack you make is multiplied by 0.88.",{excl:"ac_top"}),
-n("ac_c11","Sprawl","mod",2,-4.6,12.5,"ac_key_lat",{"dmg.aoe":22,"dmg.s:chain":18}),
-n("ac_c12","Grid Discipline","stat",1,-2.2,12.5,"ac_key_lat",{"manaRegen":3.2,"cost.all":-10}),
-n("ac_c13","Cascade","ability",3,-3.3,13.8,"ac_c11 ac_c12",{},"A standing web of charge that re-fires every time something touches it.",
-  {addSpell:{id:"cascade",name:"Cascade",cost:38,time:1.05,mult:3.05,flatScale:1.20,aoe:true,kind:"spell",
-   text:"Sustainable area damage. The highest damage-per-mana spell an Arcwright can hold."}}),
-n("ac_c14","Every Wire","stat",1,-4.7,15,"ac_c13",{"flat.volt":18}),
-n("ac_c15","No Loose Ends","mod",2,-2.3,15,"ac_c13",{"mult.s:chain":14,"dmg.aoe":16}),
-n("ac_c16","The Whole Lattice","stat",1,-3.4,16.2,"ac_c14 ac_c15",{"dmg.volt":22,"mana":60}),
+/* ---- QUIVER: multishot, then its opposite ---- */
+n("sk_q1","Broadhead","mod",2,-1.6,4,"sk_loose",{},
+  "A head that does not stop at the first thing it meets.",
+  {fxMod:{storm:{pierce:2}}, combat:"Arrows punch through two further targets each."}),
+n("sk_q2","Split Nock","mod",2,-4.2,5,"sk_q1",{},"",
+  {fxAdd:{storm:{"hits":1}}, combat:"Arrow Storm looses the whole volley twice per cast."}),
+n("sk_q3","Through and Through","mod",2,-2.2,5,"sk_q1",{},
+  "The whole point of piercing is what happens behind the first target.",
+  {fxMod:{storm:{addValue:0.72}}, combat:"Pierced targets take full arrows instead of glancing ones — more than double what they took."}),
+n("sk_q4","Barbed Shafts","mod",2,-4.4,6.2,"sk_q2",{},"",
+  {fxMod:{storm:{dot:{name:"Bleeding Shaft",elem:"gale",pct:20,dur:5,stacks:3}}},
+   combat:"Arrows stay in. Each volley leaves a bleed that stacks three times."}),
+n("sk_q5","Wider Arc","mod",2,-2.1,6.25,"sk_q3",{},"",
+  {fxAdd:{storm:{"pierce":2}}, combat:"Arrows carry through two more targets again."}),
+n("sk_q6","Heavy Quiver","stat",1,-3.1,6.2,"sk_q2 sk_q3",{"flat.gale":14,"mana":40}),
+n("sk_q7","Arrow Rain","ability",3,-3,7.6,"sk_q4 sk_q5 sk_q6",{},
+  "Stop aiming at people and start aiming at ground.",
+  {replaceSpell:["storm",{name:"Arrow Rain",cost:36,time:1.20,mult:3.05,flatScale:1.30,
+    fx:{aoe:true, pierce:4, addValue:0.72, zone:{name:"Arrow Field",elem:"gale",pct:30,dur:5}},
+    text:"Replaces Arrow Storm. Heavier, and it leaves the ground bristling for five seconds."}],
+   combat:"Arrow Storm becomes Arrow Rain: a heavier volley that leaves a field of shafts still hurting things for five seconds."}),
+n("sk_q8","Bodkin","mod",2,-4.5,8.8,"sk_q4 sk_q7",{},"",
+  {fxAdd:{storm:{"addValue":0.2}}, combat:"Even the targets at the back of the line take nearly a full arrow."}),
+n("sk_q9","Volley Discipline","stat",1,-2.35,8.9,"sk_q5 sk_q7",{"cast":12,"cost.all":-10}),
+n("sk_q10","Full Quiver","stat",1,-3.1,9.9,"sk_q8 sk_q9",{"flat.gale":20,"dmg.aoe":18}),
+n("sk_key_one","ONE ARROW","key",4,-3.1,11.2,"sk_q10",{"crit":10,"critMult":40},
+  "Everything the branch above taught you about spread, thrown away. Arrow Storm becomes a single arrow at triple damage with no spread whatsoever.",
+  {excl:"sk_top",
+   replaceSpell:["storm",{name:"One Arrow",cost:38,time:1.05,mult:7.40,flatScale:2.10, fxReset:true, fx:{},
+     text:"Replaces Arrow Storm. One arrow. No pierce, no volley, no area — three times the damage into one target."}],
+   combat:"The volley collapses into a single arrow for roughly triple damage. It hits exactly one thing, and every multishot node above it stops doing anything."}),
+n("sk_q11","Held Breath","stat",1,-4.6,12.5,"sk_key_one",{"critMult":60,"cast":-8}),
+n("sk_q12","Punch Through","mod",2,-2.2,12.5,"sk_key_one",{},"",
+  {fxMod:{storm:{shatter:{pct:70}}}, combat:"The arrow shatters a frozen or pinned target for 70% extra."}),
+n("sk_q13","The Only Shot","mod",2,-3.3,13.8,"sk_q11 sk_q12",{},"",
+  {fxMod:{storm:{execute:{pct:60}}}, combat:"Below a third health the arrow does 60% more — it is meant to finish things."}),
+n("sk_q14","Windage","stat",1,-4.7,15,"sk_q13",{"crit":12,"flat.gale":24}),
+n("sk_q15","Perfect Release","mod",2,-2.3,15,"sk_q13",{},"",
+  {fxAdd:{storm:{"execute.pct":60}}, combat:"The finishing bonus rises to 120%."}),
+n("sk_q16","Nothing Wasted","stat",1,-3.4,16.2,"sk_q14 sk_q15",{"critMult":80,"dmg.gale":22}),
 
-/* --- CHARGE (middle, centre 0) --- */
-n("ac_g1","Capacitance","stat",1,0,4,"ac_gate",{"mana":25}),
-n("ac_g2","Step-Up","stat",1,-0.9,5,"ac_g1",{"flat.volt":8}),
-n("ac_g3","Long Wind","mod",2,0.9,5,"ac_g1",{"dmg.s:thead":22,"cost.s:thead":-12}),
-n("ac_g4","Stored Charge","stat",1,-1.1,6.2,"ac_g2",{"crit":5}),
-n("ac_g5","Discharge Path","mod",2,0.9,6.2,"ac_g3",{"critMult":25}),
-n("ac_g6","Peak Voltage","mod",2,0,7.4,"ac_g4 ac_g5",{"mult.volt":9}),
-n("ac_g7","Dielectric","stat",1,-1.3,8.5,"ac_g4 ac_g6",{"mana":45,"manaRegen":1.8}),
-n("ac_g8","Everything At Once","mod",2,1.3,8.5,"ac_g5 ac_g6",{"dmg.spell":18,"cast":-12},
-  "You are trading swing count for swing size, on purpose."),
-n("ac_key_over","OVERCHARGE","key",4,0,9.9,"ac_g7 ac_g8",{"mult.spell":30,"manaRegenPct":-45,"crit":8},
-  "Spell damage ×1.30 and +8% critical chance. Mana regeneration is cut by 45%.",{excl:"ac_top"}),
-n("ac_g9","Reservoir","stat",1,-1.4,11.2,"ac_key_over",{"mana":90,"manaRegen":2.5}),
-n("ac_g10","Arc Flash","mod",2,1.4,11.2,"ac_key_over",{"critMult":45,"crit":-4}),
-n("ac_g11","Dead Short","mod",2,0,12.4,"ac_g9 ac_g10",{"mult.all":11,"res.volt":-18}),
-n("ac_g12","Capacitor Discharge","ability",3,-1.1,13.6,"ac_g11",{},"Everything the rod has been holding, released in one stroke.",
-  {addSpell:{id:"capacitor",name:"Capacitor Discharge",cost:78,time:2.40,mult:7.10,flatScale:2.30,kind:"spell",
-   text:"The largest single number in the game. You have to be able to pay for it twice."}}),
-n("ac_g13","Nine Volts","stat",1,1.2,13.6,"ac_g11",{"flat.volt":26,"crit":6}),
-n("ac_g14","Held Breath","stat",1,-1.5,15,"ac_g12",{"mana":110,"dmg.spell":14}),
-n("ac_g15","One Stroke","mod",2,1,15,"ac_g13",{"mult.s:thead":18,"mult.s:capacitor":18}),
-n("ac_g16","Ground Fault","stat",1,-0.1,16.2,"ac_g14 ac_g15",{"critMult":60,"dmg.volt":18}),
+/* ---- HUNTER: crit and single target ---- */
+n("sk_h1","Called Shot","mod",2,0,4,"sk_loose",{},
+  "The mark is the spell. The arrow is an afterthought.",
+  {fxAdd:{mark:{"mark.pct":22}}, combat:"Mark amplifies everything by 42% instead of 20%."}),
+n("sk_h2","Patience","mod",2,-0.9,5,"sk_h1",{},"",
+  {fxAdd:{mark:{"mark.dur":7}}, combat:"Mark holds for fifteen seconds, so you rarely re-apply it."}),
+n("sk_h3","Quarry","mod",2,0.9,5,"sk_h1",{},"",
+  {fxMod:{mark:{weaken:{pct:20,dur:10}}}, combat:"A marked target also swings 20% softer for ten seconds."}),
+n("sk_h4","Deadeye","ability",3,-1.1,6.2,"sk_h2",{},
+  "One arrow, placed.",
+  {replaceSpell:["pin",{name:"Deadeye Shot",cost:30,time:0.95,mult:3.10,flatScale:1.25,
+    fx:{root:{pct:30,dur:4}, execute:{pct:45}},
+    text:"Replaces Pin Shot. Far heavier, still roots, and finishes wounded targets."}],
+   combat:"Pin Shot becomes Deadeye Shot: much heavier, still pins, and hits far harder once the target is below a third."}),
+n("sk_h5","Bleeding Pin","mod",2,0.9,6.2,"sk_h3",{},"",
+  {fxMod:{pin:{dot:{name:"Puncture",elem:"volt",pct:26,dur:6,stacks:3}}},
+   combat:"The pin keeps working — a puncture that stacks three times."}),
+n("sk_h6","Hunter's Eye","mod",2,0,7.4,"sk_h4 sk_h5",{"crit":9},"",
+  {fxMod:{mark:{shatter:{pct:0}}, pin:{shatter:{pct:80}}},
+   combat:"Pin Shot shatters a frozen target for 80% extra damage."}),
+n("sk_h7","Run It Down","stat",1,-1.3,8.5,"sk_h4 sk_h6",{"execute":30,"critMult":35}),
+n("sk_h8","Never Lets Go","mod",2,1.3,8.5,"sk_h5 sk_h6",{},"",
+  {fxAdd:{pin:{"root.dur":3,"root.pct":15}}, combat:"The pin holds three seconds longer and cuts its damage by nearly half."}),
+n("sk_key_focus","FOCUS FIRE","key",4,0,9.9,"sk_h7 sk_h8",{"crit":12},
+  "You only have eyes for one thing. You deal 60% more damage to a marked target and 40% less to everything that is not marked.",
+  {excl:"sk_top", rule:"focusfire",
+   combat:"Everything you do to the marked target hits 60% harder. Everything you do to anything else hits 40% softer — including your own volleys."}),
+n("sk_h9","Second Mark","mod",2,-1.4,11.2,"sk_key_focus",{},"",
+  {fxAdd:{mark:{"mark.pct":28,"mark.dur":6}}, combat:"Mark amplifies by another 28% and lasts six seconds longer."}),
+n("sk_h10","Killing Ground","mod",2,1.4,11.2,"sk_key_focus",{},"",
+  {fxMod:{mark:{zone:{name:"Killing Ground",elem:"volt",pct:34,dur:8}}},
+   combat:"Marking a target salts the ground under it for eight seconds."}),
+n("sk_h11","No Second Guess","stat",1,0,12.4,"sk_h9 sk_h10",{"crit":14,"critMult":70}),
+n("sk_h12","The Last Arrow","ability",3,-1.1,13.6,"sk_h11",{},
+  "For when the mark has been up long enough.",
+  {replaceSpell:["mark",{name:"The Last Arrow",cost:30,time:0.60,mult:2.40,flatScale:0.80,
+    fx:{mark:{pct:70,dur:15}, execute:{pct:70}},
+    text:"Replaces Mark. Still marks, but now the marking itself is a real shot."}],
+   combat:"Mark becomes a shot in its own right — it still marks for 70%, but it also hits hard and finishes wounded targets."}),
+n("sk_h13","Cold Patience","stat",1,1.2,13.6,"sk_h11",{"critMult":75,"flat.volt":20}),
+n("sk_h14","One Target","mod",2,-1.5,15,"sk_h12",{},"",
+  {fxAdd:{mark:{"mark.pct":40}}, combat:"Mark amplifies by another 40%."}),
+n("sk_h15","Every Shot Counts","stat",1,1,15,"sk_h13",{"crit":12,"execute":50}),
+n("sk_h16","Sighted In","mod",2,-0.1,16.2,"sk_h14 sk_h15",{},"",
+  {fxAdd:{pin:{"execute.pct":60},storm:{"execute.pct":40}}, combat:"Every shot you own finishes wounded targets far faster."}),
 
-/* --- RIME (right, centre 3) --- */
-n("ac_r1","Cold Circuit","stat",1,1.6,4,"ac_gate",{"dmg.frost":7}),
-n("ac_r2","Thermal Sink","stat",1,2.2,5,"ac_r1",{"manaRegen":1.4}),
-n("ac_r3","Frozen Core","stat",1,4.2,5,"ac_r1",{"mana":35,"res.frost":7}),
-n("ac_r4","Rime Bolt","ability",3,1.8,6.2,"ac_r2",{},"Arc Bolt stops being lightning.",
-  {replaceSpell:["bolt",{name:"Rime Bolt",cost:13,time:0.45,mult:1.35,flatScale:0.62,
-   text:"Replaces Arc Bolt. Cheaper, faster, and it carries Frost scaling instead of Volt."}]}),
-n("ac_r5","Supercooled","mod",2,3.4,6.2,"ac_r2 ac_r3",{"conv.volt.frost":30}),
-n("ac_r6","Deep Reserve","stat",1,4.7,6.2,"ac_r3",{"mana":55,"cost.all":-8}),
-n("ac_r7","Efficient Lattice","mod",2,2.4,7.6,"ac_r4 ac_r5",{"cost.all":-14,"dmg.frost":12}),
-n("ac_r8","Heat Death","stat",1,4.3,7.6,"ac_r5 ac_r6",{"dmg.frost":16,"res.ember":-10}),
-n("ac_r9","Perfect Circuit","mod",2,3.2,8.8,"ac_r7 ac_r8",{"manaRegen":3,"mult.frost":7}),
-n("ac_key_rime","ABSOLUTE ZERO","key",4,3.2,10.1,"ac_r9",{"conv.neutral.frost":60,"conv.volt.frost":60,"mult.frost":18,"dmg.volt":-40},
-  "60% of neutral and Volt damage converts to Frost and Frost damage is multiplied by 1.18. Volt damage bonuses fall by 40.",{excl:"ac_top"}),
-n("ac_r10","Glass Water","stat",1,2.35,11.5,"ac_key_rime",{"dmg.frost":20}),
-n("ac_r11","Standing Ice","mod",2,4.4,11.4,"ac_key_rime",{"mult.spell":10,"speed":-15}),
-n("ac_r12","Nothing Moves","mod",2,3.1,12.6,"ac_r10 ac_r11",{"mult.frost":13,"cast":-10}),
-n("ac_r13","Winter Assembly","ability",3,1.9,13.9,"ac_r12",{},"A slow lattice of ice that finishes what the bolts started.",
-  {addSpell:{id:"winter",name:"Winter Assembly",cost:56,time:1.80,mult:5.10,flatScale:1.85,kind:"spell",
-   text:"Heavy single-target Frost. Expensive per cast, cheap per point of damage."}}),
-n("ac_r14","Permafrost","stat",1,4.4,13.9,"ac_r12",{"flat.frost":24,"mana":70}),
-n("ac_r15","The Long Winter","mod",2,3.2,15.2,"ac_r13 ac_r14",{"mult.frost":15,"manaRegen":3}),
-n("ac_r16","Nothing Left Warm","stat",1,3.2,16.4,"ac_r15",{"dmg.frost":26,"res.frost":16}),
+/* ---- DRIFT: hit and run ---- */
+n("sk_d1","Light Step","stat",1,1.6,4,"sk_loose",{"dodge":7,"speed":8}),
+n("sk_d2","Parting Shot","ability",3,2.2,5,"sk_d1",{},
+  "Leaving is an attack.",
+  {replaceSpell:["dash",{name:"Parting Shot",cost:0,time:0.35,mult:2.00,flatScale:0.80,
+    util:{dur:4,cd:7,dodge:30}, fx:{aoe:true},
+    text:"Replaces Dash. Still free, still displaces you, and now fires a volley behind you as you go."}],
+   combat:"Dash fires a volley at everything behind you as you leave. It is still free."}),
+n("sk_d3","Caltrops","mod",2,4.2,5,"sk_d1",{},"",
+  {fxMod:{dash:{zone:{name:"Caltrops",elem:"volt",pct:30,dur:6}}},
+   combat:"You leave caltrops where you were standing, hurting anything that follows for six seconds."}),
+n("sk_d4","Quick Feet","mod",2,1.8,6.2,"sk_d2",{},"",
+  {utilAdd:{dash:{cd:-2.5,dur:1}}, combat:"Dash comes back in 4.5 seconds instead of 7, and covers you a second longer."}),
+n("sk_d5","Scatter","mod",2,3.4,6.2,"sk_d2 sk_d3",{},"",
+  {fxAdd:{dash:{"zone.pct":26,"zone.dur":3}}, combat:"The caltrops field is much denser and lasts nine seconds."}),
+n("sk_d6","Open Ground","stat",1,4.7,6.2,"sk_d3",{"dodge":9,"dmg.gale":14}),
+n("sk_d7","Cover Fire","mod",2,2.4,7.6,"sk_d4 sk_d5",{},"",
+  {fxMod:{dash:{pierce:3}}, combat:"The parting volley punches through three further targets."}),
+n("sk_d8","Never Standing","stat",1,4.3,7.6,"sk_d5 sk_d6",{"dodge":11,"speed":10}),
+n("sk_d9","Trailing Edge","mod",2,3.2,8.8,"sk_d7 sk_d8",{},"",
+  {fxMod:{dash:{weaken:{pct:16,dur:5}}}, combat:"Anything caught in the parting volley swings 16% softer for five seconds."}),
+n("sk_key_feather","FEATHERWEIGHT","key",4,3.2,10.1,"sk_d9",{"hpPct":-50,"dodge":16,"speed":14},
+  "Dash effectively stops having a cooldown and covers you almost constantly. You carry half the health you did.",
+  {excl:"sk_top", utilAdd:{dash:{cd:-5,dur:2,dodge:12}},
+   combat:"Dash is available again in well under two seconds, so you are almost always mid-displacement — and your health bar is half what it was."}),
+n("sk_d10","Untouched","stat",1,2.35,11.5,"sk_key_feather",{"dodge":12,"res.gale":14}),
+n("sk_d11","Running Fire","mod",2,4.4,11.4,"sk_key_feather",{},"",
+  {fxAdd:{dash:{"zone.pct":40,"pierce":2}}, combat:"The caltrops bite far harder and the parting volley reaches two more targets."}),
+n("sk_d12","Crosswind","mod",2,3.1,12.6,"sk_d10 sk_d11",{},"",
+  {fxMod:{dash:{dot:{name:"Windburn",elem:"gale",pct:22,dur:5,stacks:3}}},
+   combat:"The parting volley leaves windburn stacking three times on everything it clips."}),
+n("sk_d13","Storm Runner","ability",3,1.9,13.9,"sk_d12",{},
+  "The gap between two shots stops existing.",
+  {replaceSpell:["dash",{name:"Storm Runner",cost:0,time:0.35,mult:3.20,flatScale:1.10,
+    util:{dur:6,cd:3,dodge:44}, fx:{aoe:true, pierce:4, zone:{name:"Caltrops",elem:"volt",pct:64,dur:9}},
+    text:"Replaces Dash. A free, near-constant volley that also carpets the ground behind you."}],
+   combat:"Dash becomes Storm Runner: a free volley through five targets every three seconds, leaving a heavy caltrop field each time."}),
+n("sk_d14","Tailwind","stat",1,4.4,13.9,"sk_d12",{"speed":16,"cast":14}),
+n("sk_d15","Nothing To Hit","mod",2,3.2,15.2,"sk_d13 sk_d14",{"dodge":14},"",
+  {utilAdd:{dash:{dur:2}}, combat:"Dash's cover lasts two seconds longer, which at this cooldown is effectively permanent."}),
+n("sk_d16","Gone","stat",1,3.2,16.4,"sk_d15",{"dodge":16,"dmg.gale":26}),
 
-n("ac_x1","Cold Chain","mod",2,-1.6,10.6,"ac_c10 ac_g7",{"conv.volt.frost":20,"dmg.aoe":12}),
-n("ac_x2","Stored Winter","mod",2,1.7,10.4,"ac_g8 ac_r9",{"mana":70,"mult.spell":6}),
-n("ac_key_null","THE LADDER'S TOP","key",4,0,17.6,"ac_c16 ac_g16 ac_r16",{"mult.spell":32,"manaRegenPct":-30,"hpPct":-20},
-  "Spell damage ×1.32. Mana regeneration falls 30% and maximum health falls 20%. Requires the bottom of any branch."),
-n("ac_t1","Copper Braid","stat",1,-2.4,1.6,"ac_pot",{"flat.volt":3,"mana":15}),
-n("ac_t2","Rubber Mat","stat",1,2.4,1.6,"ac_ins",{"res.all":4,"hp":30}),
-n("ac_t3","Tight Winding","mod",2,-1.7,2.7,"ac_t1 ac_coil",{"dmg.volt":9}),
-n("ac_t4","Slow-Blow Fuse","mod",2,1.7,2.7,"ac_t2 ac_coil",{"hp":55,"res.volt":8},"Something has to give first, and it should not be you."),
-n("ac_c17","Loose Mesh","stat",1,-5.4,10.8,"ac_c8",{"dmg.aoe":14}),
-n("ac_g17","Spare Cell","stat",1,1.6,9.3,"ac_g8",{"mana":50,"crit":4}),
-n("ac_r17","Frost Bloom","stat",1,5.5,9.0,"ac_r8",{"dmg.frost":14,"flat.frost":8})
+/* ---- cross-links ---- */
+n("sk_x1","Pinned and Peppered","mod",2,-1.6,10.6,"sk_q10 sk_h7",{},"",
+  {fxMod:{storm:{mark:{pct:18,dur:6}}}, combat:"The volley itself marks everything it hits for 18%."}),
+n("sk_x2","Running Mark","mod",2,1.7,10.4,"sk_h8 sk_d9",{},"",
+  {fxMod:{dash:{mark:{pct:24,dur:6}}}, combat:"The parting volley marks everything behind you for 24%."})
 ]);
 
 /* ------------------------------------------------------------------
-   TIDECALLER — "Tidal Mathematics"
-   WELLSPRING: mana is the damage stat.  SHATTER: frost burst.
-   UNDERTOW: gale, area, and conversion.
+   EMBER — "What It Turns Into"
+   PYRE: the hit is an excuse to start a fire.
+   RIME: fire becomes ice, and ice becomes an opening.
+   SIPHON: mana as ammunition, then as a wound.
    ------------------------------------------------------------------ */
-mkTree("tidecaller","Tidal Mathematics","Wellspring · Shatter · Undertow",[
-n("tc_root","Level Water","stat",1,0,0,"",{"mana":15,"dmg.spell":3},"Nothing in this tree works until the surface is flat."),
-n("tc_flow","Flow","stat",1,-1,1,"tc_root",{"manaRegen":1.0}),
-n("tc_chill","First Chill","stat",1,1,1,"tc_root",{"dmg.frost":6}),
-n("tc_basin","Basin","stat",1,0,2,"tc_flow tc_chill",{"mana":30}),
-n("tc_gate","Displacement","mod",2,0,3,"tc_basin",{"dmg.spell":6,"cost.all":-6},"Water moved is water that has to go somewhere."),
+mkTree("ember","What It Turns Into","Pyre · Rime · Siphon",[
+n("em_root","Kindling","stat",1,0,0,"",{"dmg.cinder":5,"mana":15},"A caster's first problem is having anything to spend."),
+n("em_focus","Focus","stat",1,-1,1,"em_root",{"dmg.spell":6}),
+n("em_ward","Thin Ward","stat",1,1,1,"em_root",{"hp":50,"res.cinder":6}),
+n("em_tl","Dry Tinder","stat",1,-2.4,1.6,"em_focus",{"flat.cinder":5}),
+n("em_tr","Cold Store","stat",1,2.4,1.6,"em_ward",{"mana":35,"manaRegen":1}),
+n("em_chan","Channel","stat",1,0,2,"em_focus em_ward",{"cast":8}),
+n("em_ignis","First Principle","mod",2,0,3,"em_chan em_tl em_tr",{"dmg.all":5},
+  "Damage is not the output. It is the input.",
+  {fxAdd:{bolt:{"hits":1}}, combat:"Firebolt fires twice per cast."}),
 
-/* --- WELLSPRING (left) --- */
-n("tc_w1","Headwater","stat",1,-1.6,4,"tc_gate",{"manaRegen":1.6}),
-n("tc_w2","Deep Aquifer","stat",1,-4.2,5,"tc_w1",{"mana":55}),
-n("tc_w3","Lower Friction","mod",2,-2.2,5,"tc_w1",{"cost.all":-12}),
-n("tc_w4","Artesian","stat",1,-4.4,6.2,"tc_w2",{"manaRegen":2.4}),
-n("tc_w5","Springtide","ability",3,-1.8,6.2,"tc_w3",{},"A cheap, constant spray that costs almost nothing to hold.",
-  {addSpell:{id:"spring",name:"Springtide",cost:11,time:0.40,mult:1.20,flatScale:0.50,kind:"spell",
-   text:"The cheapest spell in the game per cast. Its value is entirely in never stopping."}}),
-n("tc_w6","Overflow Channel","stat",1,-3.1,6.2,"tc_w2 tc_w3",{"mana":45,"cost.all":-6}),
-n("tc_w7","Pressure Head","mod",2,-3,7.6,"tc_w4 tc_w5 tc_w6",{"dmg.spell":16},
-  "Damage now scales with how much you are willing to keep spending."),
-n("tc_w8","No Dry Season","stat",1,-4.5,8.8,"tc_w4 tc_w7",{"manaRegen":3.2}),
-n("tc_w9","Standing Wave","mod",2,-2.35,8.9,"tc_w5 tc_w7",{"mult.spell":8,"cost.all":-8}),
-n("tc_w10","Reservoir Law","stat",1,-3.1,9.9,"tc_w8 tc_w9",{"mana":90,"dmg.all":10}),
-n("tc_key_well","WELLSPRING","key",4,-3.1,11.2,"tc_w10",{"manaRegenPct":80,"cost.all":-25,"mult.all":-16},
-  "Mana regeneration +80% and all spells cost 25% less. Everything you do is multiplied by 0.84.",{excl:"tc_top"}),
-n("tc_w11","Never Empty","mod",2,-4.6,12.5,"tc_key_well",{"manaRegen":4,"mana":110}),
-n("tc_w12","Attrition","stat",1,-2.2,12.5,"tc_key_well",{"dmg.spell":20,"cast":8}),
-n("tc_w13","Tidal Engine","ability",3,-3.3,13.8,"tc_w11 tc_w12",{},"Rime Lance becomes something you simply do not stop doing.",
-  {replaceSpell:["lance",{name:"Tidal Engine",cost:15,time:0.50,mult:1.75,flatScale:0.80,
-   text:"Replaces Rime Lance. Half a second, fifteen mana, forever."}]}),
-n("tc_w14","Aquifer Floor","stat",1,-4.7,15,"tc_w13",{"manaRegen":4.5}),
-n("tc_w15","Volume Over Force","mod",2,-2.3,15,"tc_w13",{"mult.spell":14,"cast":12}),
-n("tc_w16","The Whole Ocean","stat",1,-3.4,16.2,"tc_w14 tc_w15",{"mana":160,"dmg.spell":22}),
+/* ---- PYRE: damage over time ---- */
+n("em_p1","Ignite","mod",2,-1.6,4,"em_ignis",{},
+  "The bolt is the match, not the fire.",
+  {fxMod:{bolt:{dot:{name:"Burn",elem:"cinder",pct:36,dur:4,stacks:3}}},
+   combat:"Firebolt sets the target burning — a stack of Burn, up to three, for four seconds."}),
+n("em_p2","Wildfire","mod",2,-4.2,5,"em_p1",{},"",
+  {fxMod:{bolt:{spread:true}}, combat:"Burns jump from the target to everything else nearby."}),
+n("em_p3","Stoked","mod",2,-2.2,5,"em_p1",{},"",
+  {fxAdd:{bolt:{"dot.dur":4,"dot.stacks":2}}, combat:"Burns last eight seconds and stack five deep."}),
+n("em_p4","Nova Burns","mod",2,-4.4,6.2,"em_p2",{},"",
+  {fxMod:{nova:{dot:{name:"Burn",elem:"cinder",pct:30,dur:6,stacks:5}}},
+   combat:"Nova sets everything it touches burning as well."}),
+n("em_p5","Backdraft","mod",2,-2.1,6.25,"em_p3",{},"",
+  {fxAdd:{bolt:{"dot.pct":18}}, fxMod:{bolt:{zone:{name:"Scorched Air",elem:"cinder",pct:18,dur:4}}},
+   combat:"Burns bite harder, and each bolt leaves a patch of scorched air behind it."}),
+n("em_p6","Ashfall","stat",1,-3.1,6.2,"em_p2 em_p3",{"flat.cinder":14,"dmg.cinder":12}),
+n("em_p7","Cinder Lance","ability",3,-3,7.6,"em_p4 em_p5 em_p6",{},
+  "Stop throwing sparks.",
+  {replaceSpell:["bolt",{name:"Cinder Lance",cost:19,time:0.55,mult:1.85,flatScale:0.75,
+    fx:{hits:2, pierce:1, dot:{name:"Burn",elem:"cinder",pct:44,dur:8,stacks:6}},
+    text:"Replaces Firebolt. Two heavier bolts that punch through, each stacking Burn."}],
+   combat:"Firebolt becomes Cinder Lance: two heavier bolts per cast that pierce one target further and stack Burn six deep."}),
+n("em_p8","Detonate","mod",2,-4.5,8.8,"em_p4 em_p7",{},"",
+  {fxMod:{nova:{detonate:{pct:80}}}, combat:"Nova consumes every Burn on the field and throws it out at once as a single blast."}),
+n("em_p9","Slow Burn","mod",2,-2.35,8.9,"em_p5 em_p7",{},"",
+  {fxAdd:{bolt:{"dot.dur":6},nova:{"dot.dur":6}}, combat:"Every Burn you apply runs six seconds longer."}),
+n("em_p10","Firestorm","stat",1,-3.1,9.9,"em_p8 em_p9",{"dmg.cinder":20,"mana":50}),
+n("em_key_conflag","CONFLAGRATION","key",4,-3.1,11.2,"em_p10",{"directPct":-50},
+  "Burns tick three times as hard. Everything you hit directly does half damage — the bolt is only there to light the fire.",
+  {excl:"em_top",
+   fxAdd:{bolt:{"dot.pct":72},nova:{"dot.pct":60}},
+   combat:"Burn ticks roughly three times as hard as it did. Every direct hit you land is halved."}),
+n("em_p11","Everything Catches","mod",2,-4.6,12.5,"em_key_conflag",{},"",
+  {fxMod:{nova:{spread:true}}, fxAdd:{nova:{"dot.stacks":3}},
+   combat:"Nova's burns spread as well, and stack three deeper."}),
+n("em_p12","No Air Left","mod",2,-2.2,12.5,"em_key_conflag",{},"",
+  {fxAdd:{bolt:{"dot.stacks":4,"dot.pct":30}}, combat:"Burns stack four deeper and tick harder again."}),
+n("em_p13","Pyroclasm","ability",3,-3.3,13.8,"em_p11 em_p12",{},
+  "The whole field, at once.",
+  {replaceSpell:["nova",{name:"Pyroclasm",cost:48,time:1.25,mult:2.90,flatScale:1.25,
+    fx:{aoe:true, spread:true, detonate:{pct:150},
+        dot:{name:"Burn",elem:"cinder",pct:70,dur:12,stacks:8},
+        zone:{name:"Firestorm",elem:"cinder",pct:70,dur:9}},
+    text:"Replaces Nova. Detonates everything burning, then re-lights it hotter and leaves the ground on fire."}],
+   combat:"Nova becomes Pyroclasm: it blows every existing Burn stack, re-applies eight deeper, and leaves a firestorm burning on the ground for nine seconds."}),
+n("em_p14","Long Smoulder","stat",1,-4.7,15,"em_p13",{"flat.cinder":26,"dmg.cinder":18}),
+n("em_p15","Nothing Stops Burning","mod",2,-2.3,15,"em_p13",{},"",
+  {fxAdd:{bolt:{"dot.dur":8},nova:{"dot.dur":8}}, combat:"Burns run another eight seconds — long enough that they never lapse."}),
+n("em_p16","Ash and Ash","stat",1,-3.4,16.2,"em_p14 em_p15",{"mult.cinder":16,"dmg.cinder":22}),
 
-/* --- SHATTER (middle) --- */
-n("tc_s1","Hard Water","stat",1,0,4,"tc_gate",{"dmg.frost":8}),
-n("tc_s2","Ice Lens","stat",1,-0.9,5,"tc_s1",{"crit":4}),
-n("tc_s3","Fracture Line","mod",2,0.9,5,"tc_s1",{"dmg.s:verdict":22}),
-n("tc_s4","Cold Focus","stat",1,-1.1,6.2,"tc_s2",{"critMult":22}),
-n("tc_s5","Black Ice","mod",2,0.9,6.2,"tc_s3",{"mult.frost":8}),
-n("tc_s6","Shatterpoint","ability",3,0,7.4,"tc_s4 tc_s5",{},"One strike placed where the ice was already going to go.",
-  {addSpell:{id:"shatter",name:"Shatterpoint",cost:46,time:1.30,mult:3.85,flatScale:1.35,kind:"spell",
-   text:"The Tidecaller's burst tool. Short cast, very large number."}}),
-n("tc_s7","Glasswork","stat",1,-1.3,8.5,"tc_s4 tc_s6",{"crit":7,"flat.frost":10}),
-n("tc_s8","Load Bearing","mod",2,1.3,8.5,"tc_s5 tc_s6",{"dmg.frost":18,"cost.all":10}),
-n("tc_key_shat","SHATTERPOINT","key",4,0,9.9,"tc_s7 tc_s8",{"critMult":90,"crit":-10,"mult.frost":14},
-  "Critical damage +90 and Frost damage ×1.14. Critical chance falls by 10 points.",{excl:"tc_top",major:"sever"}),
-n("tc_s9","Cleave Plane","stat",1,-1.4,11.2,"tc_key_shat",{"crit":9,"flat.frost":16}),
-n("tc_s10","Deep Fault","mod",2,1.4,11.2,"tc_key_shat",{"critMult":50}),
-n("tc_s11","All At Once","mod",2,0,12.4,"tc_s9 tc_s10",{"mult.s:shatter":20,"mult.s:verdict":20}),
-n("tc_s12","The Verdict Falls","ability",3,-1.1,13.6,"tc_s11",{},"Glacial Verdict stops being a sentence and becomes an execution.",
-  {replaceSpell:["verdict",{name:"The Verdict Falls",cost:62,time:1.70,mult:6.00,flatScale:1.95,
-   text:"Replaces Glacial Verdict. Roughly 40% more damage for roughly 25% more mana."}]}),
-n("tc_s13","Cold Certainty","stat",1,1.2,13.6,"tc_s11",{"critMult":55,"dmg.frost":16}),
-n("tc_s14","Split Second","stat",1,-1.5,15,"tc_s12",{"cast":14,"crit":6}),
-n("tc_s15","Nothing Survives Contact","mod",2,1,15,"tc_s13",{"mult.frost":16,"res.ember":-14}),
-n("tc_s16","Absolute Fracture","stat",1,-0.1,16.2,"tc_s14 tc_s15",{"critMult":80,"flat.frost":26}),
+/* ---- RIME: conversion, freeze, shatter ---- */
+n("em_r1","Coldsnap","mod",2,0,4,"em_ignis",{"conv.cinder.frost":40},
+  "The same spell, arriving cold.",
+  {fxMod:{nova:{freeze:{dur:2}}},
+   combat:"Nova converts to ice and freezes everything it catches for two seconds."}),
+n("em_r2","Shatterpoint","mod",2,-0.9,5,"em_r1",{},
+  "Frozen things do not absorb a hit. They come apart.",
+  {fxMod:{bolt:{shatter:{pct:95}}},
+   combat:"Firebolt shatters a frozen target for 95% extra damage and breaks the freeze."}),
+n("em_r3","Deep Freeze","mod",2,0.9,5,"em_r1",{},"",
+  {fxAdd:{nova:{"freeze.dur":2.5}}, combat:"The freeze holds for 4.5 seconds."}),
+n("em_r4","Brittle","mod",2,-1.1,6.2,"em_r2",{},"",
+  {fxMod:{nova:{weaken:{pct:22,dur:8}}}, combat:"Anything Nova freezes swings 22% softer for eight seconds after it thaws."}),
+n("em_r5","Rime Coat","mod",2,0.9,6.2,"em_r3",{"conv.neutral.frost":35},"",
+  {fxMod:{bolt:{freeze:{dur:1.2}}}, combat:"Even Firebolt now freezes briefly, so the next bolt always shatters."}),
+n("em_r6","Glacial Nova","ability",3,0,7.4,"em_r4 em_r5",{},
+  "Nova stops being fire in any sense.",
+  {replaceSpell:["nova",{name:"Glacial Nova",cost:38,time:1.15,mult:2.85,flatScale:1.20,
+    fx:{aoe:true, freeze:{dur:4}, weaken:{pct:24,dur:8}, shatter:{pct:60}},
+    text:"Replaces Nova. A ring of ice that locks everything down and breaks whatever was already frozen."}],
+   combat:"Nova becomes Glacial Nova: it freezes for four seconds, blunts what it catches, and shatters anything already frozen."}),
+n("em_r7","Frostbite","stat",1,-1.3,8.5,"em_r4 em_r6",{"dmg.frost":18,"flat.frost":12}),
+n("em_r8","Splinter","mod",2,1.3,8.5,"em_r5 em_r6",{},"",
+  {fxAdd:{bolt:{"shatter.pct":75}}, combat:"Shatters hit for 170% extra instead of 95%."}),
+n("em_key_zero","ABSOLUTE ZERO","key",4,0,9.9,"em_r7 em_r8",{"conv.cinder.frost":100,"conv.neutral.frost":100,"conv.volt.frost":100,"mult.frost":18},
+  "Everything you do arrives as Frost and Nova freezes the whole field. Nothing you do can critically hit — there are no lucky hits here, only cold ones.",
+  {excl:"em_top", rule:"nocrit",
+   fxAdd:{nova:{"freeze.dur":3}},
+   combat:"All of your damage converts to Frost, Nova's freeze runs far longer, and your critical hits stop existing entirely."}),
+n("em_r9","Black Ice","mod",2,-1.4,11.2,"em_key_zero",{},"",
+  {fxMod:{nova:{zone:{name:"Black Ice",elem:"frost",pct:40,dur:8}}},
+   combat:"Nova leaves a sheet of black ice grinding away for eight seconds."}),
+n("em_r10","Hairline","mod",2,1.4,11.2,"em_key_zero",{},"",
+  {fxAdd:{bolt:{"shatter.pct":90}}, combat:"Shatters hit for another 90% on top."}),
+n("em_r11","Nothing Moves","mod",2,0,12.4,"em_r9 em_r10",{},"",
+  {fxMod:{bolt:{freeze:{dur:2}}, nova:{root:{pct:35,dur:6}}},
+   combat:"Firebolt's freeze lasts two seconds, and Nova roots the field for six."}),
+n("em_r12","The Long Cold","ability",3,-1.1,13.6,"em_r11",{},
+  "One spell, and it is over.",
+  {replaceSpell:["bolt",{name:"The Long Cold",cost:26,time:0.60,mult:2.55,flatScale:0.95,
+    fx:{hits:2, shatter:{pct:240}, freeze:{dur:2}},
+    text:"Replaces Firebolt. Two heavy bolts that freeze and then shatter what they froze."}],
+   combat:"Firebolt becomes The Long Cold: two bolts per cast, the first freezing and the second shattering for 240% extra."}),
+n("em_r13","Permafrost","stat",1,1.2,13.6,"em_r11",{"flat.frost":26,"mult.frost":10}),
+n("em_r14","Glass","mod",2,-1.5,15,"em_r12",{},"",
+  {fxAdd:{bolt:{"shatter.pct":120}}, combat:"Shatters hit for another 120%."}),
+n("em_r15","Winter Assembly","stat",1,1,15,"em_r13",{"dmg.frost":24,"mana":90}),
+n("em_r16","Nothing Left Warm","mod",2,-0.1,16.2,"em_r14 em_r15",{},"",
+  {fxAdd:{nova:{"freeze.dur":3},bolt:{"freeze.dur":2}}, combat:"Every freeze you apply runs several seconds longer."}),
 
-/* --- UNDERTOW (right) --- */
-n("tc_u1","Crosscurrent","stat",1,1.6,4,"tc_gate",{"dmg.gale":7}),
-n("tc_u2","Sweep","stat",1,2.2,5,"tc_u1",{"dmg.aoe":12}),
-n("tc_u3","Salt Wind","stat",1,4.2,5,"tc_u1",{"flat.gale":6}),
-n("tc_u4","Riptide","ability",3,1.8,6.2,"tc_u2",{},"Undertow gains a second pull on the way back out.",
-  {replaceSpell:["under",{name:"Riptide",cost:36,time:1.10,mult:3.20,flatScale:1.25,aoe:true,
-   text:"Replaces Undertow. Faster and substantially heavier on multiple targets."}]}),
-n("tc_u5","Brine Conversion","mod",2,3.4,6.2,"tc_u2 tc_u3",{"conv.frost.gale":30}),
-n("tc_u6","Open Water","stat",1,4.7,6.2,"tc_u3",{"dmg.gale":14,"dodge":4}),
-n("tc_u7","Undertow Discipline","mod",2,2.4,7.6,"tc_u4 tc_u5",{"dmg.aoe":20,"cost.all":-10}),
-n("tc_u8","Spray","stat",1,4.3,7.6,"tc_u5 tc_u6",{"flat.gale":12,"speed":8}),
-n("tc_u9","Everything Downstream","mod",2,3.2,8.8,"tc_u7 tc_u8",{"mult.gale":9,"dmg.aoe":14}),
-n("tc_key_under","UNDERTOW","key",4,3.2,10.1,"tc_u9",{"conv.neutral.gale":55,"conv.frost.gale":40,"mult.gale":20,"dmg.frost":-35},
-  "55% of neutral and 40% of Frost damage converts to Gale, and Gale is multiplied by 1.20. Frost bonuses fall by 35.",{excl:"tc_top"}),
-n("tc_u10","Long Pull","stat",1,2.35,11.5,"tc_key_under",{"dmg.gale":22}),
-n("tc_u11","Drowning Weight","mod",2,4.4,11.4,"tc_key_under",{"mult.aoe":0,"dmg.aoe":26,"cast":-8}),
-n("tc_u12","No Shallow Water","mod",2,3.1,12.6,"tc_u10 tc_u11",{"mult.gale":14,"flat.gale":16}),
-n("tc_u13","The Whole Shelf","ability",3,1.9,13.9,"tc_u12",{},"A standing current that keeps taking from everything inside it.",
-  {addSpell:{id:"shelf",name:"The Whole Shelf",cost:48,time:1.35,mult:4.05,flatScale:1.45,aoe:true,kind:"spell",
-   text:"The heaviest area spell available to a Tidecaller."}}),
-n("tc_u14","Gale Floor","stat",1,4.4,13.9,"tc_u12",{"flat.gale":24,"dodge":8}),
-n("tc_u15","Outgoing Tide","mod",2,3.2,15.2,"tc_u13 tc_u14",{"mult.gale":16,"dmg.aoe":18}),
-n("tc_u16","Nothing Comes Back","stat",1,3.2,16.4,"tc_u15",{"dmg.gale":26,"manaRegen":3}),
+/* ---- SIPHON: mana burn ---- */
+n("em_s1","Deeper Draw","mod",2,1.6,4,"em_ignis",{},
+  "What you take out has to go somewhere.",
+  {fxAdd:{siphon:{"drain.mana":16}}, fxMod:{siphon:{weaken:{pct:14,dur:6}}},
+   combat:"Siphon returns 38 mana and leaves the target swinging 14% softer for six seconds."}),
+n("em_s2","Mana Burn","mod",2,2.2,5,"em_s1",{},"",
+  {fxMod:{siphon:{dot:{name:"Mana Burn",elem:"volt",pct:30,dur:6,stacks:3}}},
+   combat:"Siphon leaves the target burning through its own reserves — a stack of Mana Burn, up to three."}),
+n("em_s3","Wide Draw","stat",1,4.2,5,"em_s1",{"mana":70,"manaRegen":2}),
+n("em_s4","Rift","mod",2,1.8,6.2,"em_s2",{},"",
+  {fxMod:{blink:{zone:{name:"Rift",elem:"volt",pct:32,dur:6}}},
+   combat:"Blink tears a rift where you were standing, grinding for six seconds."}),
+n("em_s5","Overdraw","mod",2,3.4,6.2,"em_s2 em_s3",{},"",
+  {fxMod:{siphon:{pierce:2}}, combat:"Siphon pulls from three targets at once instead of one."}),
+n("em_s6","Reservoir","stat",1,4.7,6.2,"em_s3",{"mana":110,"cost.all":-10}),
+n("em_s7","Leyline Tap","ability",3,2.4,7.6,"em_s4 em_s5",{},
+  "Stop borrowing and start taking.",
+  {replaceSpell:["siphon",{name:"Leyline Tap",cost:0,time:0.95,mult:1.35,flatScale:0.60,
+    fx:{pierce:2, drain:{mana:46, heal:4}, dot:{name:"Mana Burn",elem:"volt",pct:52,dur:8,stacks:4},
+        weaken:{pct:18,dur:8}},
+    text:"Replaces Siphon. Still free, far heavier, returns 46 mana and some health."}],
+   combat:"Siphon becomes Leyline Tap: free, much heavier, hits three targets, returns 46 mana and heals you."}),
+n("em_s8","Burnout","stat",1,4.3,7.6,"em_s5 em_s6",{"dmg.volt":18,"flat.volt":12}),
+n("em_s9","Nothing Spare","mod",2,3.2,8.8,"em_s7 em_s8",{},"",
+  {fxAdd:{siphon:{"dot.pct":26,"dot.stacks":2}}, combat:"Mana Burn stacks six deep and bites harder."}),
+n("em_key_blood","BLOODCAST","key",4,3.2,10.1,"em_s9",{"mult.spell":26,"hp":240},
+  "Spells cost health instead of mana, at one and a half health per point. Your mana pool stops mattering; your health bar becomes the resource you are managing.",
+  {excl:"em_top", rule:"thirst",
+   combat:"Every spell you cast is paid for in health at 1.5 per mana. Your bar drops as you cast, and spells hit 26% harder for it."}),
+n("em_s10","Blood Price","stat",1,2.35,11.5,"em_key_blood",{"hp":260,"hpRegen":16}),
+n("em_s11","Vein Tap","mod",2,4.4,11.4,"em_key_blood",{},"",
+  {fxAdd:{siphon:{"drain.heal":7}}, combat:"Siphon returns 11% of your health per cast — your only way of paying the bill."}),
+n("em_s12","Hot Blood","mod",2,3.1,12.6,"em_s10 em_s11",{"lifesteal":12,"spellLeech":9},"",
+  {fxMod:{siphon:{spread:true}}, combat:"Mana Burn spreads from the target to everything near it."}),
+n("em_s13","Exsanguination","ability",3,1.9,13.9,"em_s12",{},
+  "The cost stops being a cost.",
+  {replaceSpell:["blink",{name:"Exsanguination",cost:0,time:0.40,mult:3.40,flatScale:1.20,
+    util:{dur:3,cd:5,dodge:28},
+    fx:{aoe:true, drain:{heal:10}, zone:{name:"Rift",elem:"volt",pct:60,dur:7}},
+    text:"Replaces Blink. Still displaces you, now detonates where you were and returns 10% of your health."}],
+   combat:"Blink becomes Exsanguination: you still vanish, but the space you left explodes, tears a heavy rift, and gives you back a tenth of your health."}),
+n("em_s14","Full Draught","stat",1,4.4,13.9,"em_s12",{"hp":300,"hpRegen":20}),
+n("em_s15","Nothing Held Back","mod",2,3.2,15.2,"em_s13 em_s14",{"mult.spell":12},"",
+  {fxAdd:{siphon:{"drain.mana":40,"dot.pct":40}}, combat:"Siphon returns far more and its Mana Burn nearly doubles."}),
+n("em_s16","The Whole Ledger","stat",1,3.2,16.4,"em_s15",{"mult.all":14,"hp":220}),
 
-n("tc_x1","Cold Current","mod",2,-1.6,10.6,"tc_w10 tc_s7",{"cost.all":-10,"crit":5}),
-n("tc_x2","Fracture Tide","mod",2,1.7,10.4,"tc_s8 tc_u9",{"conv.frost.gale":20,"critMult":25}),
-n("tc_key_sea","THE WHOLE SEA","key",4,0,17.6,"tc_w16 tc_s16 tc_u16",{"mult.all":28,"manaRegenPct":-40,"res.all":-15},
-  "All damage ×1.28. Mana regeneration falls 40% and every elemental defence falls 15. Requires the bottom of any branch."),
-n("tc_t1","Silt","stat",1,-2.4,1.6,"tc_flow",{"manaRegen":0.8,"mana":18}),
-n("tc_t2","Shoreline","stat",1,2.4,1.6,"tc_chill",{"res.frost":6,"hp":35}),
-n("tc_t3","Steady Draw","mod",2,-1.7,2.7,"tc_t1 tc_basin",{"cost.all":-7}),
-n("tc_t4","Cold Shelf","mod",2,1.7,2.7,"tc_t2 tc_basin",{"dmg.frost":10}),
-n("tc_w17","Second Spring","stat",1,-5.4,10.8,"tc_w8",{"manaRegen":2.6}),
-n("tc_s17","Hairline","stat",1,1.6,9.3,"tc_s8",{"crit":6,"critMult":18}),
-n("tc_u17","Spindrift","stat",1,5.5,9.0,"tc_u8",{"dmg.gale":14,"dodge":5})
+/* ---- cross-links ---- */
+n("em_x1","Flash Freeze","mod",2,-1.6,10.6,"em_p10 em_r7",{},"",
+  {fxMod:{bolt:{freeze:{dur:1}}}, combat:"Firebolt freezes for a moment, so your next bolt always shatters."}),
+n("em_x2","Cold Ledger","mod",2,1.7,10.4,"em_r8 em_s9",{},"",
+  {fxMod:{siphon:{freeze:{dur:1.5}}}, combat:"Siphon freezes what it drains for a second and a half."})
 ]);
 
 /* ------------------------------------------------------------------
-   SHRIKE — "Small Cuts"
-   EDGE: critical strikes as the entire plan.  DRIFT: not being there.
-   PYRE: ember, execution, and finishing what is already dying.
+   THORNBOUND — "More Of You Than There Is Of It"
+   GROVE: count, and what happens when the count drops.
+   BLIGHT: ground you plant that makes the fight worse for it.
+   SAP: taking from the fight and keeping it.
    ------------------------------------------------------------------ */
-mkTree("shrike","Small Cuts","Edge · Drift · Pyre",[
-n("sh_root","Grip Tape","stat",1,0,0,"",{"crit":3},"A Shrike's first problem is holding on."),
-n("sh_wrist","Wrist Work","stat",1,-1,1,"sh_root",{"speed":6}),
-n("sh_eye","Read the Room","stat",1,1,1,"sh_root",{"dodge":4}),
-n("sh_whet","Whetstone","stat",1,0,2,"sh_wrist sh_eye",{"critMult":12}),
-n("sh_gate","Economy of Motion","mod",2,0,3,"sh_whet",{"cost.all":-8,"speed":6},"Nothing wasted. Nothing announced."),
+mkTree("thornbound","More Of You Than There Is Of It","Grove · Blight · Sap",[
+n("tb_root","Taproot","stat",1,0,0,"",{"hp":45,"manaRegen":0.6},"Nothing grows out of nothing."),
+n("tb_soil","Good Soil","stat",1,-1,1,"tb_root",{"dmg.all":5}),
+n("tb_bark","Bark","stat",1,1,1,"tb_root",{"hp":70,"res.stone":6}),
+n("tb_tl","Runners","stat",1,-2.4,1.6,"tb_soil",{"mana":35,"cost.all":-6}),
+n("tb_tr","Heartwood","stat",1,2.4,1.6,"tb_bark",{"hp":80,"hpRegen":4}),
+n("tb_grow","Growth","stat",1,0,2,"tb_soil tb_bark",{"flat.stone":6}),
+n("tb_tend","Tending","mod",2,0,3,"tb_grow tb_tl tb_tr",{"dmg.all":5},
+  "You are not the one doing the fighting. Act like it.",
+  {fxAdd:{summon:{"summon.dur":5}}, combat:"Your minions last nineteen seconds instead of fourteen."}),
 
-/* --- EDGE (left) --- */
-n("sh_e1","Find the Seam","stat",1,-1.6,4,"sh_gate",{"crit":5}),
-n("sh_e2","Hollow Ground","stat",1,-4.2,5,"sh_e1",{"critMult":20}),
-n("sh_e3","Flurry","ability",3,-2.2,5,"sh_e1",{},"Two cuts becomes six.",
-  {addSpell:{id:"flurry",name:"Flurry",cost:12,time:0.32,mult:0.95,flatScale:0.38,kind:"spell",
-   text:"Absurdly fast, absurdly cheap. Every critical-chance point you own is worth more because of it."}}),
-n("sh_e4","Bone Notch","stat",1,-4.5,6.2,"sh_e2",{"critMult":28}),
-n("sh_e5","Rhythm","stat",1,-2.1,6.25,"sh_e3",{"cast":12,"cost.s:flurry":-20}),
-n("sh_e6","Placement","mod",2,-3.1,6.2,"sh_e2 sh_e3",{"crit":8}),
-n("sh_e7","The Same Spot Twice","mod",2,-3,7.6,"sh_e4 sh_e5 sh_e6",{"critMult":35,"crit":4}),
-n("sh_e8","Steady Hand","stat",1,-4.6,8.8,"sh_e4 sh_e7",{"crit":7,"speed":6}),
-n("sh_e9","Arterial","mod",2,-2.35,8.9,"sh_e5 sh_e7",{"mult.spell":8,"dmg.s:flurry":25}),
-n("sh_e10","Practised","stat",1,-3.1,9.9,"sh_e8 sh_e9",{"critMult":40,"cost.all":-8}),
-n("sh_key_edge","PERFECT EDGE","key",4,-3.1,11.2,"sh_e10",{"crit":45,"critMult":-70,"flat.gale":-8},
-  "Critical chance +45 points. Critical damage falls by 70 and flat Gale damage by 8. You crit almost always, for less.",{excl:"sh_top"}),
-n("sh_e11","Every Cut Counts","mod",2,-4.6,12.5,"sh_key_edge",{"critMult":45,"mult.all":6}),
-n("sh_e12","No Wasted Motion","stat",1,-2.2,12.5,"sh_key_edge",{"speed":16,"cast":12}),
-n("sh_e13","Thousand Cuts","ability",3,-3.3,13.8,"sh_e11 sh_e12",{},"Lacerate stops being an opener.",
-  {replaceSpell:["lac",{name:"Thousand Cuts",cost:14,time:0.30,mult:1.10,flatScale:0.40,
-   text:"Replaces Lacerate. Thirty hundredths of a second per cast. The rotation becomes a blur."}]}),
-n("sh_e14","Fine Bevel","stat",1,-4.7,15,"sh_e13",{"crit":10,"critMult":30}),
-n("sh_e15","Nothing But Seams","mod",2,-2.3,15,"sh_e13",{"mult.all":12,"cost.all":8}),
-n("sh_e16","Perfect Edge, Kept","stat",1,-3.4,16.2,"sh_e14 sh_e15",{"critMult":70,"crit":8}),
+/* ---- GROVE: minion count ---- */
+n("tb_g1","Second Seed","mod",2,-1.6,4,"tb_tend",{},
+  "One was always going to be the wrong number.",
+  {fxAdd:{summon:{"summon.count":1,"summon.cap":2}}, combat:"Summon brings up two at a time instead of one, and you can hold six."}),
+n("tb_g2","Bitter End","mod",2,-4.2,5,"tb_g1",{},
+  "What they do on the way out matters more than what they did standing up.",
+  {fxMod:{summon:{summon:{explode:75}}}, combat:"Minions detonate when they expire, for 75% of a basic attack each."}),
+n("tb_g3","Deep Roots","mod",2,-2.2,5,"tb_g1",{},"",
+  {fxAdd:{summon:{"summon.dur":9,"summon.cap":2}}, combat:"Minions last 28 seconds and you can hold six."}),
+n("tb_g4","Barbed Husks","mod",2,-4.4,6.2,"tb_g2",{},"",
+  {fxAdd:{summon:{"summon.explode":85}}, combat:"The death blast is nearly twice as large."}),
+n("tb_g5","Thicket","mod",2,-2.1,6.25,"tb_g3",{},"",
+  {fxAdd:{summon:{"summon.count":1,"summon.cap":2}}, combat:"Three per cast, up to eight on the field."}),
+n("tb_g6","Hardy Stock","stat",1,-3.1,6.2,"tb_g2 tb_g3",{"flat.stone":14,"hp":110}),
+n("tb_g7","Bramble Host","ability",3,-3,7.6,"tb_g4 tb_g5 tb_g6",{},
+  "Stop summoning and start fielding.",
+  {replaceSpell:["summon",{name:"Bramble Host",cost:38,time:1.15,mult:0.00,flatScale:0,
+    fx:{summon:{count:3, pct:56, dur:30, cap:9, explode:95}},
+    text:"Replaces Summon. Three at once, tougher, longer-lived, and each one detonates."}],
+   combat:"Summon becomes Bramble Host: three stronger minions per cast, nine on the field, all of them detonating when they go."}),
+n("tb_g8","Fertile","mod",2,-4.5,8.8,"tb_g4 tb_g7",{},"",
+  {fxAdd:{summon:{"summon.pct":22}}, fxMod:{summon:{weaken:{pct:12,dur:8}}},
+   combat:"Minions hit considerably harder, and the act of summoning blunts what is nearby by 12%."}),
+n("tb_g9","Standing Grove","stat",1,-2.35,8.9,"tb_g5 tb_g7",{"hp":160,"manaRegen":2.5}),
+n("tb_g10","Overgrowth","stat",1,-3.1,9.9,"tb_g8 tb_g9",{"dmg.all":14,"flat.stone":18}),
+n("tb_key_grove","GROVE ETERNAL","key",4,-3.1,11.2,"tb_g10",{"hp":220},
+  "Your minions never expire and you can hold twelve of them. You deal no direct damage of any kind — not with spells, not with your weapon. The grove is the build.",
+  {excl:"tb_top", rule:"nodirect",
+   fxMod:{summon:{summon:{perm:true, cap:12}}},
+   fxAdd:{summon:{"summon.pct":30}},
+   combat:"Minions stop expiring and you can field twelve. Every number you personally put out drops to zero — everything on the damage panel now comes from them."}),
+n("tb_g11","Endless Thicket","mod",2,-4.6,12.5,"tb_key_grove",{},"",
+  {fxAdd:{summon:{"summon.count":2}}, combat:"Five per cast, so the field fills in two casts."}),
+n("tb_g12","Ironbark","mod",2,-2.2,12.5,"tb_key_grove",{},"",
+  {fxAdd:{summon:{"summon.pct":40}}, combat:"Each minion hits about as hard as you used to."}),
+n("tb_g13","The Grove Answers","mod",2,-3.3,13.8,"tb_g11 tb_g12",{},"",
+  {fxMod:{root:{summon:{count:2, pct:56, dur:1e9, cap:12}}},
+   combat:"Root now summons two more as it lands — you grow the grove just by holding something still."}),
+n("tb_g14","Old Wood","stat",1,-4.7,15,"tb_g13",{"hp":320,"flat.stone":24}),
+n("tb_g15","Everything At Once","mod",2,-2.3,15,"tb_g13",{},"",
+  {fxAdd:{summon:{"summon.pct":45,"summon.count":2}}, combat:"Seven per cast, each hitting far harder again."}),
+n("tb_g16","The Whole Grove","stat",1,-3.4,16.2,"tb_g14 tb_g15",{"dmg.all":26,"hp":260}),
 
-/* --- DRIFT (middle) --- */
-n("sh_d1","Light Feet","stat",1,0,4,"sh_gate",{"dodge":5}),
-n("sh_d2","Sidestep","stat",1,-0.9,5,"sh_d1",{"dodge":6}),
-n("sh_d3","Tailwind","stat",1,0.9,5,"sh_d1",{"speed":10,"dmg.gale":8}),
-n("sh_d4","Gone Before","mod",2,-1.1,6.2,"sh_d2",{"dodge":8,"dmg.s:vanish":0,"cost.s:vanish":-25}),
-n("sh_d5","Momentum","mod",2,0.9,6.2,"sh_d3",{"dmg.gale":14,"cast":10}),
-n("sh_d6","Cut on the Turn","mod",2,0,7.4,"sh_d4 sh_d5",{"mult.gale":8}),
-n("sh_d7","Never Standing","stat",1,-1.3,8.5,"sh_d4 sh_d6",{"dodge":9,"speed":8}),
-n("sh_d8","Pressure","stat",1,1.3,8.5,"sh_d5 sh_d6",{"flat.gale":12,"dmg.aoe":14}),
-n("sh_key_drift","DRIFT","key",4,0,9.9,"sh_d7 sh_d8",{"dodge":26,"hpPct":-40,"speed":18},
-  "+26% dodge and +18% attack speed. Your maximum health drops by 40%.",{excl:"sh_top"}),
-n("sh_d9","Untouched","stat",1,-1.4,11.2,"sh_key_drift",{"dodge":10,"res.gale":10}),
-n("sh_d10","Airborne","mod",2,1.4,11.2,"sh_key_drift",{"mult.gale":13,"flat.gale":14}),
-n("sh_d11","Weightless","mod",2,0,12.4,"sh_d9 sh_d10",{"speed":16,"cast":14,"hpPct":-8}),
-n("sh_d12","Windshear, Wider","ability",3,-1.1,13.6,"sh_d11",{},"The arc stops being an arc.",
-  {replaceSpell:["shear",{name:"Cyclone",cost:32,time:0.80,mult:2.80,flatScale:1.00,aoe:true,
-   text:"Replaces Windshear. Faster, wider, and worth substantially more against a group."}]}),
-n("sh_d13","Featherweight","stat",1,1.2,13.6,"sh_d11",{"dodge":12,"speed":10}),
-n("sh_d14","Not There","mod",2,-1.5,15,"sh_d12",{"dodge":14,"mult.all":8}),
-n("sh_d15","Open Air","stat",1,1,15,"sh_d13",{"dmg.gale":24,"flat.gale":18}),
-n("sh_d16","Nothing to Hit","stat",1,-0.1,16.2,"sh_d14 sh_d15",{"dodge":16,"mult.gale":12}),
+/* ---- BLIGHT: debuff auras ---- */
+n("tb_b1","Witherfield","mod",2,0,4,"tb_tend",{},
+  "A totem is a piece of ground you have made worse.",
+  {fxAdd:{totem:{"zone.dur":6,"weaken.dur":6}}, combat:"The totem grinds for sixteen seconds and its blunting aura lasts as long."}),
+n("tb_b2","Rot","mod",2,-0.9,5,"tb_b1",{},"",
+  {fxMod:{totem:{dot:{name:"Rot",elem:"gale",pct:24,dur:9,stacks:4}}},
+   combat:"Planting a totem also rots everything near it — a stack that builds to four."}),
+n("tb_b3","Hoarfrost Idol","mod",2,0.9,5,"tb_b1",{},"",
+  {fxMod:{totem:{freeze:{dur:2}}}, combat:"The totem flash-freezes whatever is standing next to it when it goes in."}),
+n("tb_b4","Grasping Roots","mod",2,-1.1,6.2,"tb_b2",{},"",
+  {fxMod:{root:{aoe:true}}, combat:"Root catches the whole field instead of one target."}),
+n("tb_b5","Sour Ground","mod",2,0.9,6.2,"tb_b3",{},"",
+  {fxAdd:{totem:{"weaken.pct":18,"zone.pct":22}}, combat:"The aura blunts by 33% and the ground grinds much harder."}),
+n("tb_b6","Blight Totem","ability",3,0,7.4,"tb_b4 tb_b5",{},
+  "Plant it and let the fight rot around it.",
+  {replaceSpell:["totem",{name:"Blight Totem",cost:40,time:1.05,mult:0.00,flatScale:0,
+    fx:{zone:{name:"Blight",elem:"gale",pct:78,dur:20}, weaken:{pct:34,dur:20},
+        dot:{name:"Rot",elem:"gale",pct:34,dur:12,stacks:6}, root:{pct:20,dur:6}},
+    text:"Replaces Totem. A twenty-second field that grinds, rots, blunts and holds."}],
+   combat:"Totem becomes Blight Totem: twenty seconds of ground that grinds, stacks Rot six deep, cuts enemy damage by a third and roots what stands in it."}),
+n("tb_b7","Creeping","stat",1,-1.3,8.5,"tb_b4 tb_b6",{"dmg.gale":18,"flat.gale":12}),
+n("tb_b8","Spreading Rot","mod",2,1.3,8.5,"tb_b5 tb_b6",{},"",
+  {fxMod:{totem:{spread:true}}, combat:"Rot spreads from whatever is nearest the totem to everything else."}),
+n("tb_key_thorn","THORNMANTLE","key",4,0,9.9,"tb_b7 tb_b8",{"noHeal":1},
+  "Every field you plant is twice the field it was. Nothing can heal you — not regeneration, not Drain, not a potion, not a node further down this tree.",
+  {excl:"tb_top",
+   fxAdd:{totem:{"zone.pct":80,"weaken.pct":20,"dot.pct":34,"zone.dur":8}},
+   combat:"Totem's ground, rot and blunting aura all roughly double. Every source of healing you have stops working."}),
+n("tb_b9","Killing Field","mod",2,-1.4,11.2,"tb_key_thorn",{},"",
+  {fxAdd:{totem:{"zone.pct":60,"zone.dur":6}}, combat:"The field grinds much harder for six seconds longer."}),
+n("tb_b10","Nothing Grows Here","mod",2,1.4,11.2,"tb_key_thorn",{},"",
+  {fxAdd:{totem:{"root.pct":25,"root.dur":6},root:{"root.pct":20}},
+   combat:"Everything you plant holds far harder and far longer."}),
+n("tb_b11","Second Idol","mod",2,0,12.4,"tb_b9 tb_b10",{},"",
+  {fxMod:{root:{zone:{name:"Blight",elem:"gale",pct:54,dur:12}}},
+   combat:"Root plants a second blighted patch wherever it lands."}),
+n("tb_b12","The Whole Field","ability",3,-1.1,13.6,"tb_b11",{},
+  "Stop planting one.",
+  {replaceSpell:["totem",{name:"The Whole Field",cost:52,time:1.15,mult:0.00,flatScale:0,
+    fx:{zone:{name:"Blight",elem:"gale",pct:190,dur:26}, weaken:{pct:46,dur:26},
+        dot:{name:"Rot",elem:"gale",pct:62,dur:16,stacks:9}, root:{pct:40,dur:10}, spread:true, freeze:{dur:2}},
+    text:"Replaces Totem. Twenty-six seconds of ground nothing should be standing on."}],
+   combat:"Totem becomes The Whole Field: twenty-six seconds of grinding, nine stacks of spreading Rot, a 46% damage cut and a ten-second root."}),
+n("tb_b13","Deep Blight","stat",1,1.2,13.6,"tb_b11",{"dmg.gale":24,"flat.gale":22}),
+n("tb_b14","No Safe Step","mod",2,-1.5,15,"tb_b12",{},"",
+  {fxAdd:{totem:{"zone.dur":10,"dot.stacks":4}}, combat:"The field lasts ten seconds longer and Rot stacks four deeper."}),
+n("tb_b15","Attrition","stat",1,1,15,"tb_b13",{"res.all":14,"hp":240}),
+n("tb_b16","It Gets Worse","mod",2,-0.1,16.2,"tb_b14 tb_b15",{},"",
+  {fxAdd:{totem:{"zone.pct":90,"weaken.pct":14}}, combat:"The ground grinds harder again and the aura blunts by another 14%."}),
 
-/* --- PYRE (right) --- */
-n("sh_p1","Oiled Blades","stat",1,1.6,4,"sh_gate",{"dmg.ember":7}),
-n("sh_p2","Slow Burn","stat",1,2.2,5,"sh_p1",{"flat.ember":6}),
-n("sh_p3","Marked","stat",1,4.2,5,"sh_p1",{"dmg.s:mark":18}),
-n("sh_p4","Emberwake","ability",3,1.8,6.2,"sh_p2",{},"The blades leave something behind them.",
-  {addSpell:{id:"emberwake",name:"Emberwake",cost:26,time:0.75,mult:2.20,flatScale:0.90,aoe:true,kind:"spell",
-   text:"Area Ember damage on a short cast. Pyre's answer to a crowd."}}),
-n("sh_p5","Ash Conversion","mod",2,3.4,6.2,"sh_p2 sh_p3",{"conv.gale.ember":30}),
-n("sh_p6","Closing Argument","stat",1,4.7,6.2,"sh_p3",{"execute":22}),
-n("sh_p7","Feed It","mod",2,2.4,7.6,"sh_p4 sh_p5",{"mult.ember":8,"dmg.ember":12}),
-n("sh_p8","No Mercy","stat",1,4.3,7.6,"sh_p5 sh_p6",{"execute":26,"critMult":20}),
-n("sh_p9","Kindling","mod",2,3.2,8.8,"sh_p7 sh_p8",{"flat.ember":16,"dmg.ember":14}),
-n("sh_key_pyre","PYRE","key",4,3.2,10.1,"sh_p9",{"mult.ember":26,"execute":40,"res.frost":-25,"dmg.gale":-30},
-  "Ember ×1.26 and execute damage +40. Frost defence falls 25 and Gale bonuses fall 30.",{excl:"sh_top"}),
-n("sh_p10","Burn It Down","stat",1,2.35,11.5,"sh_key_pyre",{"dmg.ember":22,"flat.ember":14}),
-n("sh_p11","Already Dying","mod",2,4.4,11.4,"sh_key_pyre",{"execute":45,"crit":6}),
-n("sh_p12","Cauterised","stat",1,3.1,12.6,"sh_p10 sh_p11",{"lifesteal":8,"spellLeech":5,"hp":80}),
-n("sh_p13","Sever the Thread","ability",3,1.9,13.9,"sh_p12",{},"Killing Mark becomes a conclusion rather than an opening.",
-  {replaceSpell:["mark",{name:"Sever the Thread",cost:56,time:1.25,mult:5.05,flatScale:1.55,execute:true,
-   text:"Replaces Killing Mark. Enormous, and enormous again below a third health."}]}),
-n("sh_p14","Ash and Ash","stat",1,4.4,13.9,"sh_p12",{"flat.ember":26,"mult.ember":8}),
-n("sh_p15","Nothing Left To Burn","mod",2,3.2,15.2,"sh_p13 sh_p14",{"mult.ember":15,"execute":35}),
-n("sh_p16","The Last Ember","stat",1,3.2,16.4,"sh_p15",{"dmg.ember":26,"critMult":45}),
+/* ---- SAP: sustain ---- */
+n("tb_s1","Leeching Vines","mod",2,1.6,4,"tb_tend",{},
+  "What you take has to come off something.",
+  {fxAdd:{drain:{"drain.heal":5}}, combat:"Drain returns 9% of your health per cast instead of 4%."}),
+n("tb_s2","Sap","mod",2,2.2,5,"tb_s1",{},"",
+  {fxMod:{drain:{dot:{name:"Sap",elem:"gale",pct:26,dur:7,stacks:3}}},
+   combat:"Drain leaves the target sapped — a stack that builds to three and keeps draining."}),
+n("tb_s3","Thick Sap","stat",1,4.2,5,"tb_s1",{"hpRegen":10,"hp":120}),
+n("tb_s4","Wide Draw","mod",2,1.8,6.2,"tb_s2",{},"",
+  {fxMod:{drain:{pierce:2}}, combat:"Drain pulls from three targets at once, healing you from each."}),
+n("tb_s5","Bitter Root","mod",2,3.4,6.2,"tb_s2 tb_s3",{},"",
+  {fxMod:{drain:{weaken:{pct:18,dur:6}}}, combat:"Whatever you drain swings 18% softer for six seconds."}),
+n("tb_s6","Standing Water","stat",1,4.7,6.2,"tb_s3",{"hpRegen":14,"manaRegen":2.5}),
+n("tb_s7","Bloodroot","ability",3,2.4,7.6,"tb_s4 tb_s5",{},
+  "Take more, and keep it.",
+  {replaceSpell:["drain",{name:"Bloodroot",cost:28,time:0.95,mult:2.30,flatScale:1.00,
+    fx:{pierce:3, drain:{heal:11}, dot:{name:"Sap",elem:"gale",pct:40,dur:10,stacks:5},
+        weaken:{pct:22,dur:8}},
+    text:"Replaces Drain. Hits four targets, heals 11% per cast, and saps five deep."}],
+   combat:"Drain becomes Bloodroot: four targets at once, 11% of your health back per cast, and a five-deep sap on everything it touches."}),
+n("tb_s8","Deep Well","stat",1,4.3,7.6,"tb_s5 tb_s6",{"hp":180,"hpRegen":16}),
+n("tb_s9","Everything Feeds You","mod",2,3.2,8.8,"tb_s7 tb_s8",{"lifesteal":12,"spellLeech":9},"",
+  {fxMod:{drain:{spread:true}}, combat:"Sap spreads from the target to everything near it."}),
+n("tb_key_symb","SYMBIOSIS","key",4,3.2,10.1,"tb_s9",{"hp":180},
+  "Every minion on the field bleeds health back into you every second. Every minion you summon is paid for out of your own health.",
+  {excl:"tb_top", rule:"symbiosis",
+   combat:"Each minion standing heals you for 2% of your maximum health per second — and each one you summon costs you 11% up front."}),
+n("tb_s10","Shared Root","mod",2,2.35,11.5,"tb_key_symb",{},"",
+  {fxAdd:{summon:{"summon.count":1}}, combat:"Two minions per cast, so the healing builds twice as fast."}),
+n("tb_s11","Thicker Blood","stat",1,4.4,11.4,"tb_key_symb",{"hp":300,"hpRegen":22}),
+n("tb_s12","Grafted","mod",2,3.1,12.6,"tb_s10 tb_s11",{},"",
+  {fxAdd:{drain:{"drain.heal":9}}, fxMod:{drain:{summon:{count:1, pct:44, dur:20, cap:8}}},
+   combat:"Drain heals far more, and summons a minion every time you cast it."}),
+n("tb_s13","One Organism","ability",3,1.9,13.9,"tb_s12",{},
+  "You stop being a separate thing from them.",
+  {replaceSpell:["root",{name:"One Organism",cost:26,time:0.70,mult:1.60,flatScale:0.70,
+    fx:{aoe:true, root:{pct:40,dur:7}, drain:{heal:8},
+        summon:{count:2, pct:50, dur:22, cap:10, explode:70}},
+    text:"Replaces Root. Holds the whole field, heals you, and grows two more of you."}],
+   combat:"Root becomes One Organism: it holds everything, heals you 8%, and puts two more minions on the field every cast."}),
+n("tb_s14","Overflowing","stat",1,4.4,13.9,"tb_s12",{"hpRegen":28,"hp":280}),
+n("tb_s15","Nothing Is Lost","mod",2,3.2,15.2,"tb_s13 tb_s14",{},"",
+  {fxAdd:{summon:{"summon.explode":90,"summon.pct":30}},
+   combat:"Minions hit harder and detonate for 90% when they finally go."}),
+n("tb_s16","All One Thing","stat",1,3.2,16.4,"tb_s15",{"hp":340,"dmg.all":18}),
 
-n("sh_x1","Cold Iron","mod",2,-1.6,10.6,"sh_e10 sh_d7",{"crit":8,"dodge":8}),
-n("sh_x2","Burning Air","mod",2,1.7,10.4,"sh_d8 sh_p9",{"conv.gale.ember":20,"dmg.aoe":14}),
-n("sh_key_dusk","TWO MINUTES TO DUSK","key",4,0,17.6,"sh_e16 sh_d16 sh_p16",{"mult.all":34,"hpPct":-30,"res.all":-20},
-  "All damage ×1.34. Maximum health falls 30% and every defence falls 20. Requires the bottom of any branch."),
-n("sh_t1","Reverse Grip","stat",1,-2.4,1.6,"sh_wrist",{"speed":7}),
-n("sh_t2","Peripheral","stat",1,2.4,1.6,"sh_eye",{"dodge":5,"hp":25}),
-n("sh_t3","Short Steps","mod",2,-1.7,2.7,"sh_t1 sh_whet",{"crit":6}),
-n("sh_t4","Loose Shoulders","mod",2,1.7,2.7,"sh_t2 sh_whet",{"dodge":7,"speed":6}),
-n("sh_e17","Mirror Polish","stat",1,-5.4,10.8,"sh_e8",{"critMult":30}),
-n("sh_d17","Crosswind","stat",1,1.6,9.3,"sh_d8",{"dmg.gale":12,"dodge":5}),
-n("sh_p17","Long Fuse","stat",1,5.5,9.0,"sh_p8",{"execute":24,"flat.ember":8})
+/* ---- cross-links ---- */
+n("tb_x1","Rotting Grove","mod",2,-1.6,10.6,"tb_g10 tb_b7",{},"",
+  {fxMod:{summon:{dot:{name:"Rot",elem:"gale",pct:22,dur:8,stacks:4}}},
+   combat:"Summoning rots whatever is nearby, stacking four deep."}),
+n("tb_x2","Fed By The Field","mod",2,1.7,10.4,"tb_b8 tb_s9",{},"",
+  {fxMod:{totem:{drain:{heal:7}}}, combat:"Planting a totem returns 7% of your health."})
 ]);
 
 /* ================================================================
@@ -1973,7 +2478,7 @@ function permaLocked(state, node){
 function newState(cls){
   const s = {cls, level:1, alloc:{}, tree:[], equipped:{}, inv:[], cleared:{}, salvaged:{}, seen:{}, best:{}};
   for(const e of ELEMS) s.alloc[e]=0;
-  const start = {warden:"w_wd1", arcwright:"w_ac1", tidecaller:"w_tc1", shrike:"w_sh1"}[cls];
+  const start = {warden:"w_wd1", skyward:"w_ac1", ember:"w_tc1", thornbound:"w_sh1"}[cls];
   for(const id of [start,"h_hodmask","c_padded","l_roughspun","b_hobnail","r_tin","a_cord"]){
     const inst = rollItem(id); s.inv.push(inst);
   }
@@ -2149,6 +2654,43 @@ function pipHtml(elem, n, kind){
   const c = "e-"+elem;
   return '<span class="pip '+c+' '+(kind||"")+'"><span class="g">'+EL[elem].letter+'</span>'+n+'</span>';
 }
+
+
+/* ---------------- what a spell does, in words ---------------- */
+function fxSummary(sp){
+  const fx = sp.fx || {}, out = [];
+  if(fx.hits > 1) out.push({k:"hits ×"+fx.hits, c:"var(--gold)"});
+  if(fx.aoe || fx.pull) out.push({k:fx.pull?"pulls everything in":"hits everything", c:"var(--gold)"});
+  else if(fx.pierce) out.push({k:"pierces "+fx.pierce, c:"var(--gold)"});
+  if(fx.chain) out.push({k:"chains "+fx.chain, c:"var(--gold)"});
+  if(fx.addValue != null && fx.addValue > 0.4) out.push({k:"full damage to extra targets", c:"var(--gold)"});
+  if(fx.dot) out.push({k:fx.dot.name+" ×"+(fx.dot.stacks||1)+" · "+fx.dot.dur+"s", c:EL[fx.dot.elem]?EL[fx.dot.elem].col:"var(--tx2)"});
+  if(fx.spread) out.push({k:"spreads", c:"var(--tx2)"});
+  if(fx.zone) out.push({k:fx.zone.name+" · "+fx.zone.dur+"s", c:EL[fx.zone.elem]?EL[fx.zone.elem].col:"var(--tx2)"});
+  if(fx.summon) out.push({k:(fx.summon.count||1)+" minion"+((fx.summon.count||1)>1?"s":"")+" · "+(fx.summon.perm?"permanent":(fx.summon.dur+"s")), c:"#6fd3a6"});
+  if(fx.summon && fx.summon.explode) out.push({k:"they detonate", c:"#ff7a5c"});
+  if(fx.freeze) out.push({k:"freezes "+fx.freeze.dur+"s", c:EL.frost.col});
+  if(fx.shatter) out.push({k:"shatters +"+fx.shatter.pct+"%", c:EL.frost.col});
+  if(fx.detonate) out.push({k:"detonates stacks", c:EL.cinder.col});
+  if(fx.mark) out.push({k:"marks +"+fx.mark.pct+"% · "+fx.mark.dur+"s", c:"#ffd24a"});
+  if(fx.weaken) out.push({k:"weakens "+fx.weaken.pct+"%", c:"#9aa4b4"});
+  if(fx.root) out.push({k:"roots "+fx.root.dur+"s", c:"#9aa4b4"});
+  if(fx.guard) out.push({k:"blocks "+fx.guard.block+"%"+(fx.guard.counter?" · counters "+fx.guard.counter+"%":""), c:"#57b2ff"});
+  if(fx.guard && fx.guard.counterAll) out.push({k:"counters everything", c:"#57b2ff"});
+  if(fx.drain && fx.drain.mana) out.push({k:"+"+fx.drain.mana+" mana", c:EL.volt.col});
+  if(fx.drain && fx.drain.heal) out.push({k:"heals "+fx.drain.heal+"%", c:"#54d391"});
+  if(fx.execute) out.push({k:"finishes +"+fx.execute.pct+"%", c:"#ff7a5c"});
+  return out;
+}
+function fxChips(sp){
+  const f = fxSummary(sp);
+  if(!f.length) return '';
+  return '<div class="line2" style="margin-top:4px">'+f.map(x=>'<span class="tag" style="border-color:'+x.c+'55;color:'+x.c+'">'+esc(x.k)+'</span>').join("")+'</div>';
+}
+const KIND_LABEL = {direct:"Direct hits", bleed:"Damage over time", zone:"Ground effects", minion:"Minions",
+                    blast:"Detonations", counter:"Counters", shatter:"Shatters"};
+const KIND_COLOUR = {direct:"#e8bd63", bleed:"#ff7a5c", zone:"#c88bff", minion:"#6fd3a6",
+                     blast:"#ff5f56", counter:"#57b2ff", shatter:"#4fb9ff"};
 
 /* ---------------- recompute + render ---------------- */
 let statFlash = {};
@@ -2377,13 +2919,14 @@ function renderGear(){
     const totalD = Object.values(run.dealtBy).reduce((a,b)=>a+b,0)||1;
     const order = table.slice().sort((a,b)=>(run.dealtBy[b.sp.id]||0)-(run.dealtBy[a.sp.id]||0));
     for(const a of order){
-      const share = (run.dealtBy[a.sp.id]||0)/totalD;
+      const share = (run.dealtBy[a.sp.name]||0)/totalD;
       const per = a.res.effective;
-      h += '<button class="spellrow" data-spell="'+a.sp.id+'"><div><div class="sn2">'+esc(a.sp.name)+
-        (a.sp.replacedBy?' <span class="tag mo">changed</span>':'')+(a.sp.fromNode?' <span class="tag ab">added</span>':'')+'</div>'+
+      h += '<button class="spellrow" data-spell="'+a.sp.id+'" style="grid-template-columns:1fr auto">'+
+        '<div><div class="sn2">'+(a.sp.slot?'<span class="slotno num">'+a.sp.slot+'</span>':'')+esc(a.sp.name)+
+        (a.sp.replacedBy?' <span class="tag mo">rewritten</span>':'')+'</div>'+
         '<div class="sd num">'+(a.cost>0? Math.round(a.cost)+" mana · ":"free · ")+a.time.toFixed(2)+'s'+
-        (share>0.005? ' · '+Math.round(share*100)+'% of your damage':' · unused by the rotation')+'</div></div>'+
-        '<div class="sv num">'+fmt(per)+'<small>per cast</small></div></button>';
+        (share>0.005? ' · '+Math.round(share*100)+'% of your damage':'')+'</div>'+ fxChips(a.sp) +'</div>'+
+        '<div class="sv num">'+(per>0?fmt(per):"—")+'<small>per cast</small></div></button>';
     }
     const starve = run.starvedTime/Math.max(0.1,run.totalTime);
     h += '<div class="note">Mana: <b>'+fmt(CTX.maxMana)+'</b> pool, <b>'+CTX.manaRegen.toFixed(1)+'/s</b> regen. '+
@@ -2797,6 +3340,9 @@ function openPipeline(spellId){
   if(!a) return;
   const r = a.res;
   let body = '<div class="note">'+esc(a.sp.text||"")+'</div>';
+  const fxs = fxSummary(a.sp);
+  if(fxs.length) body += '<div class="combatbox"><div class="mt">What it does besides damage</div><div class="cb">'+
+    fxs.map(x=>esc(x.k)).join(" · ")+'</div></div>';
   body += '<div class="diffhead">'+
     '<div class="dh"><div class="k">Per cast</div><div class="v num">'+fmt(r.effective)+'</div><div class="s num">average</div></div>'+
     '<div class="dh"><div class="k">Cost</div><div class="v num">'+Math.round(a.cost)+'</div><div class="s num">'+a.time.toFixed(2)+'s</div></div>'+
@@ -2884,13 +3430,24 @@ function nodeElement(nd){
   s.setAttribute("transform","translate("+(nd.x*U)+","+(nd.y*U)+")");
   return {g:s, shape, lab, inner:s.querySelector(".tn-inner")};
 }
-/* a node's colour is its dominant element — the same coding as everywhere else */
+/* a node's colour is its dominant element — the same coding as everywhere
+   else. Modifier nodes carry their meaning in fx, not in stats, so the
+   element of a bleed, a zone or a conversion counts too. */
 function nodeElem(nd){
   const tally = {};
   for(const k in nd.stats){
     const m = statMeta(k);
     if(m.el) tally[m.el] = (tally[m.el]||0) + Math.abs(nd.stats[k]);
   }
+  const scanFx = fx=>{
+    for(const key in fx){
+      const v = fx[key];
+      if(v && typeof v === "object" && v.elem && EL[v.elem]) tally[v.elem] = (tally[v.elem]||0) + 20;
+    }
+  };
+  for(const sid in (nd.fxMod||{})) scanFx(nd.fxMod[sid]);
+  if(nd.replaceSpell && nd.replaceSpell[1].fx) scanFx(nd.replaceSpell[1].fx);
+  if(nd.addSpell && nd.addSpell.fx) scanFx(nd.addSpell.fx);
   let best=null, bv=0;
   for(const e in tally) if(tally[e]>bv){bv=tally[e]; best=e;}
   return best;
@@ -2928,11 +3485,12 @@ function updateTree(){
     const reach = !on && reachable(S, nd) && !exclBlocked(S, nd);
     const dead = !on && permaLocked(S, nd);
     const e = nodeElem(nd);
-    const col = e ? EL[e].col : (nd.type==="key" ? "#e8bd63" : "#8894a8");
+    const col = e ? EL[e].col : (nd.type==="key" ? "#e8bd63" : (nd.type==="stat" ? "#8894a8" : "#d6bd7e"));
     o.shape.setAttribute("class","tn"+(on?"":(dead?" locked":(reach?" reachable":" unreach"))));
     o.shape.setAttribute("stroke", col);
     o.shape.setAttribute("fill", on ? col : (reach ? "#141a24" : "#0c1016"));
-    o.shape.setAttribute("fill-opacity", on ? 0.9 : 1);
+    o.shape.setAttribute("fill-opacity", on ? 1 : 1);
+    o.shape.setAttribute("stroke", on ? "#f2f6ff" : col);
     if(o.inner){ o.inner.setAttribute("stroke", on ? "#07090d" : col); }
     o.lab.setAttribute("class","tnlabel"+(on?" on":""));
     const showLabel = VIEW.k > 0.78 || nd.type==="key" || nd.type==="ability" || on;
@@ -3072,6 +3630,8 @@ function openNode(nd){
   }
   body += '<div class="note">'+TYPE_TAG[nd.type]+' <b>'+nd.cost+'</b> point'+(nd.cost>1?"s":"")+
           ' · '+treeLeft(S)+' unspent'+(nd.text? '<br><br>'+esc(nd.text) : '')+'</div>';
+  if(nd.combat) body += '<div class="combatbox"><div class="mt">In combat</div><div class="cb">'+esc(nd.combat)+'</div></div>';
+  else if(nd.type==="stat") body += '<div class="note" style="color:var(--tx3)">A stat node. Nothing about this one is visible in a fight — it is the glue between the nodes that are.</div>';
 
   const keys = Object.keys(nd.stats||{});
   if(keys.length){
@@ -3293,15 +3853,43 @@ function verdictHtml(L){
     for(const [k,v] of taken) h += '<span class="e-'+k+'">'+EL[k].name+' <b>'+Math.round(v/tt*100)+'%</b> · '+fmt(v)+'</span>';
     h += '</div>';
   }
+  /* damage by mechanism — the node you took should show up as its own bar */
+  const kinds = Object.entries(r.byKind||{}).filter(([k,v])=>v>0).sort((a,b)=>b[1]-a[1]);
+  const kt = kinds.reduce((a,b)=>a+b[1],0);
+  if(kt>0 && kinds.length>1){
+    h += '<div class="sect-h">How that damage was produced</div><div class="mixbar">';
+    for(const [k,v] of kinds) h += '<i style="flex:'+v+';background:'+(KIND_COLOUR[k]||"#8894a8")+'"></i>';
+    h += '</div><div class="mixleg">';
+    for(const [k,v] of kinds) h += '<span style="color:'+(KIND_COLOUR[k]||"#8894a8")+'">'+esc(KIND_LABEL[k]||k)+
+      ' <b>'+Math.round(v/kt*100)+'%</b> · '+fmt(v)+'</span>';
+    h += '</div>';
+  }
+  /* the fight itself, in order */
+  if(r.log && r.log.length){
+    h += '<div class="sect-h">What happened</div><div class="stab">';
+    for(const e of r.log.slice(0,16))
+      h += '<div class="srow" style="min-height:32px;padding:5px 12px"><span class="k num" style="flex:0 0 42px;color:var(--tx3);font-size:11px">'+
+        e.t.toFixed(1)+'s</span><span class="k" style="font-size:12px">'+esc(e.text)+'</span></div>';
+    h += '</div>';
+  }
+  if(r.maxStacks>1 || r.minionPeak>0 || r.freezes>0 || r.counters>0){
+    const bits = [];
+    if(r.maxStacks>1) bits.push(r.maxStacks+" stacks at the peak");
+    if(r.minionPeak>0) bits.push(r.minionPeak+" minions at once");
+    if(r.freezes>0) bits.push(r.freezes+" freezes, "+r.shatters+" shattered");
+    if(r.counters>0) bits.push(r.counters+" counters");
+    if(r.blasts>0) bits.push(r.blasts+" detonations");
+    h += '<div class="note">'+esc(bits.join(" · "))+'</div>';
+  }
   /* damage dealt mix */
   const dealt = Object.entries(r.dealtBy).filter(([k,v])=>v>0).sort((a,b)=>b[1]-a[1]);
   const dt = dealt.reduce((a,b)=>a+b[1],0);
   if(dt>0){
-    h += '<div class="sect-h">Where your damage came from</div><div class="mixbar">';
+    h += '<div class="sect-h">Which spell did it</div><div class="mixbar">';
     const cols = ["#e8bd63","#57b2ff","#c88bff","#54d391","#ff7a5c","#9aa4b4"];
     dealt.forEach(([k,v],i)=>{ h += '<i style="flex:'+v+';background:'+cols[i%cols.length]+'"></i>'; });
     h += '</div><div class="mixleg">';
-    dealt.forEach(([k,v],i)=>{ h += '<span style="color:'+cols[i%cols.length]+'">'+esc(spellName(k))+' <b>'+Math.round(v/dt*100)+'%</b></span>'; });
+    dealt.forEach(([k,v],i)=>{ h += '<span style="color:'+cols[i%cols.length]+'">'+esc(k)+' <b>'+Math.round(v/dt*100)+'%</b></span>'; });
     h += '</div>';
   }
   h += '<div style="display:flex;gap:1px"><button class="btn sm gho" id="btnRerun">Run it again</button></div>';
@@ -3369,9 +3957,10 @@ function chooseClass(){
     const cl = CLASSES[c], t = TREES[c];
     body += '<button class="slot" data-cls="'+c+'" style="width:100%;text-align:left;grid-template-columns:1fr auto">'+
       '<span class="body" style="padding:10px 12px"><div class="iname" style="font-size:16px;color:var(--gold)">'+cl.name+'</div>'+
-      '<div class="ts" style="font-size:11px;color:var(--tx3);margin-top:2px">'+cl.tagline+' · '+t.subtitle+'</div>'+
+      '<div class="ts" style="font-size:11px;color:var(--tx3);margin-top:2px">'+cl.tagline+'</div>'+
       '<div style="font-size:12px;color:var(--tx2);margin-top:6px;line-height:1.45">'+esc(cl.blurb)+'</div>'+
-      '<div class="line2" style="margin-top:7px">'+cl.spells.map(s=>'<span class="tag">'+esc(s.name)+'</span>').join("")+'</div></span>'+
+      '<div class="line2" style="margin-top:7px">'+cl.spells.map(s=>'<span class="tag"><span class="slotno num">'+s.slot+'</span>'+esc(s.name)+'</span>').join("")+'</div>'+
+      '<div class="ts" style="font-size:10.5px;color:var(--gold);margin-top:6px;letter-spacing:.04em">'+esc(cl.themes)+'</div></span>'+
       '<span class="chev">›</span></button>';
   }
   openSheet({head:'<div class="sh-title">SOLVER</div><div class="sh-sub">a game about assembling a build, not about pressing buttons</div>',
