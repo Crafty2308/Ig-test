@@ -129,28 +129,6 @@ h2{margin:0 0 14px; font-size:clamp(20px,4.5vw,30px); letter-spacing:.08em; colo
 .opinfo .row{font-size:13px; color:#a8c6e8; line-height:1.65;}
 .opinfo .row b{color:#eaf6ff;}
 .opinfo .pass{color:#9dff5c;}
-/* skill tree */
-.tree{position:relative; padding:4px 0 2px;}
-.treelines{position:absolute; inset:0; width:100%; height:100%; pointer-events:none;}
-.tier{display:flex; justify-content:center; gap:10px; margin-bottom:16px; flex-wrap:wrap;}
-.node{
-  position:relative; z-index:1; width:150px; padding:9px 8px 8px; cursor:pointer; text-align:center;
-  border-radius:10px; background:rgba(10,18,34,.96); border:1px solid rgba(120,150,190,.22);
-  transition:transform .1s, border-color .1s, box-shadow .1s;
-}
-.node .nico{font-size:20px; line-height:1.2;}
-.node .nnm{font-size:12.5px; font-weight:700; color:#cfe6ff; margin:2px 0 3px;}
-.node .nds{font-size:11px; color:#8fb2d8; line-height:1.45;}
-.node .rank{margin-top:5px; font-size:10px; letter-spacing:.1em; color:#5f7ba3;}
-.node.avail{border-color:rgba(64,224,255,.7); box-shadow:0 0 14px rgba(64,224,255,.16);}
-.node.avail:hover{transform:translateY(-3px); box-shadow:0 0 20px rgba(64,224,255,.34);}
-.node.taken{border-color:#9dff5c; background:rgba(20,42,26,.92);}
-.node.taken .nnm{color:#d4ffb8;}
-.node.taken .rank{color:#9dff5c;}
-.node.locked{opacity:.4; cursor:not-allowed;}
-.node.maxed{border-color:#ffc46b;}
-.node.maxed .rank{color:#ffc46b;}
-@media (max-width:620px){ .node{width:118px; padding:7px 5px;} .node .nds{font-size:10px;} .node .nnm{font-size:11px;} }
 @media (max-width:520px){ .panel{padding:18px 14px;} .keys{font-size:12.5px;} }
 </style>
 </head>
@@ -164,6 +142,7 @@ h2{margin:0 0 14px; font-size:clamp(20px,4.5vw,30px); letter-spacing:.08em; colo
     <p class="sub">Top-Down Arena Shooter</p>
     <div id="bestBox" class="sub" style="letter-spacing:.1em; text-transform:none; color:#ffc46b;"></div>
     <button class="btn" id="playBtn">Start Run</button>
+    <button class="btn ghost" id="treeBtn">Ability Tree</button>
     <div class="cores" id="menuCores" style="display:none"></div>
     <div class="keys" id="helpKeys">
       <div><b>Move</b> W A S D / Arrows</div>
@@ -188,12 +167,11 @@ h2{margin:0 0 14px; font-size:clamp(20px,4.5vw,30px); letter-spacing:.08em; colo
 </div>
 
 <div class="overlay" id="skilltree">
-  <div class="panel wide">
-    <h2 id="stName">SKILL TREE</h2>
-    <p class="sub"><b id="stSp" class="tag">0</b> SKILL POINTS</p>
-    <div class="tree" id="stTree"></div>
-    <button class="btn" id="stClose">Back to the Fight</button>
-    <div class="hint">Skill points come from levelling — one per level, on top of the upgrade cards.</div>
+  <div class="panel wide" style="padding:0; overflow:hidden; display:flex; flex-direction:column; height:min(88vh,860px);">
+    <div id="stMount" style="flex:1 1 auto; min-height:0;"></div>
+    <div style="flex:0 0 auto; padding:10px; background:rgba(10,16,30,.96); border-top:1px solid rgba(64,224,255,.2)">
+      <button class="btn" id="stClose">Back to the Fight</button>
+    </div>
   </div>
 </div>
 
@@ -231,6 +209,9 @@ h2{margin:0 0 14px; font-size:clamp(20px,4.5vw,30px); letter-spacing:.08em; colo
   </div>
 </div>
 
+<script src="abilitytree/tree.data.js"></script>
+<script src="abilitytree/tree.logic.js"></script>
+<script src="abilitytree/tree.ui.js"></script>
 <script>
 "use strict";
 /* ============================================================
@@ -497,6 +478,7 @@ function makePlayer(charId) {
   const prev = player;
   player = p;            // character passives are written as upgrades, so they need `player` live
   c.apply(p);
+  applyTreeToPlayer(p);  // then the ability tree, on top of the character base
   player = prev;
   return p;
 }
@@ -619,9 +601,10 @@ function gainXp(v) {
     player.xp -= player.xpNext;
     player.level++;
     player.pending++;             // a burst of xp can stack several picks
-    player.sp++;                  // ...and a skill point for the tree
     player.xpNext = Math.round(player.xpNext * 1.35 + 6);
   }
+  AbilityTree.grantPoints(treeState, player.level);   // the one points hook
+  AbilityTree.save(treeState);
   updateSpButton();
   if (player.pending > 0 && game.state === 'play') openLevelUp();
 }
@@ -1896,170 +1879,67 @@ Object.assign(WEAPONS, {
   prism:    { name: 'Prism Beam',       ico: '🔺', dmg: 10, rof: 0.17,  speed: 1080, spread: 0.06, count: 2, ammo: Infinity, kick: 2.0, size: 4.5, color: '#7cffe0', bounce: 1 }
 });
 
-/* ---------------- skill tree helper ---------------- */
-const node = (id, tier, ico, name, desc, max, needs, apply) => ({ id, tier, ico, name, desc, max, needs, apply });
-
 /* ---------------- the ten operatives ---------------- */
 const CHARACTERS = [
   {
     id: 'vanguard', name: 'ROOK', title: 'Vanguard', ico: '🛡', color: '#7ceaff', cost: 0,
     weapon: 'bulwark', role: 'Soak damage behind a recharging shield and punish whatever touches you.',
     passive: '+40 max HP, starts with a 40-point recharging shield',
-    apply: p => { p.maxHp += 40; p.hp += 40; p.shieldMax = 40; p.shield = 40; p.armor += 0.05; },
-    tree: [
-      node('reinforce', 1, '❤', 'Reinforce', '+20 max HP', 3, [], p => { p.maxHp += 20; p.hp += 20; }),
-      node('hardplate', 1, '🪨', 'Hardplate', 'Take 7% less damage', 3, [], p => { p.armor = Math.min(0.7, p.armor + 0.07); }),
-      node('cell', 2, '🔋', 'Shield Cell', '+30 shield capacity', 2, ['reinforce'], p => { p.shieldMax += 30; p.shield += 30; }),
-      node('recharge', 2, '🔌', 'Fast Cycle', 'Shield recovers 1s sooner, +6/s', 2, ['reinforce'], p => { p.shieldDelay = Math.max(1, p.shieldDelay - 1); p.shieldRegen += 6; }),
-      node('spikes', 2, '⚔', 'Spikes', 'Melee attackers take 10% of their max HP', 2, ['hardplate'], p => { p.thorns += 0.10; }),
-      node('bulwarkb', 3, '💥', 'Bulwark Burst', 'Shield breaking releases a 120-damage shockwave', 1, ['cell'], p => { p.shieldBoom = 120; }),
-      node('fortress', 3, '🏰', 'Fortress', 'Take 18% less damage while the shield holds', 2, ['recharge'], p => { p.shieldDR += 0.18; }),
-      node('immovable', 4, '⛰', 'Immovable', 'Shield regen doubles and its damage cut applies always', 1, ['bulwarkb', 'fortress'], p => { p.shieldRegen *= 2; p.armor = Math.min(0.7, p.armor + p.shieldDR); })
-    ]
+    apply: p => { p.maxHp += 40; p.hp += 40; p.shieldMax = 40; p.shield = 40; p.armor += 0.05; }
   },
   {
     id: 'cinder', name: 'CINDER', title: 'Pyro', ico: '🔥', color: '#ff8a3d', cost: 250,
     weapon: 'flamer', role: 'Short range, melts crowds. Everything you touch keeps burning.',
     passive: 'Every hit ignites: 8 damage/sec for 2s',
-    apply: p => { p.burnDps += 8; p.burnDur = Math.max(p.burnDur, 2); },
-    tree: [
-      node('accel', 1, '🌡', 'Accelerant', '+3 burn damage/sec', 3, [], p => { p.burnDps += 3; }),
-      node('fuel', 1, '🛢', 'Fuel Tanks', '+0.7s burn duration', 3, [], p => { p.burnDur += 0.7; }),
-      node('wildfire', 2, '🔥', 'Wildfire', 'Burning enemies spread fire when they die', 1, ['accel'], p => { p.burnSpread = 110; }),
-      node('immolate', 2, '☀', 'Immolation', 'Burn everything within 70 units for 12/sec', 2, ['fuel'], p => { p.burnAura += 12; p.burnAuraR = p.burnAuraR ? p.burnAuraR + 25 : 70; }),
-      node('backdraft', 2, '💨', 'Backdraft', 'Your dash leaves a burning trail', 1, ['fuel'], p => { p.dashTrail = 1; }),
-      node('inferno', 3, '🌋', 'Inferno', '+45% damage to burning enemies', 2, ['wildfire'], p => { p.burnBonus += 0.45; }),
-      node('ember', 3, '✨', 'Ember Feast', 'Killing a burning enemy heals 5', 1, ['immolate'], p => { p.emberHeal += 5; }),
-      node('firestorm', 4, '🌪', 'Firestorm', 'Double burn damage, double immolation radius', 1, ['inferno', 'ember'], p => { p.burnDps *= 2; p.burnAuraR = (p.burnAuraR || 0) * 2; })
-    ]
+    apply: p => { p.burnDps += 8; p.burnDur = Math.max(p.burnDur, 2); }
   },
   {
     id: 'halcyon', name: 'HALCYON', title: 'Cryomancer', ico: '❄', color: '#8ad8ff', cost: 400,
     weapon: 'cryo', role: 'Nothing moves at full speed near you, and slowed things break easily.',
     passive: 'Hits slow enemies by 30% for 1.5s',
-    apply: p => { p.slowPow = Math.max(p.slowPow, 0.30); p.slowDur = Math.max(p.slowDur, 1.5); },
-    tree: [
-      node('deepfreeze', 1, '🧊', 'Deep Freeze', '+8% slow power', 3, [], p => { p.slowPow = Math.min(0.85, p.slowPow + 0.08); }),
-      node('permafrost', 1, '⏳', 'Permafrost', '+0.5s slow duration', 3, [], p => { p.slowDur += 0.5; }),
-      node('shatterup', 2, '💎', 'Shatter', '+35% damage to slowed enemies', 2, ['deepfreeze'], p => { p.shatter += 0.35; }),
-      node('nova', 2, '❄', 'Frost Nova', 'Dashing chills everything within 190', 1, ['permafrost'], p => { p.dashNova = 190; }),
-      node('chill', 2, '🌬', 'Chill Aura', 'Constantly slow enemies within 150', 2, ['permafrost'], p => { p.chillAura = p.chillAura ? p.chillAura + 45 : 150; }),
-      node('glacier', 3, '🏔', 'Glacier', 'Slowed enemies under 20% HP shatter instantly', 2, ['shatterup'], p => { p.slowExecute += 0.20; }),
-      node('frostbite', 3, '🩸', 'Frostbite', 'Slowed enemies take 10 damage/sec', 2, ['chill'], p => { p.frostbite += 10; }),
-      node('zero', 4, '🥶', 'Absolute Zero', '+20% slow power, shattered enemies chill their neighbours', 1, ['glacier', 'frostbite'], p => { p.slowPow = Math.min(0.9, p.slowPow + 0.20); p.shatterChain = 1; })
-    ]
+    apply: p => { p.slowPow = Math.max(p.slowPow, 0.30); p.slowDur = Math.max(p.slowDur, 1.5); }
   },
   {
     id: 'arc', name: 'ARC', title: 'Tesla', ico: '⚡', color: '#c8b4ff', cost: 550,
     weapon: 'coil', role: 'One shot, many corpses. Damage jumps between everything in the room.',
     passive: 'Shots arc to 1 nearby enemy',
-    apply: p => { p.chains += 1; },
-    tree: [
-      node('conduct', 1, '🔗', 'Conduction', '+1 chain jump', 3, [], p => { p.chains += 1; }),
-      node('amp', 1, '📈', 'Amplifier', 'Chains deal +20% damage', 3, [], p => { p.chainDmg += 0.20; }),
-      node('static', 2, '🌩', 'Static Field', 'Zap enemies within 140 for 16/sec', 2, ['conduct'], p => { p.staticAura += 16; p.staticR = p.staticR ? p.staticR + 45 : 140; }),
-      node('overload', 2, '💫', 'Overload', 'Kills discharge an arc to 3 more enemies', 1, ['amp'], p => { p.killChain = 3; }),
-      node('capacitor', 2, '⏱', 'Capacitor', '+12% fire rate', 2, ['amp'], p => { p.rofMul *= 1.12; }),
-      node('supercharge', 3, '🔆', 'Supercharge', 'Chained hits also stagger (60% slow, 0.8s)', 1, ['static'], p => { p.chainStun = 1; }),
-      node('arcdash', 3, '⚡', 'Arc Dash', 'Dashing zaps everything you pass for 60', 2, ['overload'], p => { p.dashZap += 60; }),
-      node('storm', 4, '🌀', 'Thunderstorm', '+2 chains, chain damage matches the original hit', 1, ['supercharge', 'arcdash'], p => { p.chains += 2; p.chainDmg = Math.max(p.chainDmg, 1); })
-    ]
+    apply: p => { p.chains += 1; }
   },
   {
     id: 'vex', name: 'VEX', title: 'Marksman', ico: '🎯', color: '#ffd77a', cost: 700,
     weapon: 'longshot', role: 'Slow, heavy, precise. Every shot should remove something from the board.',
     passive: '+20% crit chance, +0.8x crit damage',
-    apply: p => { p.crit += 0.20; p.critMul += 0.8; },
-    tree: [
-      node('focus', 1, '👁', 'Focus', '+8% crit chance', 3, [], p => { p.crit += 0.08; }),
-      node('caliber', 1, '🔩', 'Heavy Caliber', '+15% damage', 3, [], p => { p.dmgMul *= 1.15; }),
-      node('penetrator', 2, '➶', 'Penetrator', '+1 pierce', 2, ['caliber'], p => { p.pierce += 1; }),
-      node('deadeye', 2, '🦅', 'Deadeye', 'Pierced shots keep their full damage', 1, ['focus'], p => { p.noFalloff = 1; }),
-      node('steady', 2, '🧘', 'Steady Aim', 'Standing still 0.5s guarantees a crit', 1, ['focus'], p => { p.steady = 1; }),
-      node('executioner', 3, '☠', 'Executioner', 'Enemies below 15% HP die instantly', 2, ['penetrator'], p => { p.execute += 0.15; }),
-      node('killshot', 3, '💥', 'Killshot', 'Crits detonate for 70 in a small radius', 2, ['deadeye'], p => { p.critBoom += 70; }),
-      node('oneshot', 4, '🎖', 'One Shot One Kill', '+1.5x crit damage and crits pierce everything', 1, ['executioner', 'killshot'], p => { p.critMul += 1.5; p.critPierce = 1; })
-    ]
+    apply: p => { p.crit += 0.20; p.critMul += 0.8; }
   },
   {
     id: 'nyx', name: 'NYX', title: 'Blade Dancer', ico: '🔪', color: '#9dff5c', cost: 0,
     weapon: 'twins', role: 'Never stop moving. The dash is a weapon, not an escape.',
     passive: '+20% move speed, dash deals 60 damage',
-    apply: p => { p.speedMul *= 1.20; p.dashDmg += 60; },
-    tree: [
-      node('momentum', 1, '👟', 'Momentum', '+8% move speed', 3, [], p => { p.speedMul *= 1.08; }),
-      node('edge', 1, '🗡', 'Razor Edge', '+50 dash damage', 3, [], p => { p.dashDmg += 50; }),
-      node('blades', 2, '🌀', 'Orbit Blades', '+2 blades circling you (25 damage)', 2, ['momentum'], p => { p.orbit += 2; p.orbitDmg += 25; }),
-      node('sprint', 2, '💨', 'Extra Charge', '+1 dash charge', 2, ['edge'], p => { p.dashMax += 1; p.dashCharge += 1; }),
-      node('bloodrush', 2, '🩸', 'Bloodrush', 'Kills grant +30% speed for 2s', 1, ['momentum'], p => { p.adrenaline = 0.30; }),
-      node('whirl', 3, '🪓', 'Whirlwind', 'Blades hit 60% harder and orbit wider', 2, ['blades'], p => { p.orbitDmg *= 1.6; p.orbitR += 18; }),
-      node('phase', 3, '👻', 'Phase Step', 'Dash lasts longer and keeps you invulnerable', 1, ['sprint'], p => { p.dashInvuln += 0.35; }),
-      node('flurry', 4, '🌠', 'Flurry', 'Kills refund a dash charge, +2 blades, double dash damage', 1, ['whirl', 'phase'], p => { p.dashRefund = 1; p.orbit += 2; p.dashDmg *= 2; })
-    ]
+    apply: p => { p.speedMul *= 1.20; p.dashDmg += 60; }
   },
   {
     id: 'cog', name: 'COG', title: 'Engineer', ico: '🔧', color: '#b8c6d8', cost: 900,
     weapon: 'nailer', role: 'You are not alone out there. Let the drones do half the shooting.',
     passive: 'Deploys 1 combat drone',
-    apply: p => { p.drones += 1; p.droneDmg += 9; },
-    tree: [
-      node('assembly', 1, '🤖', 'Assembly Line', '+1 drone', 3, [], p => { p.drones += 1; }),
-      node('tune', 1, '🔧', 'Tuning', 'Drones deal +40% damage', 3, [], p => { p.droneDmgMul *= 1.4; }),
-      node('rapid', 2, '⚙', 'Rapid Servos', 'Drones fire 30% faster', 2, ['tune'], p => { p.droneRof *= 0.7; }),
-      node('repair', 2, '🔩', 'Repair Bots', 'Drones repair you for 1.2 HP/sec', 2, ['assembly'], p => { p.droneHeal += 1.2; }),
-      node('scrap', 2, '📦', 'Scrapper', 'Enemies drop 70% more pickups', 2, ['assembly'], p => { p.dropMul += 0.7; }),
-      node('heavy', 3, '💣', 'Heavy Rounds', 'Drone shots explode on impact', 1, ['rapid'], p => { p.droneBoom = 46; }),
-      node('shieldgen', 3, '🔆', 'Shield Generator', 'Each drone grants you 20 shield', 2, ['repair'], p => { p.droneShield += 20; }),
-      node('swarm', 4, '🐝', 'Swarm Protocol', '+2 drones firing twice as fast', 1, ['heavy', 'shieldgen'], p => { p.drones += 2; p.droneRof *= 0.5; })
-    ]
+    apply: p => { p.drones += 1; p.droneDmg += 9; }
   },
   {
     id: 'boom', name: 'BOOM', title: 'Demolitionist', ico: '💣', color: '#ff6b4a', cost: 1200,
     weapon: 'mortar', role: 'Area denial. If one grenade does not clear it, the bomblets will.',
     passive: '+35% explosion radius, +20% explosion damage',
-    apply: p => { p.explodeMul *= 1.35; p.explodeDmgMul *= 1.2; },
-    tree: [
-      node('payload', 1, '🧨', 'Payload', '+25% explosion damage', 3, [], p => { p.explodeDmgMul *= 1.25; }),
-      node('blastwave', 1, '📡', 'Blast Wave', '+15% explosion radius', 3, [], p => { p.explodeMul *= 1.15; }),
-      node('cluster', 2, '🎇', 'Cluster Shells', 'Explosions spawn 3 bomblets', 2, ['payload'], p => { p.cluster += 3; }),
-      node('sticky', 2, '🩹', 'Sticky Charge', 'Enemies killed by blasts detonate too', 1, ['payload'], p => { p.onKillBoom += 70; }),
-      node('demoman', 2, '💥', 'Demo Dash', 'Your dash ends in an explosion', 1, ['blastwave'], p => { p.dashBlast += 90; }),
-      node('carpet', 3, '🗺', 'Carpet Bombing', '+2 bomblets and they cluster as well', 2, ['cluster'], p => { p.cluster += 2; p.clusterDepth = 1; }),
-      node('shockplate', 3, '🌊', 'Shock Plate', 'Explosions slow survivors by 50% for 2s', 1, ['demoman'], p => { p.blastSlow = 0.5; }),
-      node('fatman', 4, '☢', 'Fat Man', 'Every 6th shot is a mega shell: 2.4x radius, 3x damage', 1, ['carpet', 'shockplate'], p => { p.megaEvery = 6; })
-    ]
+    apply: p => { p.explodeMul *= 1.35; p.explodeDmgMul *= 1.2; }
   },
   {
     id: 'mourn', name: 'MOURN', title: 'Reaper', ico: '🌙', color: '#d08bff', cost: 1600,
     weapon: 'scythe', role: 'Fragile and furious. The closer you are to death, the harder you hit.',
     passive: '75 max HP, 5% lifesteal, +10% damage',
-    apply: p => { p.maxHp = 75; p.hp = 75; p.lifesteal += 0.05; p.dmgMul *= 1.10; },
-    tree: [
-      node('hunger', 1, '🩸', 'Hunger', '+3% lifesteal', 3, [], p => { p.lifesteal += 0.03; }),
-      node('wrath', 1, '😡', 'Wrath', '+3% damage per 10% missing HP', 3, [], p => { p.berserk += 0.03; }),
-      node('harvest', 2, '👻', 'Harvest', 'Kills drop soul orbs that heal 6', 2, ['hunger'], p => { p.soulHeal += 6; }),
-      node('reap', 2, '☠', 'Reap', 'Execute enemies below 14% HP', 2, ['wrath'], p => { p.execute += 0.14; }),
-      node('shroud', 2, '🌑', 'Shroud', '+20% move speed below 40% HP', 2, ['wrath'], p => { p.desperateSpeed += 0.20; }),
-      node('deathmark', 3, '🎯', 'Death Mark', 'Every 5th hit marks a target to take +50%', 2, ['reap'], p => { p.markBonus += 0.5; p.markEvery = 5; }),
-      node('secondwind', 3, '💗', 'Second Wind', 'Survive one lethal hit each wave at 25 HP', 1, ['shroud'], p => { p.secondWind = 1; }),
-      node('soulreaper', 4, '⚰', 'Soul Reaper', 'Kills heal 8 and grant 1s of +60% fire rate', 1, ['deathmark', 'secondwind'], p => { p.killHeal += 8; p.killFrenzy = 0.6; })
-    ]
+    apply: p => { p.maxHp = 75; p.hp = 75; p.lifesteal += 0.05; p.dmgMul *= 1.10; }
   },
   {
     id: 'iris', name: 'IRIS', title: 'Prism', ico: '🔺', color: '#7cffe0', cost: 2000,
     weapon: 'prism', role: 'Bank shots off the crates. Your bullets keep working after they miss.',
     passive: 'Shots bounce off walls once, +1 projectile',
-    apply: p => { p.bounce += 1; p.extra += 1; },
-    tree: [
-      node('refract', 1, '🔷', 'Refraction', '+1 wall bounce', 3, [], p => { p.bounce += 1; }),
-      node('lens', 1, '🔍', 'Focus Lens', '+18% damage', 3, [], p => { p.dmgMul *= 1.18; }),
-      node('seek', 2, '🧭', 'Seeker Optics', 'Shots curve toward nearby enemies', 2, ['refract'], p => { p.homing += 2.6; }),
-      node('split', 2, '✳', 'Split Beam', 'Bouncing shots split into 2', 1, ['refract'], p => { p.bounceSplit = 1; }),
-      node('spectrum', 2, '🌈', 'Spectrum', '+1 projectile', 2, ['lens'], p => { p.extra += 1; }),
-      node('amplify', 3, '📶', 'Amplify', 'Each bounce adds +30% damage', 2, ['split'], p => { p.bounceGain += 0.30; }),
-      node('lance', 3, '🗡', 'Light Lance', '+2 pierce, pierced shots still bounce', 2, ['seek'], p => { p.pierce += 2; }),
-      node('kaleidoscope', 4, '🔮', 'Kaleidoscope', '+2 projectiles, +2 bounces, double homing', 1, ['amplify', 'lance'], p => { p.extra += 2; p.bounce += 2; p.homing *= 2; })
-    ]
+    apply: p => { p.bounce += 1; p.extra += 1; }
   }
 ];
 
@@ -2069,7 +1949,7 @@ for (const c of CHARACTERS) CHAR_BY_ID[c.id] = c;
 /* ---------------- roguelite stat block ---------------- */
 function rogueStats() {
   return {
-    charId: 'vanguard', sigWeapon: 'bulwark', sp: 0, tree: {},
+    charId: 'vanguard', sigWeapon: 'bulwark',
     // defence
     shield: 0, shieldMax: 0, shieldRegen: 8, shieldDelay: 3.5, shieldTimer: 0,
     shieldBoom: 0, shieldDR: 0, shieldFlash: 0,
@@ -2493,8 +2373,8 @@ function showCharInfo() {
   const c = CHAR_BY_ID[selectedChar];
   const w = WEAPONS[c.weapon];
   const unlocked = isUnlocked(c.id);
-  const tiers = c.tree.filter(n => n.tier === 1).map(n => n.name).join(' · ');
-  const cap = c.tree.find(n => n.tier === 4);
+  const tc = treeState.compiled;
+  const dom = tc.dominant ? AbilityTree.ARCHETYPES[tc.dominant] : null;
   document.getElementById('csInfo').innerHTML =
     '<h3 style="color:' + c.color + '">' + c.ico + ' ' + c.name + '</h3>' +
     '<div class="role">' + c.title + '</div>' +
@@ -2502,7 +2382,9 @@ function showCharInfo() {
     '<div class="row"><b>Weapon:</b> ' + w.ico + ' ' + w.name + ' — ' + w.dmg + ' dmg, ' + (1 / w.rof).toFixed(1) + '/s' +
       (w.count > 1 ? ', ' + w.count + ' shots' : '') + '</div>' +
     '<div class="row pass"><b>Passive:</b> ' + c.passive + '</div>' +
-    '<div class="row"><b>Tree:</b> ' + tiers + ' … <span style="color:#ffc46b">' + cap.name + '</span></div>';
+    '<div class="row"><b>Ability tree:</b> ' + tc.pointsSpent + ' points spent' +
+      (dom ? ' · <span style="color:' + dom.color + '">' + dom.name + '</span>' : ' · no archetype yet') +
+      (tc.pointsLeft > 0 ? ' · <span style="color:#9dff5c">' + tc.pointsLeft + ' unspent</span>' : '') + '</div>';
 
   const btn = document.getElementById('csDeploy');
   if (unlocked) {
@@ -2533,108 +2415,108 @@ function deploySelected() {
   startRun(c.id);
 }
 
-/* ---------------- skill tree ---------------- */
-function nodeState(c, n) {
-  const rank = player.tree[n.id] || 0;
-  if (rank >= n.max) return 'maxed';
-  const ready = n.needs.every(id => (player.tree[id] || 0) > 0);
-  if (!ready) return 'locked';
-  return rank > 0 ? 'taken' : 'avail';
-}
+/* ---------------- ability tree (drop-in module) ---------------- */
+/* The game owns none of the tree's rules. It grants points, reads the
+   compiled stats, and maps them onto the engine in applyTreeToPlayer(). */
+const treeState = AbilityTree.load();
+let treeUI = null;
 
 function openSkillTree() {
-  if (!player) return;
   if (game.state === 'play') game.state = 'skills';
-  else if (game.state !== 'skills') return;
+  else if (game.state !== 'skills' && game.state !== 'menu' && game.state !== 'select') return;
   mouse.down = false;
-  showOverlay('skilltree');     // lay it out first: the connectors measure real positions
-  buildSkillTree();
+  showOverlay('skilltree');
+  if (!treeUI) {
+    treeUI = AbilityTreeUI.mount(document.getElementById('stMount'), {
+      state: treeState,
+      onChange: () => { if (player && game.state === 'skills') applyTreeToPlayer(player, true); updateSpButton(); }
+    });
+  } else {
+    treeUI.refresh(treeState);
+  }
   updateSpButton();
 }
 
 function closeSkillTree() {
   closeOverlay('skilltree');
   if (game.state === 'skills') game.state = 'play';
-}
-
-function buildSkillTree() {
-  const c = CHAR_BY_ID[player.charId];
-  document.getElementById('stName').textContent = c.ico + '  ' + c.name + ' — ' + c.title;
-  document.getElementById('stSp').textContent = player.sp;
-
-  const wrap = document.getElementById('stTree');
-  wrap.innerHTML = '<svg class="treelines" id="stLines"></svg>';
-  const byId = {};
-
-  for (let tier = 1; tier <= 4; tier++) {
-    const row = document.createElement('div');
-    row.className = 'tier';
-    for (const n of c.tree) {
-      if (n.tier !== tier) continue;
-      const rank = player.tree[n.id] || 0;
-      const state = nodeState(c, n);
-      const el = document.createElement('div');
-      el.className = 'node ' + state + (state !== 'locked' && rank > 0 && state !== 'maxed' ? ' taken' : '');
-      el.innerHTML =
-        '<div class="nico">' + n.ico + '</div>' +
-        '<div class="nnm">' + n.name + '</div>' +
-        '<div class="nds">' + n.desc + '</div>' +
-        '<div class="rank">' + rank + ' / ' + n.max + (state === 'locked' ? ' — LOCKED' : '') + '</div>';
-      if ((state === 'avail' || state === 'taken') && player.sp > 0) {
-        el.addEventListener('click', () => buySkill(n));
-      } else if (state !== 'locked' && state !== 'maxed') {
-        el.style.opacity = 0.75;
-      }
-      byId[n.id] = el;
-      row.appendChild(el);
-    }
-    wrap.appendChild(row);
-  }
-  drawTreeLines(c, byId, wrap);
-}
-
-function drawTreeLines(c, byId, wrap) {
-  const svg = document.getElementById('stLines');
-  const parts = [];
-  for (const n of c.tree) {
-    const el = byId[n.id];
-    if (!el) continue;
-    for (const need of n.needs) {
-      const pe = byId[need];
-      if (!pe) continue;
-      const x1 = pe.offsetLeft + pe.offsetWidth / 2, y1 = pe.offsetTop + pe.offsetHeight;
-      const x2 = el.offsetLeft + el.offsetWidth / 2, y2 = el.offsetTop;
-      const lit = (player.tree[need] || 0) > 0;
-      const mid = (y1 + y2) / 2;
-      parts.push('<path d="M' + x1 + ' ' + y1 + ' C' + x1 + ' ' + mid + ' ' + x2 + ' ' + mid + ' ' + x2 + ' ' + y2 +
-        '" fill="none" stroke="' + (lit ? 'rgba(157,255,92,.55)' : 'rgba(120,150,190,.22)') + '" stroke-width="2"/>');
-    }
-  }
-  svg.setAttribute('viewBox', '0 0 ' + wrap.offsetWidth + ' ' + wrap.offsetHeight);
-  svg.setAttribute('width', wrap.offsetWidth);
-  svg.setAttribute('height', wrap.offsetHeight);
-  svg.innerHTML = parts.join('');
-}
-
-function buySkill(n) {
-  if (player.sp <= 0) return;
-  const rank = player.tree[n.id] || 0;
-  if (rank >= n.max) return;
-  if (!n.needs.every(id => (player.tree[id] || 0) > 0)) return;
-  player.sp--;
-  player.tree[n.id] = rank + 1;
-  n.apply(player);
-  floatText(player.x, player.y - 40, n.name, '#9dff5c', 16);
-  buildSkillTree();
   updateSpButton();
+}
+
+/* The one place tree output meets the engine: compiled stats and flags in,
+   existing player fields out. */
+function applyTreeToPlayer(p, live) {
+  if (live) {
+    // mid-run change: rebuild the player from its character base, keep run progress
+    const keep = { x: p.x, y: p.y, hp: p.hp, xp: p.xp, level: p.level, xpNext: p.xpNext,
+                   weapon: p.weapon, ammo: p.ammo, upgrades: p.upgrades, pending: p.pending };
+    const rebuilt = makePlayer(p.charId);
+    for (const k in rebuilt) p[k] = rebuilt[k];
+    p.x = keep.x; p.y = keep.y; p.xp = keep.xp; p.level = keep.level; p.xpNext = keep.xpNext;
+    p.weapon = keep.weapon; p.ammo = keep.ammo; p.pending = keep.pending;
+    for (const id in keep.upgrades) {                       // replay the in-run upgrade cards
+      const u = UPGRADES.find(x => x.id === id);
+      if (u) for (let i = 0; i < keep.upgrades[id]; i++) u.apply(p);
+    }
+    p.upgrades = keep.upgrades;
+    p.hp = Math.min(keep.hp, p.maxHp);
+    return;
+  }
+
+  const c = treeState.compiled;
+  const S = c.stats, F = c.flags;
+
+  p.dmgMul *= S.damage;
+  p.rofMul *= S.fireRate;
+  p.speedMul *= S.moveSpeed;
+  p.dashCdMul *= S.dashCooldown;
+  p.maxHp = Math.max(20, p.maxHp + S.maxHp);
+  p.hp = Math.min(p.hp + Math.max(0, S.maxHp), p.maxHp);
+  p.armor = Math.min(0.7, p.armor + S.armor);
+  p.pierce += S.pierce;
+  p.extra += S.projectiles;
+  p.crit += S.critChance;
+  p.critMul += S.critDamage;
+  p.chains += S.chainCount;
+  p.dashMax += S.dashCharges;
+  p.dashCharge += S.dashCharges;
+  if (S.slowPower > 0) {
+    p.slowPow = Math.min(0.9, p.slowPow + S.slowPower);
+    p.slowDur = Math.max(p.slowDur, 1.2);
+  }
+  p.slowDur *= S.statusDuration;
+  if (p.burnDur) p.burnDur *= S.statusDuration;
+
+  if (F.has('phaseDash')) p.dashInvuln += 0.35;
+  if (F.has('gravityWell')) p.blastSlow = Math.max(p.blastSlow, 0.5);
+  if (F.has('blinkProtocol')) { p.dashDmg += 80; p.dashInvuln += 0.1; }
+  if (F.has('executioner')) p.execute += 0.12;
+  if (F.has('cryoNova')) p.dashNova = Math.max(p.dashNova, 190);
+  if (F.has('bladestorm')) { p.orbit += 2; p.orbitDmg = Math.max(p.orbitDmg, 22) + 8; }
+  if (F.has('frenzy')) p.killFrenzy = Math.max(p.killFrenzy, 0.25);
+  if (F.has('stasisLock')) { p.slowExecute += 0.20; p.shatterChain = 1; }
+  if (F.has('ricochet')) p.bounce += 2;
+  if (F.has('conductor')) p.chainStun = 1;
+  if (F.has('afterimage')) p.dashTrail = 1;
+  if (F.has('annihilation')) p.critPierce = 1;
+  if (F.has('absoluteZero')) { p.chillAura = Math.max(p.chillAura, 150); p.frostbite += 8; }
+  if (F.has('perpetualMotion')) p.dmgMul *= 1 + (p.speedMul - 1);   // damage rides your speed
+
+  // aura radii scale last so flag-granted auras are included
+  if (S.auraRadius !== 1) {
+    if (p.burnAuraR) p.burnAuraR *= S.auraRadius;
+    if (p.staticR) p.staticR *= S.auraRadius;
+    if (p.chillAura) p.chillAura *= S.auraRadius;
+  }
 }
 
 function updateSpButton() {
   const b = document.getElementById('spBtn');
   if (!b) return;
-  const show = player && player.sp > 0 && game.state === 'play';
+  const left = treeState.compiled.pointsLeft;
+  const show = left > 0 && game.state === 'play';
   b.style.display = show ? 'block' : 'none';
-  if (show) b.textContent = '★ ' + player.sp + ' SKILL POINT' + (player.sp === 1 ? '' : 'S') + (isTouch ? '' : ' — TAB');
+  if (show) b.textContent = '\u2605 ' + left + ' ABILITY POINT' + (left === 1 ? '' : 'S') + (isTouch ? '' : ' \u2014 TAB');
 }
 
 /* ---------------- shell ---------------- */
@@ -2726,6 +2608,7 @@ document.getElementById('csBack').addEventListener('click', () => {
   closeAllOverlays(); game.state = 'menu'; refreshMenu(); showOverlay('menu');
 });
 document.getElementById('stClose').addEventListener('click', closeSkillTree);
+document.getElementById('treeBtn').addEventListener('click', openSkillTree);
 document.getElementById('spBtn').addEventListener('click', openSkillTree);
 document.getElementById('resumeBtn').addEventListener('click', togglePause);
 document.getElementById('quitBtn').addEventListener('click', () => {
