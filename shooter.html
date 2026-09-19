@@ -22,7 +22,7 @@ html,body{
   user-select:none; -webkit-user-select:none; touch-action:none;
 }
 #game{position:fixed; inset:0; display:block; width:100%; height:100%; cursor:crosshair;}
-#actBtn{
+#actBtn,#actBtn2{
   display:none; position:fixed; left:50%; bottom:16px; transform:translateX(-50%); z-index:5;
   padding:10px 20px; border:0; border-radius:22px; cursor:pointer;
   font:700 13px/1 "Segoe UI",Roboto,sans-serif; letter-spacing:.1em;
@@ -143,6 +143,7 @@ h2{margin:0 0 14px; font-size:clamp(20px,4.5vw,30px); letter-spacing:.08em; colo
 <canvas id="game"></canvas>
 <button id="spBtn">★ SKILL POINT</button>
 <button id="actBtn">ABILITY</button>
+<button id="actBtn2">ABILITY</button>
 
 <div class="overlay show" id="menu">
   <div class="panel">
@@ -365,7 +366,11 @@ h2{margin:0 0 14px; font-size:clamp(20px,4.5vw,30px); letter-spacing:.08em; colo
     killChainCount: 0, onKillBlast: 0, droneRepair: 0, killHealAmount: 0, soulHeal: 0,
     // the four distinct weapon behaviours
     beamPower: 0, beamRamp: 0, beamRange: 0, focusPower: 0, focusTime: 0,
-    meterGain: 0, dischargePower: 0, dischargeChain: 0, chargePower: 0, chargeRate: 0
+    meterGain: 0, dischargePower: 0, dischargeChain: 0, chargePower: 0, chargeRate: 0,
+    // summoning
+    minionCount: 0, minionDamage: 0, minionHealth: 0, minionSpeed: 1, minionRate: 1,
+    essenceRegen: 0, summonCost: 0, essenceOnKill: 0,
+    consumePower: 0, consumeHeal: 0, consumeRefund: 0, rallyPower: 0, rallyTime: 0
   };
 
   const FLAGS = [
@@ -377,7 +382,8 @@ h2{margin:0 0 14px; font-size:clamp(20px,4.5vw,30px); letter-spacing:.08em; colo
     'phaseDash', 'dashStrike', 'dashBlast', 'afterimage', 'blink', 'dashRefund',
     'bounceSplit', 'amplify', 'noFalloff', 'critPierce',
     'steadyAim', 'critBoom', 'volatile', 'carpet', 'megaShell',
-    'adrenaline', 'frenzy', 'deathMark', 'executioner', 'desperate'
+    'adrenaline', 'frenzy', 'deathMark', 'executioner', 'desperate',
+    'soulLink', 'thrallBurst', 'phylactery'
   ];
 
   const TREES = {};
@@ -989,6 +995,67 @@ h2{margin:0 0 14px; font-size:clamp(20px,4.5vw,30px); letter-spacing:.08em; colo
       r('flock', 'Flock', '+2 projectiles that curve 2.6 faster and pass through 1 more enemy.', add('projectiles', 2), add('homingStrength', 2.6), add('pierce', 1)),
       y('wideseek', 'Wide Seek', '+12% fire rate and shots curve 2.6 faster.', mult('fireRate', 1.12), add('homingStrength', 5.2)),
       r('starfall', 'STARFALL', '+3 projectiles curving 5.2 faster, +15% fire rate, and shots pass through 2 more enemies. Each projectile deals 15% less.', add('projectiles', 3), add('homingStrength', 5.2), mult('fireRate', 1.15), add('pierce', 2), mult('damage', 0.85))
+    ]
+  });
+
+  /* ============================================================ VESSEL ============================================================ */
+  TREES.vessel = tree('vessel', 'VESSEL',
+    w('root', 'First Binding', 'Opens the pact. Essence regenerates 2 more per second (8 to 10).', add('essenceRegen', 2)),
+    [
+      arch('legion', 'Legion', '#b58cff',
+        'Legion wins on headcount. Swarm Call and Horde raise the thrall cap while Cheap Rite drops the essence a binding costs, so the field is never empty. Each thrall is no tougher for it, so a Legion build loses its whole army to one boss sweep.',
+        { difficulty: 'Low', damage: 'High', defense: 'Medium', range: 'Medium', speed: 'High' }),
+      arch('bond', 'Bond', '#8affb0',
+        'Bond makes the few thralls you have survive. Soul Link heals you for 25% of everything they deal, Reinforced Husk raises their health, and Phylactery returns any thrall an enemy kills after 6 seconds. It adds no thralls at all, so the damage ceiling is lower than Legion.',
+        { difficulty: 'Medium', damage: 'Medium', defense: 'High', range: 'Low', speed: 'Low' }),
+      arch('consumption', 'Consumption', '#ff6b9d',
+        'Consumption treats thralls as ammunition. CONSUME detonates the nearest one for 120 and heals you 25, Unstable Thralls makes any death a 90-damage blast, and Greedy Rite refunds the essence to bind the next. Spending your army is the damage, so Consumption is always one bad trade from standing alone.',
+        { difficulty: 'High', damage: 'High', defense: 'Low', range: 'Medium', speed: 'Medium' })
+    ], {
+    legion: [
+      w('vessel2', 'Second Vessel', '+1 thrall.', add('minionCount', 1)),
+      w('quickrite', 'Quick Rite', 'The sigil binds 20% faster (0.35s to 0.29s between thralls).', mult('fireRate', 1.20)),
+      w('cheaprite', 'Cheap Rite', 'Binding costs 4 less essence (25 to 21).', add('summonCost', -4)),
+      y('swarmcall', 'Swarm Call', '+1 thrall, and binding costs 4 less essence.', add('minionCount', 1), add('summonCost', -4)),
+      w('restless', 'Restless Dead', 'Thralls move 12% faster.', mult('minionSpeed', 1.12)),
+      r('endlesshost', 'Endless Host', '+2 thralls, and essence regenerates 4 more per second.', add('minionCount', 2), add('essenceRegen', 4)),
+      w('freshbind', 'Fresh Bindings', 'Essence regenerates 3 more per second.', add('essenceRegen', 3)),
+      y('horde', 'Horde', '+1 thrall, and thralls strike 15% faster (0.75s to 0.64s).', add('minionCount', 1), mult('minionRate', 0.85)),
+      r('legioncap', 'LEGION', '+3 thralls, binding costs 10 less essence, and essence regenerates 6 more per second. Thralls gain no health from this.', add('minionCount', 3), add('summonCost', -10), add('essenceRegen', 6))
+    ],
+    bond: [
+      w('husk', 'Reinforced Husk', 'Thralls have 25 more health (60 to 85).', add('minionHealth', 25)),
+      w('claws', 'Sharp Claws', 'Thralls deal 6 more damage per strike (20 to 26).', add('minionDamage', 6)),
+      w('warded', 'Warded Flesh', 'Thralls have 25 more health.', add('minionHealth', 25)),
+      y('soullink', 'Soul Link', 'You heal for 25% of all damage your thralls deal.', flag('soulLink')),
+      w('boneplate', 'Bone Plate', 'Thralls have 30 more health.', add('minionHealth', 30)),
+      r('bloodbond', 'Blood Bond', 'Thralls deal 14 more damage per strike, and you heal for 25% of it.', add('minionDamage', 14), flag('soulLink')),
+      w('ironclaws', 'Iron Claws', 'Thralls deal 8 more damage per strike.', add('minionDamage', 8)),
+      y('phylactery', 'Phylactery', 'A thrall killed by an enemy returns 6 seconds later at no cost. Thralls you consume do not return.', flag('phylactery')),
+      r('eternalbond', 'ETERNAL BOND', 'Thralls have 60 more health and deal 20 more damage per strike, and you heal for 25% of everything they deal.', add('minionHealth', 60), add('minionDamage', 20), flag('soulLink'))
+    ],
+    consumption: [
+      w('volatile', 'Volatile Remains', 'CONSUME detonates for 40 more damage (120 to 160).', add('consumePower', 40)),
+      w('siphon', 'Siphon', 'CONSUME heals 15 more (25 to 40).', add('consumeHeal', 15)),
+      w('greedy', 'Greedy Rite', 'Each kill returns 6 more essence (12 to 18).', add('essenceOnKill', 6)),
+      y('cannibal', 'Cannibal Rite', 'CONSUME detonates for 60 more damage and heals 15 more.', add('consumePower', 60), add('consumeHeal', 15)),
+      w('echoing', 'Echoing Blast', 'Explosions are 15% larger.', mult('explosionSize', 1.15)),
+      r('unstable', 'Unstable Thralls', 'Any thrall that dies detonates for 90 damage in a 110-unit radius, however it died.', flag('thrallBurst')),
+      w('deepwells', 'Deep Wells', 'Essence regenerates 3 more per second.', add('essenceRegen', 3)),
+      y('warcry', 'War Cry', 'RALLY lasts 2s longer and thralls strike twice as fast during it, up from 50% faster.', add('rallyTime', 2), add('rallyPower', 0.5)),
+      r('masssacrifice', 'MASS SACRIFICE', 'CONSUME detonates for 160 more damage and returns 30 more essence, and any dying thrall detonates for 90.', add('consumePower', 160), add('consumeRefund', 30), flag('thrallBurst'))
+    ],
+    legion_bond: [
+      y('gravehost', 'Grave Host', '+1 thrall, and thralls have 25 more health.', add('minionCount', 1), add('minionHealth', 25)),
+      r('deathless', 'Deathless Horde', '+1 thrall, and any thrall an enemy kills returns 6 seconds later.', add('minionCount', 1), flag('phylactery')),
+      y('packstrength', 'Pack Strength', 'Thralls deal 10 more damage per strike and move 10% faster.', add('minionDamage', 10), mult('minionSpeed', 1.10)),
+      r('unending', 'UNENDING LEGION', '+2 thralls with 40 more health that return 6 seconds after an enemy kills them.', add('minionCount', 2), add('minionHealth', 40), flag('phylactery'))
+    ],
+    bond_consumption: [
+      y('bitterharvest', 'Bitter Harvest', 'CONSUME heals 15 more, and thralls have 20 more health.', add('consumeHeal', 15), add('minionHealth', 20)),
+      r('sacrificiallink', 'Sacrificial Link', 'You heal for 25% of all thrall damage, and any dying thrall detonates for 90.', flag('soulLink'), flag('thrallBurst')),
+      y('reclamation', 'Reclamation', 'CONSUME returns 20 more essence and heals 15 more.', add('consumeRefund', 20), add('consumeHeal', 15)),
+      r('bloodengine', 'BLOOD ENGINE', 'Thralls deal 16 more damage and you heal for 25% of it; every thrall that dies detonates for 90 and returns 20 essence.', add('minionDamage', 16), flag('soulLink'), flag('thrallBurst'), add('consumeRefund', 20))
     ]
   });
 
@@ -1801,8 +1868,8 @@ window.addEventListener('keydown', e => {
   if (keys[k]) return;
   keys[k] = true;
   if (k === ' ') dashQueued = true;
-  if (k === 'q') toggleArcMode();
-  if (k === 'e') focusDrones();
+  if (k === 'q') classAbility(2);
+  if (k === 'e') classAbility(1);
   if (k === 'escape' || k === 'p') togglePause();
 });
 window.addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
@@ -2320,6 +2387,16 @@ function updateWeapon(dt, firing) {
     return;
   }
 
+  if (w.summon) {
+    // VESSEL - the trigger does not shoot, it binds a thrall where you are pointing
+    if (firing && player.fireCd <= 0) {
+      const p = aimPoint();
+      if (summonMinion(p.x, p.y)) { player.fireCd = w.rof; camera.shake = Math.min(14, camera.shake + 3); }
+      else player.fireCd = 0.2;
+    }
+    return;
+  }
+
   if (w.chargeUp) {
     // VEX - hold to wind up, release to fire. Damage scales with the wind-up.
     if (firing) {
@@ -2334,6 +2411,189 @@ function updateWeapon(dt, firing) {
   }
 
   if (firing && player.fireCd <= 0) shoot();
+}
+
+/* ============================================================
+   MINIONS
+   VESSEL has no gun. Its trigger places a thrall, and thralls are real
+   entities: they walk, they fight on their own, enemies chase and kill them,
+   and every blow they land runs the same dealDamage() everything else does.
+   ============================================================ */
+let minions = [];
+
+function summonMinion(x, y) {
+  if (minions.length >= player.minionCap) return false;
+  if (player.essence < player.summonCost) return false;
+  player.essence -= player.summonCost;
+  const hp = player.minionHp;
+  const m = {
+    minion: true, x: clamp(x, 30, WORLD.w - 30), y: clamp(y, 30, WORLD.h - 30),
+    vx: 0, vy: 0, r: 11, hp: hp, maxHp: hp, angle: rand(0, TAU),
+    atkCd: 0.2, hitFlash: 0, spawnT: 0.3, life: 0
+  };
+  minions.push(m);
+  burst(m.x, m.y, 14, '#b58cff', 220, 2.6);
+  particles.push({ x: m.x, y: m.y, vx: 0, vy: 0, life: 0.35, max: 0.35, color: '#b58cff', size: 46, glow: true, ring: true });
+  return true;
+}
+
+function damageMinion(m, amount, from) {
+  if (m.dead) return;
+  m.hp -= amount;
+  m.hitFlash = 0.14;
+  burst(m.x, m.y, 4, '#b58cff', 150, 2);
+  if (from) {
+    const a = Math.atan2(m.y - from.y, m.x - from.x);
+    m.vx += Math.cos(a) * 120; m.vy += Math.sin(a) * 120;
+  }
+  if (m.hp <= 0) killMinion(m, false);
+}
+
+function killMinion(m, consumed) {
+  if (m.dead) return;
+  m.dead = true;
+  burst(m.x, m.y, 18, '#b58cff', 280, 3);
+  if (player.thrallBurst > 0) {
+    explode(m.x, m.y, 110 * player.explodeMul, player.thrallBurst, true);
+  }
+  if (!consumed && player.phylactery > 0) {       // it comes back on its own
+    player.rebuildQueue.push(player.phylactery);
+  }
+}
+
+/* Consume the nearest thrall: it detonates, you get health and essence back. */
+function consumeMinion() {
+  if (game.state !== 'play' || !minions.length) return;
+  let best = null, bd = 1e9;
+  for (const m of minions) {
+    const d = len(m.x - player.x, m.y - player.y);
+    if (d < bd) { bd = d; best = m; }
+  }
+  if (!best) return;
+  explode(best.x, best.y, 130 * player.explodeMul, player.consumePower, true);
+  healPlayer(player.consumeHeal);
+  player.essence = Math.min(player.essenceMax, player.essence + player.consumeRefund);
+  floatText(best.x, best.y - 20, 'CONSUMED', '#b58cff', 15);
+  killMinion(best, true);
+}
+
+/* Rally: every thrall runs to the cursor and swings faster for a few seconds. */
+function rallyMinions() {
+  if (game.state !== 'play' || !minions.length) return;
+  const p = aimPoint();
+  player.rallyX = p.x; player.rallyY = p.y;
+  player.rallyT = player.rallyTime;
+  particles.push({ x: p.x, y: p.y, vx: 0, vy: 0, life: 0.5, max: 0.5, color: '#b58cff', size: 70, glow: true, ring: true });
+  floatText(p.x, p.y - 16, 'RALLY', '#b58cff', 15);
+}
+
+/* where the player is pointing, in world space */
+function aimPoint() {
+  if (isTouch && sticks.aim && sticks.aim.mag > 0.25) {
+    return { x: player.x + sticks.aim.dx * 240, y: player.y + sticks.aim.dy * 240 };
+  }
+  return { x: mouse.x + camera.x, y: mouse.y + camera.y };
+}
+
+function updateMinions(dt) {
+  if (player.rallyT > 0) player.rallyT -= dt;
+
+  // thralls that died with a phylactery come back
+  for (let i = player.rebuildQueue.length - 1; i >= 0; i--) {
+    player.rebuildQueue[i] -= dt;
+    if (player.rebuildQueue[i] <= 0) {
+      player.rebuildQueue.splice(i, 1);
+      const a = rand(0, TAU);
+      summonFree(player.x + Math.cos(a) * 60, player.y + Math.sin(a) * 60);
+    }
+  }
+
+  for (let i = minions.length - 1; i >= 0; i--) if (minions[i].dead) minions.splice(i, 1);
+
+  const rallying = player.rallyT > 0;
+  for (const m of minions) {
+    m.life += dt;
+    m.hitFlash = Math.max(0, m.hitFlash - dt);
+    m.atkCd -= dt;
+    if (m.spawnT > 0) { m.spawnT -= dt; continue; }
+
+    // pick a target: nearest enemy to the thrall, within reach of the fight
+    let best = null, bd = 540;
+    for (const e of enemies) {
+      if (e.dead || e.spawnT > 0) continue;
+      const d = len(e.x - m.x, e.y - m.y);
+      if (d < bd) { bd = d; best = e; }
+    }
+    m.target = best;
+
+    let tx, ty, speed = player.minionSpeed;
+    if (rallying) { tx = player.rallyX; ty = player.rallyY; speed *= 1.5; }
+    else if (best) { tx = best.x; ty = best.y; }
+    else { tx = player.x + Math.cos(m.life * 0.8 + m.r) * 70; ty = player.y + Math.sin(m.life * 0.8 + m.r) * 70; }
+
+    const dx = tx - m.x, dy = ty - m.y;
+    const d = len(dx, dy) || 1;
+    const stop = best && !rallying ? best.r + m.r + 2 : 12;
+    const go = d > stop ? 1 : 0;
+    m.vx += ((dx / d) * speed * go - m.vx) * Math.min(1, dt * 9);
+    m.vy += ((dy / d) * speed * go - m.vy) * Math.min(1, dt * 9);
+    m.x += m.vx * dt; m.y += m.vy * dt;
+    collideWorld(m);
+    m.angle = angleLerp(m.angle, Math.atan2(dy, dx), Math.min(1, dt * 10));
+
+    // strike
+    if (best && m.atkCd <= 0 && len(best.x - m.x, best.y - m.y) < best.r + m.r + 8) {
+      m.atkCd = player.minionRate / (rallying ? 1 + player.rallyPower : 1);
+      const res = dealDamage(best, player.minionDmg, 'minion', { fromX: m.x, fromY: m.y });
+      if (player.soulLink > 0 && res.dmg > 0) healPlayer(res.dmg * player.soulLink);
+      burst(m.x + Math.cos(m.angle) * m.r, m.y + Math.sin(m.angle) * m.r, 4, '#d8b8ff', 160, 2);
+    }
+  }
+
+  // essence
+  player.essence = Math.min(player.essenceMax, player.essence + player.essenceRegen * dt);
+}
+
+/* a free thrall, ignoring cost and cap (phylactery, tree effects) */
+function summonFree(x, y) {
+  const cost = player.summonCost, cap = player.minionCap;
+  player.summonCost = 0; player.minionCap = cap + 1;
+  summonMinion(x, y);
+  player.summonCost = cost; player.minionCap = cap;
+}
+
+function drawMinions(ox, oy) {
+  for (const m of minions) {
+    const x = m.x - ox, y = m.y - oy;
+    ctx.save();
+    ctx.translate(x, y);
+    if (m.spawnT > 0) { const t = 1 - m.spawnT / 0.3; ctx.globalAlpha = t; ctx.scale(0.5 + t * 0.5, 0.5 + t * 0.5); }
+    ctx.rotate(m.angle);
+    ctx.shadowBlur = 12; ctx.shadowColor = '#b58cff';
+    ctx.strokeStyle = m.hitFlash > 0 ? '#ffffff' : '#b58cff';
+    ctx.fillStyle = 'rgba(181,140,255,.20)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(m.r, 0); ctx.lineTo(-m.r * 0.5, m.r * 0.75);
+    ctx.lineTo(-m.r * 0.15, 0); ctx.lineTo(-m.r * 0.5, -m.r * 0.75);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.restore();
+
+    if (m.hp < m.maxHp) {
+      const w = m.r * 2, h = 3;
+      ctx.fillStyle = 'rgba(0,0,0,.55)';
+      ctx.fillRect(x - w / 2, y - m.r - 9, w, h);
+      ctx.fillStyle = '#b58cff';
+      ctx.fillRect(x - w / 2, y - m.r - 9, w * clamp(m.hp / m.maxHp, 0, 1), h);
+    }
+  }
+  if (player.rallyT > 0) {
+    ctx.save();
+    ctx.globalAlpha = clamp(player.rallyT / player.rallyTime, 0, 1) * 0.6;
+    ctx.strokeStyle = '#b58cff'; ctx.lineWidth = 2; ctx.setLineDash([5, 6]);
+    ctx.beginPath(); ctx.arc(player.rallyX - ox, player.rallyY - oy, 26, 0, TAU); ctx.stroke();
+    ctx.restore();
+  }
 }
 
 /* ---------------- projectiles, fx ---------------- */
@@ -2421,6 +2681,7 @@ function spawnEnemy(type, x, y, scale) {
 const SOURCE = {
   shot:   { kb: 90,  riders: true },
   drone:  { kb: 40,  riders: true },
+  minion: { kb: 45,  riders: true },
   beam:   { kb: 0,   riders: true },
   blade:  { kb: 60,  riders: true },
   dash:   { kb: 120, riders: true },
@@ -2539,6 +2800,7 @@ function killEnemy(e, noKillEffects) {
 }
 
 function onEnemyKilled(e) {
+  if (player.essenceMax > 0) player.essence = Math.min(player.essenceMax, player.essence + player.essenceOnKill);
   if (player.onKillBoom > 0) explode(e.x, e.y, 80 * player.explodeMul, player.onKillBoom, true);
   if (player.killChain > 0) chainFrom(e, 24 * player.dmgMul * player.chainDmg, player.killChain, [e]);
   if (player.burnSpread > 0 && e.burnT > 0) {
@@ -2562,6 +2824,18 @@ function dropPickup(x, y, type) {
   pickups.push({ type, x, y, vx: rand(-40, 40), vy: rand(-40, 40), r: 13, life: 26, bob: rand(0, TAU) });
 }
 
+/* Enemies chase whatever is closest and threatening: a thrall inside its taunt
+   radius, otherwise the player. This is what makes a summoner a summoner. */
+function enemyTarget(e) {
+  let best = null, bd = 300;
+  for (const m of minions) {
+    if (m.dead || m.spawnT > 0) continue;
+    const d = len(m.x - e.x, m.y - e.y);
+    if (d < bd) { bd = d; best = m; }
+  }
+  return best || player;
+}
+
 function updateEnemy(e, dt) {
   if (e.spawnT > 0) { e.spawnT -= dt; return; }
   e.hitFlash = Math.max(0, e.hitFlash - dt);
@@ -2571,16 +2845,17 @@ function updateEnemy(e, dt) {
   if (e.dead) return;
   const chilled = slowFactor(e);
 
-  const dx = player.x - e.x, dy = player.y - e.y;
+  const tgt = enemyTarget(e);
+  const dx = tgt.x - e.x, dy = tgt.y - e.y;
   const d = len(dx, dy) || 1;
-  const toPlayer = Math.atan2(dy, dx);
+  const toPlayer = Math.atan2(dy, dx);          // toward the current target
   let ax = dx / d, ay = dy / d, moving = 1;
 
   switch (e.type) {
     case 'shooter':
     case 'spitter': {
       const t = ENEMY_TYPES[e.type];
-      const sees = lineOfSight(e.x, e.y, player.x, player.y);
+      const sees = lineOfSight(e.x, e.y, tgt.x, tgt.y);
       if (d < t.range * 0.72 && sees) { ax = -ax; ay = -ay; }        // back off
       else if (d < t.range && sees) { ax = -dy / d; ay = dx / d; moving = 0.6; } // strafe sideways
       e.fireCd -= dt;
@@ -2597,7 +2872,7 @@ function updateEnemy(e, dt) {
     }
     case 'charger': {
       if (e.state === 'chase') {
-        if (d < 300 && lineOfSight(e.x, e.y, player.x, player.y)) { e.state = 'wind'; e.stateT = 0; }
+        if (d < 300 && lineOfSight(e.x, e.y, tgt.x, tgt.y)) { e.state = 'wind'; e.stateT = 0; }
       } else if (e.state === 'wind') {
         moving = 0.12;
         e.chargeAngle = angleLerp(e.chargeAngle === undefined ? toPlayer : e.chargeAngle, toPlayer, 0.12);
@@ -2645,11 +2920,15 @@ function updateEnemy(e, dt) {
   collideWorld(e);
   e.angle = angleLerp(e.angle, Math.atan2(e.vy, e.vx) || toPlayer, Math.min(1, dt * 9));
 
-  // contact damage
-  if (e.contactCd <= 0 && d < e.r + player.r) {
-    damagePlayer(e.dmg, e.x, e.y);
+  // contact damage, against whatever it is actually chasing
+  if (e.contactCd <= 0 && d < e.r + tgt.r) {
+    if (tgt.minion) {
+      damageMinion(tgt, e.dmg, e);
+    } else {
+      damagePlayer(e.dmg, e.x, e.y);
+      if (player.thorns > 0) dealDamage(e, e.maxHp * player.thorns, 'thorns', { fromX: player.x, fromY: player.y });
+    }
     e.contactCd = 0.75;
-    if (player.thorns > 0) dealDamage(e, e.maxHp * player.thorns, 'thorns', { fromX: player.x, fromY: player.y });
     if (e.type === 'charger' && e.state === 'dash') { e.state = 'rest'; e.stateT = 0; }
   }
 }
@@ -3057,6 +3336,12 @@ function updateBullets(dt) {
         break;
       }
     } else if (!done && !b.friendly) {
+      for (const m of minions) {
+        if (m.dead || m.spawnT > 0) continue;
+        const mr = m.r + b.r;
+        if ((m.x - b.x) ** 2 + (m.y - b.y) ** 2 < mr * mr) { damageMinion(m, b.dmg, b); done = true; break; }
+      }
+      if (done) { bullets.splice(i, 1); continue; }
       const rr = player.r + b.r;
       if ((player.x - b.x) ** 2 + (player.y - b.y) ** 2 < rr * rr && player.invuln <= 0) {
         damagePlayer(b.dmg, b.x, b.y);
@@ -3522,6 +3807,18 @@ function drawHUD() {
     ctx.fillText(player.moveFire > 0.18 ? 'FIRING FROM MOVEMENT' : 'MOVE TO FIRE', pad + 5, my + 8);
     my += 16;
   }
+  if (player.minionCap > 0) {
+    bar(pad, my, barW * 0.8, 10, player.essence / player.essenceMax, player.essence >= player.summonCost ? '#b58cff' : '#4a3a6e');
+    ctx.font = '700 10px "Segoe UI",Roboto,sans-serif';
+    ctx.fillStyle = '#04121c';
+    ctx.fillText('ESSENCE  ' + Math.round(player.essence) + '/' + player.essenceMax, pad + 5, my + 8);
+    my += 16;
+    ctx.font = '700 11px "Segoe UI",Roboto,sans-serif';
+    ctx.fillStyle = player.rallyT > 0 ? '#ffffff' : '#b58cff';
+    ctx.fillText(minions.length + ' / ' + player.minionCap + ' THRALLS' +
+      (player.rallyT > 0 ? '  RALLYING' : (isTouch ? '' : '  (E rally, Q consume)')), pad, my + 9);
+    my += 16;
+  }
   if (player.drones > 0) {
     ctx.font = '700 11px "Segoe UI",Roboto,sans-serif';
     ctx.fillStyle = player.droneFocusT > 0 ? '#ffffff' : '#b8c6d8';
@@ -3621,6 +3918,10 @@ function drawMinimap() {
     const r = e.boss ? 3.6 : 2.2;
     ctx.beginPath(); ctx.arc(mx + e.x * sx, my + e.y * sy, r, 0, TAU); ctx.fill();
   }
+  for (const m of minions) {
+    ctx.fillStyle = '#b58cff';
+    ctx.beginPath(); ctx.arc(mx + m.x * sx, my + m.y * sy, 2, 0, TAU); ctx.fill();
+  }
   ctx.fillStyle = '#7ceaff';
   ctx.beginPath(); ctx.arc(mx + player.x * sx, my + player.y * sy, 2.6, 0, TAU); ctx.fill();
 
@@ -3666,6 +3967,8 @@ Object.assign(WEAPONS, {
   nailer:   { name: 'Nail Driver',      ico: '🔩', droneMain: true, dmg: 5, rof: 0.16, speed: 1250, spread: 0.06, count: 1, ammo: Infinity, kick: 1.4, size: 4, color: '#b8c6d8', pierce: 1 },
   mortar:   { name: 'Grenade Launcher', ico: '💣', dmg: 22, rof: 0.62,  speed: 720,  spread: 0.05, count: 1, ammo: Infinity, kick: 5,  size: 7,   color: '#ff8a3d', explode: 74 },
   scythe:   { name: 'Soul Scythe',      ico: '🌙', dmg: 16, rof: 0.34,  speed: 840,  spread: 0.26, count: 3, ammo: Infinity, kick: 3.4, size: 6,   color: '#d08bff', curve: 1.5, life: 0.85 },
+  sigil:    { name: 'Binding Sigil',    ico: '🕯', summon: true, dmg: 0, rof: 0.35, speed: 0, spread: 0,
+              count: 1, ammo: Infinity, kick: 0, size: 5, color: '#b58cff' },
   prism:    { name: 'Prism Beam',       ico: '🔺', dmg: 10, rof: 0.17,  speed: 1080, spread: 0.06, count: 2, ammo: Infinity, kick: 2.0, size: 4.5, color: '#7cffe0', bounce: 1 }
 });
 
@@ -3726,6 +4029,12 @@ const CHARACTERS = [
     apply: p => { p.maxHp = 75; p.hp = 75; p.lifesteal += 0.05; p.dmgMul *= 1.10; }
   },
   {
+    id: 'vessel', name: 'VESSEL', title: 'Summoner', ico: '🕯', color: '#b58cff', cost: 1400,
+    weapon: 'sigil', role: 'Your trigger does not shoot. It binds thralls where you point, and they walk, fight and die on their own while enemies chase them instead of you.',
+    passive: '3 thralls at 25 essence each. RALLY (E) sends them to the cursor; CONSUME (Q) detonates the nearest for 120 and heals 25',
+    apply: p => { p.minionCap = 3; p.essenceMax = 100; p.essence = 100; p.maxHp = 90; p.hp = 90; }
+  },
+  {
     id: 'iris', name: 'IRIS', title: 'Prism', ico: '🔺', color: '#7cffe0', cost: 2000,
     weapon: 'prism', role: 'Bank shots off the crates. Your bullets keep working after they miss.',
     passive: 'Shots bounce off walls once, +1 projectile',
@@ -3746,6 +4055,12 @@ function rogueStats() {
     mode: 'charge', meter: 0, meterMax: 0, meterCost: 14, meterGain: 3,
     dischargePower: 3.2, dischargeChain: 2,
     charge: 0, chargeMax: 0, chargePower: 2.2, chargeRate: 1.1, heldFire: false, moveFire: 0,
+    // summoning
+    minionCap: 0, minionDmg: 20, minionHp: 60, minionSpeed: 165, minionRate: 0.75,
+    essence: 0, essenceMax: 0, essenceRegen: 8, summonCost: 25, essenceOnKill: 12,
+    consumePower: 120, consumeHeal: 25, consumeRefund: 20,
+    rallyTime: 3, rallyPower: 0.5, rallyX: 0, rallyY: 0, rallyT: 0,
+    soulLink: 0, thrallBurst: 0, phylactery: 0, rebuildQueue: [],
     // defence
     shield: 0, shieldMax: 0, shieldRegen: 8, shieldDelay: 3.5, shieldTimer: 0,
     shieldBoom: 0, shieldDR: 0, shieldFlash: 0,
@@ -4025,6 +4340,7 @@ function updateFuses(dt) {
 
 /* ---------------- per-frame roguelite systems ---------------- */
 function updateRogue(dt) {
+  if (player.minionCap > 0 || minions.length) updateMinions(dt);
   updateShield(dt);
   updateOrbit(dt);
   updateDrones(dt);
@@ -4093,6 +4409,8 @@ function drawRogueFx(ox, oy) {
     }
     ctx.restore();
   }
+
+  if (minions.length || player.rallyT > 0) drawMinions(ox, oy);
 
   // drones
   for (const d of player.droneList) {
@@ -4341,7 +4659,11 @@ const TREE_FLAGS = {
   frenzy:      p => { p.killFrenzy = Math.max(p.killFrenzy, 0.25); },
   deathMark:   p => { p.markEvery = 5; p.markBonus += 0.5; },
   executioner: p => { p.execute += 0.12; },
-  desperate:   p => { p.desperateSpeed += 0.20; }
+  desperate:   p => { p.desperateSpeed += 0.20; },
+  // summoning
+  soulLink:    p => { p.soulLink = Math.max(p.soulLink, 0.25); },
+  thrallBurst: p => { p.thrallBurst = Math.max(p.thrallBurst, 90); },
+  phylactery:  p => { p.phylactery = Math.max(p.phylactery, 6); }
 };
 
 (function checkFlagCoverage() {
@@ -4415,6 +4737,19 @@ function applyTreeToPlayer(p, live) {
   p.dischargeChain += S.dischargeChain;
   p.chargePower += S.chargePower;
   p.chargeRate += S.chargeRate;
+  p.minionCap += S.minionCount;
+  p.minionDmg += S.minionDamage;
+  p.minionHp += S.minionHealth;
+  p.minionSpeed *= S.minionSpeed;
+  p.minionRate *= S.minionRate;
+  p.essenceRegen += S.essenceRegen;
+  p.summonCost = Math.max(5, p.summonCost + S.summonCost);
+  p.essenceOnKill += S.essenceOnKill;
+  p.consumePower += S.consumePower;
+  p.consumeHeal += S.consumeHeal;
+  p.consumeRefund += S.consumeRefund;
+  p.rallyPower += S.rallyPower;
+  p.rallyTime += S.rallyTime;
   p.homing += S.homingStrength;
   p.cluster += S.clusterCount;
   p.frostbite += S.frostbiteDamage;
@@ -4448,19 +4783,38 @@ function applyTreeToPlayer(p, live) {
   }
 }
 
-function updateActButton() {
-  const b = document.getElementById('actBtn');
-  if (!b) return;
-  if (!player || game.state !== 'play') { b.style.display = 'none'; return; }
-  if (player.meterMax > 0) {
-    b.style.display = 'block';
-    b.textContent = (player.mode === 'discharge' ? 'CHARGE MODE' : 'DISCHARGE') + (isTouch ? '' : '  \u2014 Q');
-  } else if (player.drones > 0) {
-    b.style.display = 'block';
-    b.textContent = 'FOCUS DRONES' + (isTouch ? '' : '  \u2014 E');
+/* Slot 1 is E, slot 2 is Q. Each operative wires them to its own mechanic. */
+function classAbility(slot) {
+  if (!player || game.state !== 'play') return;
+  if (slot === 1) {
+    if (player.minionCap > 0) rallyMinions();
+    else if (player.drones > 0) focusDrones();
   } else {
-    b.style.display = 'none';
+    if (player.minionCap > 0) consumeMinion();
+    else if (player.meterMax > 0) toggleArcMode();
   }
+}
+
+function abilityLabels() {
+  if (!player) return [null, null];
+  if (player.minionCap > 0) return ['RALLY', 'CONSUME'];
+  if (player.meterMax > 0) return [null, player.mode === 'discharge' ? 'CHARGE MODE' : 'DISCHARGE'];
+  if (player.drones > 0) return ['FOCUS DRONES', null];
+  return [null, null];
+}
+
+function updateActButton() {
+  const b1 = document.getElementById('actBtn');
+  const b2 = document.getElementById('actBtn2');
+  if (!b1 || !b2) return;
+  if (!player || game.state !== 'play') { b1.style.display = 'none'; b2.style.display = 'none'; return; }
+  const labels = abilityLabels();
+  b1.style.display = labels[0] ? 'block' : 'none';
+  b2.style.display = labels[1] ? 'block' : 'none';
+  if (labels[0]) b1.textContent = labels[0] + (isTouch ? '' : '  \u2014 E');
+  if (labels[1]) b2.textContent = labels[1] + (isTouch ? '' : '  \u2014 Q');
+  b1.style.left = labels[1] ? 'calc(50% - 92px)' : '50%';
+  b2.style.left = labels[0] ? 'calc(50% + 92px)' : '50%';
 }
 
 function updateSpButton() {
@@ -4493,7 +4847,7 @@ function togglePause() {
 
 function startRun(charId) {
   bullets = []; enemies = []; pickups = []; particles = []; texts = []; telegraphs = [];
-  arcs = []; fuses = [];
+  arcs = []; fuses = []; minions = [];
   player = makePlayer(charId || selectedChar);
   game.time = 0; game.score = 0; game.kills = 0; game.wave = 0;
   game.betweenWaves = 0; game.spawnQueue = []; game.banner = null;
@@ -4565,10 +4919,8 @@ document.getElementById('csBack').addEventListener('click', () => {
 document.getElementById('stClose').addEventListener('click', closeSkillTree);
 document.getElementById('treeBtn').addEventListener('click', openSkillTree);
 document.getElementById('spBtn').addEventListener('click', openSkillTree);
-document.getElementById('actBtn').addEventListener('click', () => {
-  if (player && player.meterMax > 0) toggleArcMode();
-  else if (player && player.drones > 0) focusDrones();
-});
+document.getElementById('actBtn').addEventListener('click', () => classAbility(1));
+document.getElementById('actBtn2').addEventListener('click', () => classAbility(2));
 document.getElementById('resumeBtn').addEventListener('click', togglePause);
 document.getElementById('quitBtn').addEventListener('click', () => {
   closeAllOverlays(); game.state = 'menu'; refreshMenu(); showOverlay('menu');

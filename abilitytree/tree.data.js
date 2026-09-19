@@ -144,7 +144,11 @@
     killChainCount: 0, onKillBlast: 0, droneRepair: 0, killHealAmount: 0, soulHeal: 0,
     // the four distinct weapon behaviours
     beamPower: 0, beamRamp: 0, beamRange: 0, focusPower: 0, focusTime: 0,
-    meterGain: 0, dischargePower: 0, dischargeChain: 0, chargePower: 0, chargeRate: 0
+    meterGain: 0, dischargePower: 0, dischargeChain: 0, chargePower: 0, chargeRate: 0,
+    // summoning
+    minionCount: 0, minionDamage: 0, minionHealth: 0, minionSpeed: 1, minionRate: 1,
+    essenceRegen: 0, summonCost: 0, essenceOnKill: 0,
+    consumePower: 0, consumeHeal: 0, consumeRefund: 0, rallyPower: 0, rallyTime: 0
   };
 
   const FLAGS = [
@@ -156,7 +160,8 @@
     'phaseDash', 'dashStrike', 'dashBlast', 'afterimage', 'blink', 'dashRefund',
     'bounceSplit', 'amplify', 'noFalloff', 'critPierce',
     'steadyAim', 'critBoom', 'volatile', 'carpet', 'megaShell',
-    'adrenaline', 'frenzy', 'deathMark', 'executioner', 'desperate'
+    'adrenaline', 'frenzy', 'deathMark', 'executioner', 'desperate',
+    'soulLink', 'thrallBurst', 'phylactery'
   ];
 
   const TREES = {};
@@ -768,6 +773,67 @@
       r('flock', 'Flock', '+2 projectiles that curve 2.6 faster and pass through 1 more enemy.', add('projectiles', 2), add('homingStrength', 2.6), add('pierce', 1)),
       y('wideseek', 'Wide Seek', '+12% fire rate and shots curve 2.6 faster.', mult('fireRate', 1.12), add('homingStrength', 5.2)),
       r('starfall', 'STARFALL', '+3 projectiles curving 5.2 faster, +15% fire rate, and shots pass through 2 more enemies. Each projectile deals 15% less.', add('projectiles', 3), add('homingStrength', 5.2), mult('fireRate', 1.15), add('pierce', 2), mult('damage', 0.85))
+    ]
+  });
+
+  /* ============================================================ VESSEL ============================================================ */
+  TREES.vessel = tree('vessel', 'VESSEL',
+    w('root', 'First Binding', 'Opens the pact. Essence regenerates 2 more per second (8 to 10).', add('essenceRegen', 2)),
+    [
+      arch('legion', 'Legion', '#b58cff',
+        'Legion wins on headcount. Swarm Call and Horde raise the thrall cap while Cheap Rite drops the essence a binding costs, so the field is never empty. Each thrall is no tougher for it, so a Legion build loses its whole army to one boss sweep.',
+        { difficulty: 'Low', damage: 'High', defense: 'Medium', range: 'Medium', speed: 'High' }),
+      arch('bond', 'Bond', '#8affb0',
+        'Bond makes the few thralls you have survive. Soul Link heals you for 25% of everything they deal, Reinforced Husk raises their health, and Phylactery returns any thrall an enemy kills after 6 seconds. It adds no thralls at all, so the damage ceiling is lower than Legion.',
+        { difficulty: 'Medium', damage: 'Medium', defense: 'High', range: 'Low', speed: 'Low' }),
+      arch('consumption', 'Consumption', '#ff6b9d',
+        'Consumption treats thralls as ammunition. CONSUME detonates the nearest one for 120 and heals you 25, Unstable Thralls makes any death a 90-damage blast, and Greedy Rite refunds the essence to bind the next. Spending your army is the damage, so Consumption is always one bad trade from standing alone.',
+        { difficulty: 'High', damage: 'High', defense: 'Low', range: 'Medium', speed: 'Medium' })
+    ], {
+    legion: [
+      w('vessel2', 'Second Vessel', '+1 thrall.', add('minionCount', 1)),
+      w('quickrite', 'Quick Rite', 'The sigil binds 20% faster (0.35s to 0.29s between thralls).', mult('fireRate', 1.20)),
+      w('cheaprite', 'Cheap Rite', 'Binding costs 4 less essence (25 to 21).', add('summonCost', -4)),
+      y('swarmcall', 'Swarm Call', '+1 thrall, and binding costs 4 less essence.', add('minionCount', 1), add('summonCost', -4)),
+      w('restless', 'Restless Dead', 'Thralls move 12% faster.', mult('minionSpeed', 1.12)),
+      r('endlesshost', 'Endless Host', '+2 thralls, and essence regenerates 4 more per second.', add('minionCount', 2), add('essenceRegen', 4)),
+      w('freshbind', 'Fresh Bindings', 'Essence regenerates 3 more per second.', add('essenceRegen', 3)),
+      y('horde', 'Horde', '+1 thrall, and thralls strike 15% faster (0.75s to 0.64s).', add('minionCount', 1), mult('minionRate', 0.85)),
+      r('legioncap', 'LEGION', '+3 thralls, binding costs 10 less essence, and essence regenerates 6 more per second. Thralls gain no health from this.', add('minionCount', 3), add('summonCost', -10), add('essenceRegen', 6))
+    ],
+    bond: [
+      w('husk', 'Reinforced Husk', 'Thralls have 25 more health (60 to 85).', add('minionHealth', 25)),
+      w('claws', 'Sharp Claws', 'Thralls deal 6 more damage per strike (20 to 26).', add('minionDamage', 6)),
+      w('warded', 'Warded Flesh', 'Thralls have 25 more health.', add('minionHealth', 25)),
+      y('soullink', 'Soul Link', 'You heal for 25% of all damage your thralls deal.', flag('soulLink')),
+      w('boneplate', 'Bone Plate', 'Thralls have 30 more health.', add('minionHealth', 30)),
+      r('bloodbond', 'Blood Bond', 'Thralls deal 14 more damage per strike, and you heal for 25% of it.', add('minionDamage', 14), flag('soulLink')),
+      w('ironclaws', 'Iron Claws', 'Thralls deal 8 more damage per strike.', add('minionDamage', 8)),
+      y('phylactery', 'Phylactery', 'A thrall killed by an enemy returns 6 seconds later at no cost. Thralls you consume do not return.', flag('phylactery')),
+      r('eternalbond', 'ETERNAL BOND', 'Thralls have 60 more health and deal 20 more damage per strike, and you heal for 25% of everything they deal.', add('minionHealth', 60), add('minionDamage', 20), flag('soulLink'))
+    ],
+    consumption: [
+      w('volatile', 'Volatile Remains', 'CONSUME detonates for 40 more damage (120 to 160).', add('consumePower', 40)),
+      w('siphon', 'Siphon', 'CONSUME heals 15 more (25 to 40).', add('consumeHeal', 15)),
+      w('greedy', 'Greedy Rite', 'Each kill returns 6 more essence (12 to 18).', add('essenceOnKill', 6)),
+      y('cannibal', 'Cannibal Rite', 'CONSUME detonates for 60 more damage and heals 15 more.', add('consumePower', 60), add('consumeHeal', 15)),
+      w('echoing', 'Echoing Blast', 'Explosions are 15% larger.', mult('explosionSize', 1.15)),
+      r('unstable', 'Unstable Thralls', 'Any thrall that dies detonates for 90 damage in a 110-unit radius, however it died.', flag('thrallBurst')),
+      w('deepwells', 'Deep Wells', 'Essence regenerates 3 more per second.', add('essenceRegen', 3)),
+      y('warcry', 'War Cry', 'RALLY lasts 2s longer and thralls strike twice as fast during it, up from 50% faster.', add('rallyTime', 2), add('rallyPower', 0.5)),
+      r('masssacrifice', 'MASS SACRIFICE', 'CONSUME detonates for 160 more damage and returns 30 more essence, and any dying thrall detonates for 90.', add('consumePower', 160), add('consumeRefund', 30), flag('thrallBurst'))
+    ],
+    legion_bond: [
+      y('gravehost', 'Grave Host', '+1 thrall, and thralls have 25 more health.', add('minionCount', 1), add('minionHealth', 25)),
+      r('deathless', 'Deathless Horde', '+1 thrall, and any thrall an enemy kills returns 6 seconds later.', add('minionCount', 1), flag('phylactery')),
+      y('packstrength', 'Pack Strength', 'Thralls deal 10 more damage per strike and move 10% faster.', add('minionDamage', 10), mult('minionSpeed', 1.10)),
+      r('unending', 'UNENDING LEGION', '+2 thralls with 40 more health that return 6 seconds after an enemy kills them.', add('minionCount', 2), add('minionHealth', 40), flag('phylactery'))
+    ],
+    bond_consumption: [
+      y('bitterharvest', 'Bitter Harvest', 'CONSUME heals 15 more, and thralls have 20 more health.', add('consumeHeal', 15), add('minionHealth', 20)),
+      r('sacrificiallink', 'Sacrificial Link', 'You heal for 25% of all thrall damage, and any dying thrall detonates for 90.', flag('soulLink'), flag('thrallBurst')),
+      y('reclamation', 'Reclamation', 'CONSUME returns 20 more essence and heals 15 more.', add('consumeRefund', 20), add('consumeHeal', 15)),
+      r('bloodengine', 'BLOOD ENGINE', 'Thralls deal 16 more damage and you heal for 25% of it; every thrall that dies detonates for 90 and returns 20 essence.', add('minionDamage', 16), flag('soulLink'), flag('thrallBurst'), add('consumeRefund', 20))
     ]
   });
 

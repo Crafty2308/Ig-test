@@ -41,7 +41,7 @@
   const flagSet = new Set(T.FLAGS);
   const BANNED = /\b(enhances?|improves?|empowers?|strengthens?|boosts?|better|greatly)\b/i;
 
-  eq(T.CHAR_IDS.length, 10, 'ten characters have trees');
+  eq(T.CHAR_IDS.length, 11, 'eleven characters have trees');
 
   for (const charId of T.CHAR_IDS) {
     const idx = T.INDEX[charId];

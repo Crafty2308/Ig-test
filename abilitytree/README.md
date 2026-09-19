@@ -6,10 +6,10 @@ no build step.
 
 | file | role |
 |---|---|
-| `tree.data.js` | the trees: 10 characters x 36 nodes, three archetype columns each, plain data |
+| `tree.data.js` | the trees: 11 characters x 36 nodes, three archetype columns each, plain data |
 | `tree.logic.js` | rules, compilation, persistence. Pure — no DOM, no game code |
 | `tree.ui.js` | rendering, tooltips, reset confirmation. Injects its own CSS |
-| `tree.test.js` | 6071 console assertions. `node tree.test.js`, or load it last in a page |
+| `tree.test.js` | 6671 console assertions. `node tree.test.js`, or load it last in a page |
 | `demo.html` | standalone harness: simulate levels, watch the compiled stats update |
 
 The files are classic scripts with a UMD-ish wrapper, so they load straight off
@@ -118,6 +118,7 @@ shown when the player hovers (or taps) the archetype's column header.
 | COG | Fabrication · Command · Ordnance |
 | BOOM | Payload · Submunitions · Shockwave |
 | MOURN | Hunger · Wrath · Harvest |
+| VESSEL | Legion · Bond · Consumption |
 | IRIS | Refraction · Seeker · Spectrum |
 
 ## Node descriptions

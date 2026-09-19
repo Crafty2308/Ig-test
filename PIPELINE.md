@@ -11,6 +11,7 @@ Sources pass **base** damage only; nothing applies its own multipliers.
 |---|---|
 | `shot` | the player's weapon |
 | `drone` | a COG drone's shot |
+| `minion` | a VESSEL thrall's melee strike |
 | `beam` | one tick of HALCYON's Cryo Beam |
 | `blade` | an orbiting blade touching an enemy |
 | `dash` | dash strike / blink contact |
@@ -38,8 +39,8 @@ exclusion.
 
 | modifier | sources it skips | reason |
 |---|---|---|
-| Multishot (`projectiles`) | blade, dash, blast, chain, burn, frost, aura, thorns, onkill | These have no emission step to duplicate. Blades scale on `orbitCount` instead, explosions on `clusterCount`. **Applies to `beam`** — multishot splits it into extra rays. |
-| Pierce | blade, dash, blast, chain, burn, frost, aura, thorns, onkill | No travel path to pass through. **Applies to `beam`** — pierce is how many bodies one ray damages. |
+| Multishot (`projectiles`) | minion, blade, dash, blast, chain, burn, frost, aura, thorns, onkill | These have no emission step to duplicate. Thrall strikes are melee, blades scale on `orbitCount`, explosions on `clusterCount`, and thralls on `minionCount`. **Applies to `beam`** — multishot splits it into extra rays. |
+| Pierce | minion, blade, dash, blast, chain, burn, frost, aura, thorns, onkill | No travel path to pass through. **Applies to `beam`** — pierce is how many bodies one ray damages. |
 | Wall bounce | beam, and all non-projectile sources | A beam is re-aimed from the player every frame, so a rebound has nothing to persist on between frames. The rest never travel. |
 | Homing | beam, and all non-projectile sources | The beam's direction is the player's aim, resolved every frame; there is nothing to steer. |
 | Explosive rounds (`volatile`) | beam, and all non-projectile sources | Continuous contact would detonate 60 times a second. Blasts from other sources already exist (`dashBlast`, `onKillBlast`). |
@@ -51,5 +52,5 @@ exclusion.
 
 Everything not listed above interacts. The checks in
 `scratchpad/pipeline.mjs` assert the damage multiplier, crit, lifesteal and the on-hit
-riders across all eleven live sources, and that drone shots carry multishot, pierce,
+riders across all twelve live sources, and that drone shots carry multishot, pierce,
 bounce, homing and explosive rounds.
