@@ -6,10 +6,10 @@ no build step.
 
 | file | role |
 |---|---|
-| `tree.data.js` | the trees: 10 characters x 34 nodes, three archetypes each, plain data |
+| `tree.data.js` | the trees: 10 characters x 36 nodes, three archetype columns each, plain data |
 | `tree.logic.js` | rules, compilation, persistence. Pure — no DOM, no game code |
 | `tree.ui.js` | rendering, tooltips, reset confirmation. Injects its own CSS |
-| `tree.test.js` | 4156 console assertions. `node tree.test.js`, or load it last in a page |
+| `tree.test.js` | 6071 console assertions. `node tree.test.js`, or load it last in a page |
 | `demo.html` | standalone harness: simulate levels, watch the compiled stats update |
 
 The files are classic scripts with a UMD-ish wrapper, so they load straight off
@@ -80,29 +80,52 @@ Blocks are permanent until `reset(state)`, which refunds everything.
 - **yellow** — meaningful modifiers to something already unlocked, always archetype-owned
 - **red** — rewrites a weapon behaviour or a core rule. Exactly 3 per archetype
 
+## Structure
+
+Each tree is one tall column-grid, 14 rows deep, scrolled top to bottom:
+
+- **Three archetype lanes** at grid columns 0, 2 and 4, nine nodes each, coloured by
+  archetype throughout.
+- **Two convergence columns** at grid columns 1 and 3, four nodes each. A convergence
+  hangs off both neighbouring lanes, is gated on *both* archetypes at once, and feeds
+  back into the lane below it, so the columns cross rather than run parallel.
+- **Five endings**, all mutually exclusive: one capstone per lane (needs all 8 of that
+  lane) and one fusion per convergence column (needs 5 of each of two archetypes plus
+  the convergence spine above it).
+
+A pure single-archetype build is possible and reaches its own capstone, but it can never
+touch a convergence node — that is the deliberate sacrifice. A two-archetype build gets
+the fusion ending and leaves the third lane untouched.
+
+Points are scarce on purpose: a full tree costs 86 points and a level-40 run banks 32,
+so a finished build covers roughly a third of it.
+
 ## Archetypes
 
-Each character has three of its own, fitted to how it plays:
+Each class has three of its own. Every archetype carries an identity paragraph that
+names the abilities involved, the state they create and the tradeoff they impose, plus
+Difficulty / Damage / Defense / Range / Speed each rated Low, Medium or High. Both are
+shown when the player hovers (or taps) the archetype's column header.
 
-| character | archetypes |
+| class | archetypes |
 |---|---|
 | ROOK | Bulwark · Retribution · Suppression |
 | CINDER | Wildfire · Immolation · Backdraft |
-| HALCYON | Permafrost · Shatter · Whiteout |
-| ARC | Conduction · Overload · Capacitor |
-| VEX | Precision · Penetration · Execution |
-| NYX | Momentum · Bladestorm · Phase |
-| COG | Fabrication · Support · Ordnance |
+| HALCYON | Sustained · Permafrost · Whiteout |
+| ARC | Capacitor · Discharge · Conduction |
+| VEX | Wind-Up · Penetration · Execution |
+| NYX | Velocity · Bladestorm · Phase |
+| COG | Fabrication · Command · Ordnance |
 | BOOM | Payload · Submunitions · Shockwave |
 | MOURN | Hunger · Wrath · Harvest |
 | IRIS | Refraction · Seeker · Spectrum |
 
-Every tree has the same shape, so archetypes stay comparable: 34 nodes, 19 white,
-6 yellow, 9 red — exactly 3 reds per archetype, one of which is that archetype's
-capstone. Each lane carries a mutually exclusive red pair at row 5, and the three
-capstones block each other, so a tree can end in exactly one of them. Gating is what
-forces commitment: a capstone needs 8 nodes of its own archetype plus 12 points spent,
-which a lane only reaches by being taken almost whole. Spreading evenly reaches none.
+## Node descriptions
+
+Every node states what it does in numbers, names the ability it changes, and states its
+downside in the same sentence. The test suite enforces this: each description must
+contain a digit, must not use `enhances / improves / empowers / strengthens / boosts /
+better / greatly`, and must be a punctuated sentence.
 
 ## Schema
 
@@ -114,7 +137,8 @@ which a lane only reaches by being taken almost whole. Spreading evenly reaches 
   col, row,                       // fixed column grid, rows unbounded
   parents: ['id'],                // connections are derived from these, never authored
   blocks:  ['id'],
-  reqs: { archetypeMin: { name, count }, pointsSpentMin: n },
+  dual: ['archA', 'archB'],       // a convergence node, coloured with both
+  reqs: { archetypeMins: [{ name, count }, ...], pointsSpentMin: n },
   effect:  { stat, op: 'add'|'mult', value } | { flag: 'name' },
   effects: [ ... ]                // optional list, for a node that does two things
 }
@@ -136,7 +160,8 @@ One key, `neon.abilityTree`:
   "chars": { "nyx": { "level": 12, "unlocked": ["nyx_root", "nyx_light"] }, "...": {} } }
 ```
 
-Points are derived from each character's own `level`, so a refund is automatic. `load()` never throws:
+Points are derived from each character's own `level` (`ceil(level * 0.8)`), so a refund
+is automatic. `load()` never throws:
 corrupt JSON, a `null` payload or blocked storage all return a fresh tree, an unknown
 node id wipes the build and hands every point back (reported in `state.refunded`, which
 the UI surfaces as a note), and a save that no longer satisfies the rules is trimmed

@@ -47,9 +47,11 @@
   /* ---------------- points ---------------- */
 
   /* the single hook the game calls. One point per level, a bonus every fifth. */
+  /* Deliberately scarce: a full tree costs ~86 points, and a level-40 run
+     banks ~32, so a build covers roughly a third of it. */
   function pointsForLevel(level) {
     const l = Math.max(0, Math.floor(level || 0));
-    return l + Math.floor(l / 5);
+    return Math.ceil(l * 0.8);
   }
 
   function costOf(nodeOrId, charId) {
@@ -151,12 +153,15 @@
     }
 
     const reqs = node.reqs || {};
-    if (reqs.archetypeMin) {
-      const { name, count } = reqs.archetypeMin;
-      const have = archetypeCounts(state)[name] || 0;
-      if (have < count) {
-        const label = idx.archetypes[name] ? idx.archetypes[name].name : name;
-        reasons.push('Requires ' + count + ' ' + label + ' abilities (you have ' + have + ')');
+    const mins = reqs.archetypeMins || (reqs.archetypeMin ? [reqs.archetypeMin] : []);
+    if (mins.length) {
+      const counts = archetypeCounts(state);
+      for (const m of mins) {
+        const have = counts[m.name] || 0;
+        if (have < m.count) {
+          const label = idx.archetypes[m.name] ? idx.archetypes[m.name].name : m.name;
+          reasons.push('Requires ' + m.count + ' ' + label + ' abilities (you have ' + have + ')');
+        }
       }
     }
     if (reqs.pointsSpentMin) {

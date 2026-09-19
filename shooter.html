@@ -22,6 +22,13 @@ html,body{
   user-select:none; -webkit-user-select:none; touch-action:none;
 }
 #game{position:fixed; inset:0; display:block; width:100%; height:100%; cursor:crosshair;}
+#actBtn{
+  display:none; position:fixed; left:50%; bottom:16px; transform:translateX(-50%); z-index:5;
+  padding:10px 20px; border:0; border-radius:22px; cursor:pointer;
+  font:700 13px/1 "Segoe UI",Roboto,sans-serif; letter-spacing:.1em;
+  color:#04121c; background:linear-gradient(180deg,#d8c8ff,#a88fff);
+  box-shadow:0 0 18px rgba(200,180,255,.5);
+}
 #spBtn{
   display:none; position:fixed; left:50%; top:12px; transform:translateX(-50%); z-index:5;
   padding:7px 16px; border:0; border-radius:20px; cursor:pointer;
@@ -135,6 +142,7 @@ h2{margin:0 0 14px; font-size:clamp(20px,4.5vw,30px); letter-spacing:.08em; colo
 <body>
 <canvas id="game"></canvas>
 <button id="spBtn">★ SKILL POINT</button>
+<button id="actBtn">ABILITY</button>
 
 <div class="overlay show" id="menu">
   <div class="panel">
@@ -213,24 +221,12 @@ h2{margin:0 0 14px; font-size:clamp(20px,4.5vw,30px); letter-spacing:.08em; colo
 <script>/* abilitytree/tree.data.js */
 /* ============================================================
    ability tree - DATA
-   One tree per operative. Each tree has its own three archetypes,
-   its own nodes, and its own capstones.
+   One tall tree per class. Three archetypes run as three parallel
+   columns that cross and converge; the strongest nodes sit on the
+   convergences and need points in two archetypes to reach.
 
-   node = {
-     id, name, desc,
-     tier:      'white' | 'yellow' | 'red'   -> drives cost, colour, tooltip framing
-     archetype: id of one of that tree's archetypes, or null (neutral, white only)
-     col, row:  fixed column grid, rows unbounded
-     parents:   [id]   - at least one must be unlocked (root = [])
-     blocks:    [id]   - taking this permanently locks those, until reset
-     reqs:      { archetypeMin: {name, count}, pointsSpentMin: n }
-     effect:    {stat, op:'add'|'mult', value} | {flag:'name'}
-     effects:   [ ...same... ]   - optional list when one node does two things
-   }
-
-   The w()/y()/r() and lane() helpers below only fill in the mechanical parts
-   (ids, grid position, parent chaining, tier gates). Every node's identity,
-   text and effects are written out by hand.
+   Node descriptions state numbers, name the ability they change, and
+   state their downside. No vague verbs.
    ============================================================ */
 (function (root, factory) {
   const api = factory();
@@ -239,77 +235,123 @@ h2{margin:0 0 14px; font-size:clamp(20px,4.5vw,30px); letter-spacing:.08em; colo
 })(typeof globalThis !== 'undefined' ? globalThis : this, function () {
   'use strict';
 
-  const TIER_COST = { white: 1, yellow: 2, red: 4 };
+  const TIER_COST = { white: 1, yellow: 2, red: 5 };
   const TIER_LABEL = { white: 'Minor', yellow: 'Modifier', red: 'Build-defining' };
-  const COLS = 9;
+  const COLS = 5;                       // lanes at 0 / 2 / 4, convergences at 1 and 3
 
-  /* effect constructors */
   const add = (stat, value) => ({ stat, op: 'add', value });
   const mult = (stat, value) => ({ stat, op: 'mult', value });
   const flag = name => ({ flag: name });
 
-  /* tier constructors - key, name, desc, then any number of effects */
   const mk = tier => (key, name, desc, ...effects) => ({ key, name, desc, tier, effects });
   const w = mk('white'), y = mk('yellow'), r = mk('red');
 
-  /* Every lane has the same shape, so archetypes stay comparable:
-       row1            entry           white
-       row2  left + right              white white
-       row3            gate            yellow  (needs 2 of this archetype)
-       row4  left + right              white white
-       row5  left + right              red red - mutually exclusive pair
-       row6            join            white   (either red leads here)
-       row7            modifier        yellow  (needs 6)
-       row8            capstone        red     (needs 8, blocks the other capstones)  */
-  function lane(charId, archId, col, defs) {
-    if (defs.length !== 11) throw new Error(charId + '/' + archId + ' needs 11 nodes, got ' + defs.length);
-    const [entry, l2, r2, gate, l4, r4, redL, redR, join, mod, cap] = defs;
+  /* archetype: identity text (names the ability, the state and the tradeoff)
+     plus the five ratings shown on its column header. */
+  const arch = (id, name, color, desc, ratings) => ({ id, name, color, desc, ratings });
+
+  /* ---- the shape every class shares ----
+     row  0      root
+     row  1,2    lane whites
+     row  3      convergence  (yellow, 2 of each neighbouring archetype)
+     row  4      lane white
+     row  5      lane yellow  (3 of its own)
+     row  6      convergence  (red, 4 of each)
+     row  7,8    lane white, lane red (5 of its own)
+     row  9      convergence  (yellow, 5 of each)
+     row 10,11   lane white, lane yellow (7 of its own)
+     row 12      lane capstone (red, all 8 of its own)
+     row 13      fusion capstone (red, 6 of each of two archetypes)
+     Every capstone and fusion blocks every other, so a tree ends in exactly one. */
+  const LANE_ROWS = [1, 2, 4, 5, 7, 8, 10, 11, 12];
+  const LANE_TIER = ['white', 'white', 'white', 'yellow', 'white', 'red', 'white', 'yellow', 'red'];
+  const CONV_ROWS = [3, 6, 9, 13];
+  const CONV_TIER = ['yellow', 'red', 'yellow', 'red'];
+
+  function tree(charId, name, rootNode, archetypes, lanes) {
+    const A = archetypes[0].id, B = archetypes[1].id, C = archetypes[2].id;
     const id = n => charId + '_' + n.key;
-    const L = col - 1, C = col, R = col + 1;
-
-    const node = (n, c, row, parents, extra) => Object.assign({
-      id: id(n), name: n.name, desc: n.desc, tier: n.tier, archetype: archId,
-      col: c, row: row, parents: parents,
-      effects: n.effects.length > 1 ? n.effects : undefined,
-      effect: n.effects.length === 1 ? n.effects[0] : undefined
-    }, extra || {});
-
-    const arch2 = { archetypeMin: { name: archId, count: 2 } };
-    const arch4 = { archetypeMin: { name: archId, count: 4 } };
-    const arch6 = { archetypeMin: { name: archId, count: 6 } };
-    const arch8 = { archetypeMin: { name: archId, count: 8 }, pointsSpentMin: 12 };
-
-    return [
-      node(entry, C, 1, [charId + '_root']),
-      node(l2, L, 2, [id(entry)]),
-      node(r2, R, 2, [id(entry)]),
-      node(gate, C, 3, [id(l2), id(r2)], { reqs: arch2 }),
-      node(l4, L, 4, [id(gate)]),
-      node(r4, R, 4, [id(gate)]),
-      node(redL, L, 5, [id(l4), id(gate)], { reqs: arch4, blocks: [id(redR)] }),
-      node(redR, R, 5, [id(r4), id(gate)], { reqs: arch4, blocks: [id(redL)] }),
-      node(join, C, 6, [id(redL), id(redR)]),
-      node(mod, C, 7, [id(join)], { reqs: arch6 }),
-      node(cap, C, 8, [id(mod)], { reqs: arch8, capstone: true })
-    ];
-  }
-
-  /* assembles a character's tree and wires the capstones to block each other */
-  function tree(charId, rootName, rootDesc, rootEffect, archetypes, lanes) {
     const nodes = [{
-      id: charId + '_root', name: rootName, desc: rootDesc, tier: 'white',
-      archetype: null, col: 4, row: 0, parents: [], effect: rootEffect
+      id: charId + '_root', name: rootNode.name, desc: rootNode.desc, tier: 'white',
+      archetype: null, col: 2, row: 0, parents: [],
+      effects: rootNode.effects.length > 1 ? rootNode.effects : undefined,
+      effect: rootNode.effects.length === 1 ? rootNode.effects[0] : undefined
     }];
-    for (const l of lanes) nodes.push.apply(nodes, l);
-    const caps = nodes.filter(n => n.capstone);
-    for (const c of caps) c.blocks = caps.filter(o => o !== c).map(o => o.id);
-    return { charId, archetypes, nodes };
+
+    const laneIds = {};
+    const build = (archId, col, defs) => {
+      if (defs.length !== 9) throw new Error(charId + '/' + archId + ' needs 9 lane nodes, got ' + defs.length);
+      laneIds[archId] = defs.map(id);
+      defs.forEach((n, i) => {
+        const tier = LANE_TIER[i];
+        const reqs = i === 3 ? { archetypeMins: [{ name: archId, count: 3 }] }
+                   : i === 5 ? { archetypeMins: [{ name: archId, count: 5 }] }
+                   : i === 7 ? { archetypeMins: [{ name: archId, count: 7 }] }
+                   : i === 8 ? { archetypeMins: [{ name: archId, count: 8 }], pointsSpentMin: 18 }
+                   : undefined;
+        nodes.push({
+          id: id(n), name: n.name, desc: n.desc, tier: tier, archetype: archId,
+          col: col, row: LANE_ROWS[i],
+          parents: i === 0 ? [charId + '_root'] : [id(defs[i - 1])],
+          reqs: reqs, capstone: i === 8 || undefined,
+          effects: n.effects.length > 1 ? n.effects : undefined,
+          effect: n.effects.length === 1 ? n.effects[0] : undefined
+        });
+      });
+    };
+    build(A, 0, lanes[A]);
+    build(B, 2, lanes[B]);
+    build(C, 4, lanes[C]);
+
+    /* convergences hang off both neighbouring lanes, and feed back into them */
+    const conv = (leftArch, rightArch, col, defs) => {
+      if (defs.length !== 4) throw new Error(charId + ' convergence needs 4 nodes, got ' + defs.length);
+      const counts = [2, 3, 4, 5];
+      const feeders = [1, 3, 5, 7];                // which lane row each one hangs off
+      defs.forEach((n, i) => {
+        // the convergence column is its own chain, cross-linked into both lanes
+        const parents = i === 0
+          ? [laneIds[leftArch][feeders[i]], laneIds[rightArch][feeders[i]]]
+          : i === 3
+            ? [id(defs[i - 1])]
+            : [id(defs[i - 1]), laneIds[leftArch][feeders[i]], laneIds[rightArch][feeders[i]]];
+        nodes.push({
+          id: id(n), name: n.name, desc: n.desc, tier: CONV_TIER[i],
+          archetype: null, dual: [leftArch, rightArch],
+          col: col, row: CONV_ROWS[i],
+          parents: parents,
+          reqs: {
+            archetypeMins: [{ name: leftArch, count: counts[i] }, { name: rightArch, count: counts[i] }],
+            pointsSpentMin: i === 3 ? 18 : undefined
+          },
+          capstone: i === 3 || undefined,
+          effects: n.effects.length > 1 ? n.effects : undefined,
+          effect: n.effects.length === 1 ? n.effects[0] : undefined
+        });
+      });
+    };
+    conv(A, B, 1, lanes[A + '_' + B]);
+    conv(B, C, 3, lanes[B + '_' + C]);
+
+    /* a convergence also opens the lane node beside it, so the columns cross */
+    for (const n of nodes) {
+      if (!n.dual) continue;
+      const nextRow = n.row + 1;
+      for (const laneArch of n.dual) {
+        const idx = LANE_ROWS.indexOf(nextRow);
+        if (idx === -1) continue;
+        const target = nodes.find(x => x.archetype === laneArch && x.row === nextRow);
+        if (target && target.parents.indexOf(n.id) === -1) target.parents.push(n.id);
+      }
+    }
+
+    /* every ending is exclusive with every other ending */
+    const ends = nodes.filter(n => n.capstone);
+    for (const c of ends) c.blocks = ends.filter(o => o !== c).map(o => o.id);
+
+    return { charId, name, archetypes, nodes };
   }
 
-  const arch = (id, name, color, blurb) => ({ id, name, color, blurb });
-
-  /* base values the compiler starts from.
-     'add' effects are summed onto the base, then 'mult' effects multiply. */
   const STAT_BASE = {
     // multipliers
     damage: 1, fireRate: 1, moveSpeed: 1, dashCooldown: 1, statusDuration: 1,
@@ -320,11 +362,12 @@ h2{margin:0 0 14px; font-size:clamp(20px,4.5vw,30px); letter-spacing:.08em; colo
     regen: 0, magnet: 0, burnDamage: 0, burnDuration: 0, orbitCount: 0, orbitDamage: 0,
     droneCount: 0, dashDamage: 0, execute: 0, berserk: 0, scoreBonus: 0, dropBonus: 0,
     bounces: 0, homingStrength: 0, clusterCount: 0, shieldRecharge: 0, frostbiteDamage: 0,
-    killChainCount: 0, onKillBlast: 0, droneRepair: 0, killHealAmount: 0, soulHeal: 0
+    killChainCount: 0, onKillBlast: 0, droneRepair: 0, killHealAmount: 0, soulHeal: 0,
+    // the four distinct weapon behaviours
+    beamPower: 0, beamRamp: 0, beamRange: 0, focusPower: 0, focusTime: 0,
+    meterGain: 0, dischargePower: 0, dischargeChain: 0, chargePower: 0, chargeRate: 0
   };
 
-  /* every flag any tree may set. The game maps these onto its own mechanics;
-     the test asserts no tree uses a flag that is not listed here. */
   const FLAGS = [
     'shieldBurst', 'fortress', 'secondWind',
     'ignite', 'wildfire', 'immolate', 'emberFeast', 'inferno',
@@ -334,502 +377,622 @@ h2{margin:0 0 14px; font-size:clamp(20px,4.5vw,30px); letter-spacing:.08em; colo
     'phaseDash', 'dashStrike', 'dashBlast', 'afterimage', 'blink', 'dashRefund',
     'bounceSplit', 'amplify', 'noFalloff', 'critPierce',
     'steadyAim', 'critBoom', 'volatile', 'carpet', 'megaShell',
-    'adrenaline', 'frenzy', 'deathMark',
-    'executioner', 'desperate'
+    'adrenaline', 'frenzy', 'deathMark', 'executioner', 'desperate'
   ];
 
   const TREES = {};
 
-  /* ============================================================
-     ROOK - Vanguard. Bulwark Rifle, recharging shield.
-     ============================================================ */
-  TREES.vanguard = tree('vanguard', 'Frame Uplink', 'Boot the armour. Everything hangs off this.', mult('damage', 1.04),
-    [arch('bulwark', 'Bulwark', '#6ec6ff', 'Outlast it. The shield is the build.'),
-     arch('retribution', 'Retribution', '#ff5c6e', 'Let them hit you. Make it the last thing they do.'),
-     arch('suppression', 'Suppression', '#ffc857', 'Never stop firing. Nothing gets close.')], [
-    lane('vanguard', 'bulwark', 1, [
-      w('plate', 'Plating', 'Heavier panels.', add('maxHp', 20)),
-      w('cell', 'Shield Cell', 'More capacity to burn.', add('shield', 25)),
-      w('coolant', 'Coolant Loop', 'The field cycles sooner.', add('shieldRecharge', 1)),
-      y('hardlight', 'Hardlight Weave', 'A far deeper field, and thicker armour under it.', add('shield', 40), add('armor', 0.05)),
-      w('deflect', 'Deflector', 'Angled panels shed damage.', add('armor', 0.06)),
-      w('capacitor', 'Capacitor', 'Bigger reservoir.', add('shield', 30)),
-      r('overshield', 'Overshield', 'When the shield breaks it goes off: a 140-damage shockwave clears the room around you.', flag('shieldBurst'), add('shield', 20)),
-      r('siege', 'Siege Mode', 'While the shield holds you take a quarter less damage, but the weight roots you.', flag('fortress'), mult('moveSpeed', 0.85)),
-      w('reinforce', 'Reinforce', 'More frame to protect.', add('maxHp', 30)),
-      y('secondskin', 'Second Skin', 'The field begins recharging almost immediately.', add('shieldRecharge', 1), add('shield', 25)),
-      r('immovable', 'IMMOVABLE', 'Nothing shifts you and nothing gets through: heavy armour, a field that never stays down.', add('armor', 0.20), flag('fortress'), add('shieldRecharge', 1))
-    ]),
-    lane('vanguard', 'retribution', 4, [
-      w('spikes', 'Spikes', 'Contact costs them.', add('thorns', 0.08)),
-      w('counter', 'Counterweight', 'Swing back harder.', mult('damage', 1.06)),
-      w('riposte', 'Riposte', 'Sharper edges.', add('thorns', 0.08)),
-      y('barbed', 'Barbed Plate', 'Anything that touches you loses a chunk of itself.', add('thorns', 0.15)),
-      w('hardened', 'Hardened', 'Take the hit better.', add('armor', 0.05)),
-      w('heavyframe', 'Heavy Frame', 'More to throw around.', add('maxHp', 25)),
-      r('painengine', 'Pain Engine', 'Damage climbs as your health falls. Wounded, you are the most dangerous thing here.', add('berserk', 0.04), flag('desperate')),
-      r('aegis', 'Aegis Protocol', 'Whatever strikes you is frozen where it stands and bleeds out in the cold.', add('slowPower', 0.35), flag('chillAura')),
-      w('vengeance', 'Vengeance', 'Answer everything.', mult('damage', 1.08)),
-      y('backlash', 'Backlash', 'Everything you kill detonates on the way out.', add('onKillBlast', 55)),
-      r('retaliation', 'RETALIATION ENGINE', 'Every wound you take is repaid as a blast, and your spikes gut anything that dares close.', add('thorns', 0.30), flag('shieldBurst'), add('onKillBlast', 55))
-    ]),
-    lane('vanguard', 'suppression', 7, [
-      w('trigger', 'Hair Trigger', 'Lighter sear.', mult('fireRate', 1.06)),
-      w('belt', 'Long Belt', 'Heavier rounds.', mult('damage', 1.06)),
-      w('stabilizer', 'Stabilizer', 'Steadier line.', add('critChance', 0.04)),
-      y('sustained', 'Sustained Fire', 'The rifle simply does not stop.', mult('fireRate', 1.14)),
-      w('apcore', 'AP Core', 'Punches past the first body.', add('pierce', 1)),
-      w('optics', 'Focus Optics', 'Find the seams.', add('critChance', 0.06)),
-      r('suppress', 'Suppression Field', 'Your fire pins them: everything you hit is dragged down to a crawl.', flag('chill'), add('slowPower', 0.30)),
-      r('breach', 'Breach Rounds', 'Rounds tear through the whole line without slowing, at the cost of bite per body.', add('pierce', 4), flag('noFalloff'), mult('damage', 0.80)),
-      w('feedramp', 'Feed Ramp', 'Faster cycling.', mult('fireRate', 1.08)),
-      y('grinder', 'Grinder', 'Anything already staggered takes far more from you.', mult('damage', 1.18)),
-      r('wallonlead', 'WALL OF LEAD', 'Two more rounds per pull and a savage rate of fire. Accuracy is somebody else\'s problem.', add('projectiles', 2), mult('fireRate', 1.25), mult('damage', 0.88))
-    ])
-  ]);
+  /* ============================================================ ROOK ============================================================ */
+  TREES.vanguard = tree('vanguard', 'ROOK',
+    w('root', 'Frame Uplink', 'Boots the armour. +4% damage from every source.', mult('damage', 1.04)),
+    [
+      arch('bulwark', 'Bulwark', '#6ec6ff',
+        'Bulwark makes the shield the weapon. Overshield detonates the field for 140 damage the moment it breaks, and Siege Mode cuts incoming damage 25% for as long as it holds. Siege costs 15% move speed, so Bulwark holds ground rather than taking it.',
+        { difficulty: 'Low', damage: 'Low', defense: 'High', range: 'Medium', speed: 'Low' }),
+      arch('retribution', 'Retribution', '#ff5c6e',
+        'Retribution charges attackers for touching you: Spikes returns a share of their own max HP on contact, and Pain Engine adds up to 40% damage as your health drops. It only pays out while you are hurt, so it works against the healing and shielding the rest of the class wants.',
+        { difficulty: 'High', damage: 'High', defense: 'Medium', range: 'Low', speed: 'Medium' }),
+      arch('suppression', 'Suppression', '#ffc857',
+        'Suppression never lets the Bulwark Rifle stop. Sustained Fire and Feed Ramp stack rate of fire, Breach Rounds punch through four more bodies without losing damage, and Wall of Lead adds two projectiles. Every red in the lane buys volume with damage per shot.',
+        { difficulty: 'Low', damage: 'Medium', defense: 'Low', range: 'High', speed: 'Medium' })
+    ], {
+    bulwark: [
+      w('plate', 'Plating', '+25 max HP.', add('maxHp', 25)),
+      w('cell', 'Shield Cell', '+30 shield capacity.', add('shield', 30)),
+      w('coolant', 'Coolant Loop', 'Your shield starts recharging 0.6s sooner and regenerates 5 more per second.', add('shieldRecharge', 1)),
+      y('hardlight', 'Hardlight Weave', '+45 shield capacity and 6% damage reduction.', add('shield', 45), add('armor', 0.06)),
+      w('deflect', 'Deflector', '7% damage reduction.', add('armor', 0.07)),
+      r('overshield', 'Overshield', 'When your shield breaks it detonates for 140 damage in a 150-unit radius. +20 shield capacity.', flag('shieldBurst'), add('shield', 20)),
+      w('capacitor', 'Capacitor', '+35 shield capacity.', add('shield', 35)),
+      y('secondskin', 'Second Skin', 'Shield recharge starts 0.6s sooner, regenerates 5 more per second, and gains 25 capacity.', add('shieldRecharge', 1), add('shield', 25)),
+      r('immovable', 'IMMOVABLE', 'While any shield remains, incoming damage is reduced 25%. Shield recharge starts a further 0.6s sooner with +5 regeneration, and you gain 20% damage reduction at all times.', flag('fortress'), add('shieldRecharge', 1), add('armor', 0.20))
+    ],
+    retribution: [
+      w('spikes', 'Spikes', 'Enemies that touch you take 8% of their own max HP.', add('thorns', 0.08)),
+      w('counter', 'Counterweight', '+7% damage.', mult('damage', 1.07)),
+      w('riposte', 'Riposte', 'Enemies that touch you take a further 8% of their own max HP.', add('thorns', 0.08)),
+      y('barbed', 'Barbed Plate', 'Enemies that touch you take a further 14% of their own max HP.', add('thorns', 0.14)),
+      w('hardened', 'Hardened', '6% damage reduction.', add('armor', 0.06)),
+      r('painengine', 'Pain Engine', '+4% damage for every 10% of max HP you are missing, up to +40% at 1 HP. Nothing at full health.', add('berserk', 0.04)),
+      w('vengeance', 'Vengeance', '+9% damage.', mult('damage', 1.09)),
+      y('backlash', 'Backlash', 'Every enemy you kill detonates for 55 damage in an 80-unit radius.', add('onKillBlast', 55)),
+      r('retaliation', 'RETALIATION ENGINE', 'Enemies that touch you take a further 30% of their own max HP, your shield detonates for 140 damage when it breaks, and every kill detonates for 55.', add('thorns', 0.30), flag('shieldBurst'), add('onKillBlast', 55))
+    ],
+    suppression: [
+      w('trigger', 'Hair Trigger', '+7% fire rate.', mult('fireRate', 1.07)),
+      w('belt', 'Long Belt', '+7% damage.', mult('damage', 1.07)),
+      w('stabilizer', 'Stabilizer', '+5% critical hit chance.', add('critChance', 0.05)),
+      y('sustained', 'Sustained Fire', '+14% fire rate.', mult('fireRate', 1.14)),
+      w('apcore', 'AP Core', 'Bullwark Rifle rounds pass through 1 more enemy.', add('pierce', 1)),
+      r('breach', 'Breach Rounds', 'Rounds pass through 4 more enemies and keep full damage through every one. Costs 20% damage per shot.', add('pierce', 4), flag('noFalloff'), mult('damage', 0.80)),
+      w('feedramp', 'Feed Ramp', '+9% fire rate.', mult('fireRate', 1.09)),
+      y('grinder', 'Grinder', '+18% damage.', mult('damage', 1.18)),
+      r('wallonlead', 'WALL OF LEAD', '+2 projectiles per shot and +25% fire rate. Each projectile deals 12% less damage.', add('projectiles', 2), mult('fireRate', 1.25), mult('damage', 0.88))
+    ],
+    bulwark_retribution: [
+      y('reactive', 'Reactive Plating', '+30 shield capacity, and enemies that touch you take 10% of their own max HP.', add('shield', 30), add('thorns', 0.10)),
+      r('thornfield', 'Thornfield', 'While any shield remains, incoming damage is reduced 25%. Enemies that touch you take a further 20% of their own max HP.', flag('fortress'), add('thorns', 0.20)),
+      y('counterfield', 'Counterfield', '+40 shield capacity and +10% damage.', add('shield', 40), mult('damage', 1.10)),
+      r('doctrine', 'FORTRESS DOCTRINE', 'Your shield detonates for 140 damage when it breaks, enemies that touch you take 30% of their own max HP, and damage taken is reduced 25% while any shield remains.', flag('shieldBurst'), add('thorns', 0.30), flag('fortress'))
+    ],
+    retribution_suppression: [
+      y('spite', 'Suppressive Spite', '+10% fire rate, and enemies that touch you take 10% of their own max HP.', mult('fireRate', 1.10), add('thorns', 0.10)),
+      r('bleedfire', 'Bleed Fire', 'Rifle rounds set enemies alight for 6 damage per second for 2s, and burning enemies take 45% more damage from every source.', flag('ignite'), flag('inferno')),
+      y('volley', 'Punishing Volley', '+12% damage and +8% fire rate.', mult('damage', 1.12), mult('fireRate', 1.08)),
+      r('laststand', 'LAST STAND', '+4% damage per 10% missing HP, +20% fire rate, and once per wave a killing blow leaves you at 25 HP with 1.6s of invulnerability instead.', add('berserk', 0.04), mult('fireRate', 1.20), flag('secondWind'))
+    ]
+  });
 
-  /* ============================================================
-     CINDER - Pyro. Flame Projector.
-     ============================================================ */
-  TREES.cinder = tree('cinder', 'Ignition Core', 'Light the pilot flame.', add('burnDamage', 2),
-    [arch('wildfire', 'Wildfire', '#ff8a3d', 'Fire that spreads on its own.'),
-     arch('immolation', 'Immolation', '#ffc857', 'Be the hazard. Stand in the middle of it.'),
-     arch('backdraft', 'Backdraft', '#ff5c6e', 'Move through them and leave the room burning.')], [
-    lane('cinder', 'wildfire', 1, [
-      w('accel', 'Accelerant', 'Hotter mix.', add('burnDamage', 3)),
-      w('fuel', 'Fuel Tanks', 'Longer burn.', add('burnDuration', 0.7)),
-      w('pressure', 'Pressure Valve', 'Faster throughput.', mult('fireRate', 1.08)),
-      y('catalyst', 'Catalyst', 'Everything you set alight burns hotter and longer.', add('burnDamage', 5), mult('statusDuration', 1.25)),
-      w('napalm', 'Napalm', 'It sticks.', add('burnDuration', 0.8)),
-      w('richmix', 'Rich Mix', 'More fuel per pull.', add('burnDamage', 4)),
-      r('spread', 'Wildfire', 'A burning body is a bomb: whatever dies alight passes the fire to everything nearby.', flag('wildfire')),
-      r('inferno', 'Inferno', 'Fire no longer just ticks. Anything burning takes brutally more from every source.', flag('inferno'), add('burnDamage', 4)),
-      w('bellows', 'Bellows', 'Feed the flame.', add('burnDamage', 5)),
-      y('feast', 'Ember Feast', 'Killing something that burns feeds you.', flag('emberFeast'), add('lifesteal', 0.02)),
-      r('firestorm', 'FIRESTORM', 'The arena becomes the weapon: fire spreads, feeds and doubles back on everything still standing.', flag('wildfire'), flag('inferno'), add('burnDamage', 10))
-    ]),
-    lane('cinder', 'immolation', 4, [
-      w('pilot', 'Pilot Light', 'A permanent halo of heat.', flag('immolate')),
-      w('radiant', 'Radiant Plating', 'Wider reach.', mult('auraRadius', 1.15)),
-      w('heatsink', 'Heat Sink', 'Stand the heat.', add('maxHp', 20)),
-      y('corona', 'Corona', 'The halo becomes a furnace you carry.', mult('auraRadius', 1.25), add('burnDamage', 4)),
-      w('emitters', 'Emitters', 'Push it further out.', mult('auraRadius', 1.15)),
-      w('ceramic', 'Ceramic Weave', 'Shrug off the backwash.', add('armor', 0.08)),
-      r('pyreheart', 'Pyre Heart', 'The fire around you feeds on the dying: every kill heals you and stokes the halo.', flag('emberFeast'), add('killHealAmount', 6)),
-      r('meltdown', 'Meltdown', 'Contact is fatal for them: the halo detonates whatever it finishes.', add('onKillBlast', 55), flag('immolate')),
-      w('convection', 'Convection', 'Hotter still.', add('burnDamage', 6)),
-      y('scorched', 'Scorched Earth', 'Your dash drags the fire with you.', flag('afterimage')),
-      r('sunwell', 'SUNWELL', 'You stop being a shooter. Standing near you is the kill condition.', mult('auraRadius', 1.6), add('burnDamage', 14), flag('immolate'))
-    ]),
-    lane('cinder', 'backdraft', 7, [
-      w('lightrig', 'Light Rig', 'Move faster.', mult('moveSpeed', 1.06)),
-      w('jets', 'Jets', 'Recharge the dash sooner.', mult('dashCooldown', 0.9)),
-      w('thermals', 'Thermals', 'Ride the heat.', mult('moveSpeed', 1.05)),
-      y('flashover', 'Flashover', 'Dashing tears a burning wake behind you.', flag('afterimage'), add('burnDamage', 3)),
-      w('vents', 'Vents', 'Another charge sooner.', mult('dashCooldown', 0.85)),
-      w('chassis', 'Light Chassis', 'Less to carry.', mult('moveSpeed', 1.06)),
-      r('detonator', 'Detonator', 'Every dash ends in a fireball.', flag('dashBlast'), mult('explosionSize', 1.2)),
-      r('phasefire', 'Phase Fire', 'You pass through the fight untouchable, igniting everything you cross.', flag('phaseDash'), flag('dashStrike'), add('dashDamage', 60)),
-      w('afterburn', 'Afterburn', 'The wake lingers.', mult('statusDuration', 1.2)),
-      y('chainrush', 'Chain Rush', 'Kills hand the dash straight back.', flag('dashRefund'), add('dashCharges', 1)),
-      r('cometrun', 'COMET RUN', 'Three charges, a blazing trail, and a detonation at the end of every one.', add('dashCharges', 2), flag('afterimage'), flag('dashBlast'))
-    ])
-  ]);
+  /* ============================================================ CINDER ============================================================ */
+  TREES.cinder = tree('cinder', 'CINDER',
+    w('root', 'Ignition Core', 'Lights the pilot flame. Flame Projector hits set enemies alight for 2 more damage per second.', add('burnDamage', 2)),
+    [
+      arch('wildfire', 'Wildfire', '#ff8a3d',
+        'Wildfire makes the burn do the killing. Catalyst raises burn damage and duration, Spread passes the fire from any burning corpse to everything within 110 units, and Inferno adds 45% damage from every source against anything alight. It needs targets to live long enough to burn, so it is weak against single tough enemies.',
+        { difficulty: 'Medium', damage: 'High', defense: 'Low', range: 'Low', speed: 'Medium' }),
+      arch('immolation', 'Immolation', '#ffc857',
+        'Immolation makes standing near you lethal. Pilot Light burns everything within 70 units for 12 per second, Corona widens that ring, and Pyre Heart turns each kill inside it into healing. You have to be in melee range for any of it to work.',
+        { difficulty: 'High', damage: 'Medium', defense: 'Medium', range: 'Low', speed: 'Low' }),
+      arch('backdraft', 'Backdraft', '#ff5c6e',
+        'Backdraft turns the dash into the attack. Flashover leaves a burning trail behind every dash, Detonator ends each one in a 90-damage blast, and Chain Rush refunds a charge on every kill so the dashes never stop. Damage comes from moving, not from aiming.',
+        { difficulty: 'Medium', damage: 'Medium', defense: 'Medium', range: 'Low', speed: 'High' })
+    ], {
+    wildfire: [
+      w('accel', 'Accelerant', 'Burning enemies take 3 more damage per second.', add('burnDamage', 3)),
+      w('fuel', 'Fuel Tanks', 'Burns last 0.7s longer.', add('burnDuration', 0.7)),
+      w('pressure', 'Pressure Valve', '+8% fire rate.', mult('fireRate', 1.08)),
+      y('catalyst', 'Catalyst', 'Burning enemies take 5 more damage per second, and every status you apply lasts 25% longer.', add('burnDamage', 5), mult('statusDuration', 1.25)),
+      w('napalm', 'Napalm', 'Burns last 0.8s longer.', add('burnDuration', 0.8)),
+      r('spread', 'Wildfire', 'When a burning enemy dies, everything within 110 units catches fire at your current burn damage.', flag('wildfire')),
+      w('bellows', 'Bellows', 'Burning enemies take 5 more damage per second.', add('burnDamage', 5)),
+      y('feast', 'Ember Feast', 'Killing a burning enemy heals you for 5, and you heal for 2% of all damage dealt.', flag('emberFeast'), add('lifesteal', 0.02)),
+      r('firestorm', 'FIRESTORM', 'Burning enemies take 45% more damage from every source and 10 more damage per second, and any burning corpse sets fire to everything within 110 units.', flag('inferno'), add('burnDamage', 10), flag('wildfire'))
+    ],
+    immolation: [
+      w('pilot', 'Pilot Light', 'Everything within 70 units of you burns for 12 damage per second.', flag('immolate')),
+      w('radiant', 'Radiant Plating', 'Your aura radius is 15% larger.', mult('auraRadius', 1.15)),
+      w('heatsink', 'Heat Sink', '+25 max HP.', add('maxHp', 25)),
+      y('corona', 'Corona', 'Aura radius +25%, and burning enemies take 4 more damage per second.', mult('auraRadius', 1.25), add('burnDamage', 4)),
+      w('emitters', 'Emitters', 'Aura radius +15%.', mult('auraRadius', 1.15)),
+      r('pyreheart', 'Pyre Heart', 'Killing a burning enemy heals you for 5, and every kill heals you for a further 6.', flag('emberFeast'), add('killHealAmount', 6)),
+      w('convection', 'Convection', 'Burning enemies take 6 more damage per second.', add('burnDamage', 6)),
+      y('meltdown', 'Meltdown', 'Every kill detonates for 55 damage in an 80-unit radius.', add('onKillBlast', 55)),
+      r('sunwell', 'SUNWELL', 'Aura radius +60%, everything in it burns for a further 14 damage per second, and enemies inside are set alight continuously.', mult('auraRadius', 1.60), add('burnDamage', 14), flag('immolate'))
+    ],
+    backdraft: [
+      w('lightrig', 'Light Rig', '+6% move speed.', mult('moveSpeed', 1.06)),
+      w('jets', 'Jets', 'Dash recharges 10% faster.', mult('dashCooldown', 0.90)),
+      w('thermals', 'Thermals', '+5% move speed.', mult('moveSpeed', 1.05)),
+      y('flashover', 'Flashover', 'Dashing leaves a burning trail that sets enemies alight, and burns deal 3 more damage per second.', flag('afterimage'), add('burnDamage', 3)),
+      w('vents', 'Vents', 'Dash recharges 15% faster.', mult('dashCooldown', 0.85)),
+      r('detonator', 'Detonator', 'Every dash ends in a 90-damage explosion, with 20% larger blasts.', flag('dashBlast'), mult('explosionSize', 1.20)),
+      w('chassis', 'Light Chassis', '+6% move speed.', mult('moveSpeed', 1.06)),
+      y('chainrush', 'Chain Rush', 'Every kill refunds a dash charge, and you gain 1 more charge.', flag('dashRefund'), add('dashCharges', 1)),
+      r('cometrun', 'COMET RUN', '+2 dash charges, dashes leave a burning trail, and each one ends in a 90-damage explosion.', add('dashCharges', 2), flag('afterimage'), flag('dashBlast'))
+    ],
+    wildfire_immolation: [
+      y('emberfield', 'Ember Field', 'Aura radius +20%, and burning enemies take 4 more damage per second.', mult('auraRadius', 1.20), add('burnDamage', 4)),
+      r('conflagration', 'Conflagration', 'Everything within 70 units of you burns for 12 per second, and any burning corpse sets fire to everything within 110 units.', flag('immolate'), flag('wildfire')),
+      y('hearth', 'Hearth', 'Killing a burning enemy heals 5, and burns last 30% longer.', flag('emberFeast'), mult('statusDuration', 1.30)),
+      r('pyreclasm', 'PYRECLASM', 'Burning enemies take 45% more damage from every source, your aura burns everything within 70 units, and burning corpses spread the fire.', flag('inferno'), flag('immolate'), flag('wildfire'))
+    ],
+    immolation_backdraft: [
+      y('scorchrun', 'Scorched Run', 'Dashes leave a burning trail, and aura radius +15%.', flag('afterimage'), mult('auraRadius', 1.15)),
+      r('wildfiredash', 'Firewalker', 'Every dash ends in a 90-damage explosion and every kill refunds a dash charge.', flag('dashBlast'), flag('dashRefund')),
+      y('emberwake', 'Ember Wake', '+8% move speed, and every kill heals you for 6.', mult('moveSpeed', 1.08), add('killHealAmount', 6)),
+      r('inferno_engine', 'INFERNO ENGINE', '+2 dash charges, each dash ends in a 90-damage blast and leaves a burning trail, and enemies within 70 units burn continuously.', add('dashCharges', 2), flag('dashBlast'), flag('afterimage'), flag('immolate'))
+    ]
+  });
 
-  /* ============================================================
-     HALCYON - Cryomancer. Cryo Lance.
-     ============================================================ */
-  TREES.halcyon = tree('halcyon', 'Coolant Core', 'Bring the temperature down.', add('slowPower', 0.08),
-    [arch('permafrost', 'Permafrost', '#8ad8ff', 'Deeper, longer, colder.'),
-     arch('shatter', 'Shatter', '#bfeaff', 'Frozen things break. Break them.'),
-     arch('whiteout', 'Whiteout', '#6ec6ff', 'Own the ground they have to cross.')], [
-    lane('halcyon', 'permafrost', 1, [
-      w('coating', 'Cryo Coating', 'Colder rounds.', add('slowPower', 0.08)),
-      w('lingering', 'Lingering Frost', 'It outstays the hit.', mult('statusDuration', 1.2)),
-      w('supercool', 'Supercooled', 'Sharper bite.', add('slowPower', 0.08)),
-      y('deepfreeze', 'Deep Freeze', 'What you hit barely moves at all.', add('slowPower', 0.18)),
-      w('icecore', 'Ice Core', 'Colder still.', add('slowPower', 0.08)),
-      w('rime', 'Rime', 'The chill lasts.', mult('statusDuration', 1.25)),
-      r('flashfreeze', 'Flash Freeze', 'Chilled enemies bleed out in the cold, taking steady damage the whole time.', add('frostbiteDamage', 10)),
-      r('blacklice', 'Black Ice', 'The cold spreads: anything that dies frozen chills everything around it.', flag('shatterChain'), flag('chillAura')),
-      w('glacial', 'Glacial Rounds', 'Heavier cold.', add('slowPower', 0.08)),
-      y('hypothermia', 'Hypothermia', 'The longer they stay chilled, the worse it gets.', add('frostbiteDamage', 10), mult('statusDuration', 1.3)),
-      r('absolutezero', 'ABSOLUTE ZERO', 'Nothing in your presence moves at its own pace, and the cold never lifts.', add('slowPower', 0.30), mult('statusDuration', 1.5), flag('chillAura'))
-    ]),
-    lane('halcyon', 'shatter', 4, [
-      w('fracture', 'Fracture Lines', 'Find the cracks.', add('critChance', 0.05)),
-      w('heavylance', 'Heavy Lance', 'Drive it deeper.', mult('damage', 1.08)),
-      w('brittle', 'Brittle', 'Cold makes them fragile.', mult('damage', 1.06)),
-      y('shatterpoint', 'Shatterpoint', 'Anything chilled comes apart under your fire.', mult('damage', 1.25)),
-      w('splinter', 'Splinter', 'Through the first body.', add('pierce', 1)),
-      w('coldsteel', 'Cold Steel', 'Harder impacts.', add('critDamage', 0.3)),
-      r('stasislock', 'Stasis Lock', 'A chilled enemy under a fifth of its health does not die. It shatters.', flag('stasis')),
-      r('icepick', 'Ice Pick', 'Every critical hit detonates in a spray of frozen shards.', flag('critBoom'), add('critChance', 0.1)),
-      w('cleave', 'Cleave', 'More force behind it.', mult('damage', 1.08)),
-      y('avalanche', 'Avalanche', 'Shattered bodies take their neighbours with them.', flag('shatterChain'), add('onKillBlast', 55)),
-      r('killingfrost', 'KILLING FROST', 'Frozen is dead: the threshold rises and every shatter sets off the next.', add('execute', 0.15), flag('stasis'), flag('shatterChain'))
-    ]),
-    lane('halcyon', 'whiteout', 7, [
-      w('fog', 'Cold Fog', 'A chill hangs around you.', flag('chillAura')),
-      w('frontage', 'Frontage', 'Wider field.', mult('auraRadius', 1.2)),
-      w('insulate', 'Insulation', 'Hold your ground.', add('maxHp', 25)),
-      y('blizzard', 'Blizzard', 'The field around you drags on everything in it.', mult('auraRadius', 1.3), add('slowPower', 0.1)),
-      w('drift', 'Snowdrift', 'Further out.', mult('auraRadius', 1.2)),
-      w('coldarmor', 'Cold Armour', 'Frost on your own plating.', add('armor', 0.08)),
-      r('cryonova', 'Cryo Nova', 'Every dash detonates a freezing nova around you.', flag('cryoNova')),
-      r('gravitywell', 'Gravity Well', 'Explosions collapse into wells that hold whatever survives.', flag('gravityWell'), mult('explosionSize', 1.25)),
-      w('deepcold', 'Deep Cold', 'The field bites.', add('frostbiteDamage', 10)),
-      y('stormfront', 'Stormfront', 'The field moves with you and never thins.', mult('auraRadius', 1.25), mult('statusDuration', 1.2)),
-      r('whiteout', 'WHITEOUT', 'The arena is yours. Everything inside it is slowed, freezing and dying on your terms.', mult('auraRadius', 1.7), add('slowPower', 0.2), add('frostbiteDamage', 10))
-    ])
-  ]);
+  /* ============================================================ HALCYON ============================================================ */
+  TREES.halcyon = tree('halcyon', 'HALCYON',
+    w('root', 'Coolant Core', 'Primes the emitter. Cryo Beam deals 6 more damage per second.', add('beamPower', 6)),
+    [
+      arch('sustained', 'Sustained', '#8ad8ff',
+        'Sustained is about contact time. The Cryo Beam ramps to 2.8x damage after 2.6s on one target; Focused Lens raises that ceiling and Long Emitter extends the beam so you can hold it from further away. Switching targets bleeds the ramp, so it punishes panic.',
+        { difficulty: 'High', damage: 'High', defense: 'Low', range: 'High', speed: 'Low' }),
+      arch('permafrost', 'Permafrost', '#6ec6ff',
+        'Permafrost stacks the chill the beam applies until nothing can close on you. Deep Freeze raises slow power, Hypothermia makes chilled enemies bleed 10 per second, and Stasis Lock shatters any chilled enemy below 20% health outright. It adds almost no raw damage on its own.',
+        { difficulty: 'Low', damage: 'Medium', defense: 'High', range: 'Medium', speed: 'Medium' }),
+      arch('whiteout', 'Whiteout', '#bfeaff',
+        'Whiteout fights the room instead of the target. Cold Fog chills everything within 150 units, Cryo Nova freezes a 190-unit circle on every dash, and Gravity Well drags survivors of any explosion. Its damage is all indirect, so it needs the beam or Permafrost to close kills.',
+        { difficulty: 'Medium', damage: 'Low', defense: 'High', range: 'Medium', speed: 'Medium' })
+    ], {
+    sustained: [
+      w('focus1', 'Focusing Ring', 'Cryo Beam deals 6 more damage per second.', add('beamPower', 6)),
+      w('emitter1', 'Long Emitter', 'Cryo Beam reaches 60 units further.', add('beamRange', 60)),
+      w('coil1', 'Cooled Coil', 'Cryo Beam deals 6 more damage per second.', add('beamPower', 6)),
+      y('lens', 'Focusing Lens', 'Cryo Beam ramps to 3.4x instead of 2.8x at full contact time, and deals 5 more damage per second.', add('beamRamp', 0.6), add('beamPower', 5)),
+      w('aperture', 'Wide Aperture', 'Cryo Beam reaches 60 units further.', add('beamRange', 60)),
+      r('overdrive', 'Overdrive', 'Cryo Beam ramps to 4.6x at full contact time. The ramp still resets if you switch targets.', add('beamRamp', 1.8)),
+      w('supercool', 'Supercooled', 'Cryo Beam deals 8 more damage per second.', add('beamPower', 8)),
+      y('pierce_beam', 'Penetrating Beam', 'Cryo Beam passes through 2 more enemies, damaging each one.', add('pierce', 2)),
+      r('zeropoint', 'ZERO POINT', 'Cryo Beam ramps to 5.4x at full contact time and deals 18 more damage per second, and passes through 2 more enemies.', add('beamRamp', 2.6), add('beamPower', 18), add('pierce', 2))
+    ],
+    permafrost: [
+      w('coating', 'Cryo Coating', 'Chill slows 8% harder.', add('slowPower', 0.08)),
+      w('lingering', 'Lingering Frost', 'Chill lasts 20% longer.', mult('statusDuration', 1.20)),
+      w('icecore', 'Ice Core', 'Chill slows 8% harder.', add('slowPower', 0.08)),
+      y('deepfreeze', 'Deep Freeze', 'Chill slows 18% harder.', add('slowPower', 0.18)),
+      w('rime', 'Rime', 'Chill lasts 25% longer.', mult('statusDuration', 1.25)),
+      r('hypothermia', 'Hypothermia', 'Chilled enemies take 10 damage per second for as long as the chill lasts.', add('frostbiteDamage', 10)),
+      w('glacial', 'Glacial Rounds', 'Chill slows 8% harder.', add('slowPower', 0.08)),
+      y('brittle', 'Brittle', 'Chilled enemies take 35% more damage from every source.', mult('damage', 1.35)),
+      r('stasislock', 'STASIS LOCK', 'A chilled enemy below 20% health shatters instantly, chilling everything within 150 units of it. Chill slows a further 20% harder.', flag('stasis'), flag('shatterChain'), add('slowPower', 0.20))
+    ],
+    whiteout: [
+      w('fog', 'Cold Fog', 'Everything within 150 units of you is chilled continuously.', flag('chillAura')),
+      w('frontage', 'Frontage', 'Aura radius +20%.', mult('auraRadius', 1.20)),
+      w('insulate', 'Insulation', '+25 max HP.', add('maxHp', 25)),
+      y('blizzard', 'Blizzard', 'Aura radius +30%, and chill slows 10% harder.', mult('auraRadius', 1.30), add('slowPower', 0.10)),
+      w('drift', 'Snowdrift', 'Aura radius +20%.', mult('auraRadius', 1.20)),
+      r('cryonova', 'Cryo Nova', 'Every dash freezes everything within 190 units for 1.5s.', flag('cryoNova')),
+      w('coldarmor', 'Cold Armour', '8% damage reduction.', add('armor', 0.08)),
+      y('deepcold', 'Deep Cold', 'Chilled enemies take 10 damage per second.', add('frostbiteDamage', 10)),
+      r('whiteout', 'WHITEOUT', 'Aura radius +70%, chill slows 20% harder, and chilled enemies take a further 10 damage per second.', mult('auraRadius', 1.70), add('slowPower', 0.20), add('frostbiteDamage', 10))
+    ],
+    sustained_permafrost: [
+      y('frostlens', 'Frost Lens', 'Cryo Beam deals 8 more damage per second and chill slows 10% harder.', add('beamPower', 8), add('slowPower', 0.10)),
+      r('shatterbeam', 'Shatter Beam', 'Chilled enemies take 10 damage per second, and Cryo Beam ramps to 3.6x at full contact time.', add('frostbiteDamage', 10), add('beamRamp', 0.8)),
+      y('coldfocus', 'Cold Focus', 'Cryo Beam deals 10 more damage per second and chill lasts 25% longer.', add('beamPower', 10), mult('statusDuration', 1.25)),
+      r('absolutebeam', 'ABSOLUTE ZERO', 'Cryo Beam ramps to 4.4x and deals 14 more damage per second; chilled enemies below 20% health shatter instantly.', add('beamRamp', 1.6), add('beamPower', 14), flag('stasis'))
+    ],
+    permafrost_whiteout: [
+      y('frostfield', 'Frost Field', 'Aura radius +20% and chill slows 10% harder.', mult('auraRadius', 1.20), add('slowPower', 0.10)),
+      r('glacierfield', 'Glacier Field', 'Everything within 150 units is chilled continuously and takes 10 damage per second.', flag('chillAura'), add('frostbiteDamage', 10)),
+      y('novafrost', 'Nova Frost', 'Every dash freezes everything within 190 units, and chill lasts 25% longer.', flag('cryoNova'), mult('statusDuration', 1.25)),
+      r('icecap', 'ICE AGE', 'Everything within 150 units is chilled, chilled enemies below 20% health shatter and chill their neighbours, and aura radius is 50% larger.', flag('chillAura'), flag('stasis'), flag('shatterChain'), mult('auraRadius', 1.50))
+    ]
+  });
 
-  /* ============================================================
-     ARC - Tesla. Arc Coil.
-     ============================================================ */
-  TREES.arc = tree('arc', 'Coil Primer', 'Charge the coil.', add('chainCount', 1),
-    [arch('conduction', 'Conduction', '#c8b4ff', 'One shot, many bodies.'),
-     arch('overload', 'Overload', '#ff8aff', 'Every death is the next discharge.'),
-     arch('capacitor', 'Capacitor', '#8ad8ff', 'Hold the charge. Never stop dumping it.')], [
-    lane('arc', 'conduction', 1, [
-      w('conduct', 'Conduction', 'One more jump.', add('chainCount', 1)),
-      w('amp', 'Amplifier', 'Harder arcs.', mult('chainDamage', 1.2)),
-      w('coil', 'Tighter Coil', 'Cleaner discharge.', mult('damage', 1.06)),
-      y('lattice', 'Lattice', 'The arc keeps finding another body, and hits properly when it does.', add('chainCount', 1), mult('chainDamage', 1.25)),
-      w('copper', 'Copper Core', 'Better conductor.', mult('chainDamage', 1.2)),
-      w('reach', 'Extended Reach', 'Longer jumps.', add('chainCount', 1)),
-      r('stagger', 'Staggering Arc', 'Every chained hit locks the target in place as well as burning it.', flag('chainStun')),
-      r('fullcurrent', 'Full Current', 'Chains stop weakening. Each jump lands like the original shot.', mult('chainDamage', 2.2), flag('arcShot')),
-      w('bus', 'Bus Bar', 'More capacity.', add('chainCount', 1)),
-      y('cascade', 'Cascade', 'The current refuses to stop.', add('chainCount', 2)),
-      r('thunderstorm', 'THUNDERSTORM', 'One trigger pull is a storm: the current crosses the room and hits full strength the whole way.', add('chainCount', 3), mult('chainDamage', 1.8), flag('chainStun'))
-    ]),
-    lane('arc', 'overload', 4, [
-      w('discharge', 'Discharge', 'Death releases charge.', add('killChainCount', 2)),
-      w('grounding', 'Grounding', 'Steadier frame.', add('maxHp', 20)),
-      w('surge', 'Surge', 'More output.', mult('damage', 1.07)),
-      y('feedback', 'Feedback Loop', 'Kills dump a far bigger arc into whatever is left.', add('killChainCount', 2), mult('chainDamage', 1.3)),
-      w('voltage', 'Voltage', 'Harder hits.', mult('damage', 1.08)),
-      w('relay', 'Relay', 'Longer reach on the discharge.', add('chainCount', 1)),
-      r('overkill', 'Overload', 'Every kill detonates, not just arcs.', add('onKillBlast', 55), add('killChainCount', 2)),
-      r('runaway', 'Runaway Reaction', 'Each kill winds you up: fire rate spikes and stays there while you keep killing.', flag('frenzy'), mult('fireRate', 1.1)),
-      w('breaker', 'Breaker', 'Bigger dump.', mult('chainDamage', 1.25)),
-      y('chainkill', 'Chain Kill', 'One death lights the whole cluster.', add('killChainCount', 2), add('onKillBlast', 55)),
-      r('criticalmass', 'CRITICAL MASS', 'A single kill cascades through the room, each death feeding the next.', add('killChainCount', 2), add('onKillBlast', 55), flag('frenzy'))
-    ]),
-    lane('arc', 'capacitor', 7, [
-      w('static', 'Static Field', 'A live field around you.', flag('staticField')),
-      w('cycle', 'Fast Cycle', 'Quicker discharge.', mult('fireRate', 1.08)),
-      w('insulation', 'Insulation', 'Hold more.', add('maxHp', 20)),
-      y('chargebank', 'Charge Bank', 'The field hums louder and reaches further.', mult('auraRadius', 1.3), flag('staticField')),
-      w('throughput', 'Throughput', 'Faster still.', mult('fireRate', 1.08)),
-      w('emitter', 'Emitter Array', 'Wider field.', mult('auraRadius', 1.2)),
-      r('arcdash', 'Arc Dash', 'Dashing drags a live cable through everything you pass.', flag('arcDash'), flag('dashStrike'), add('dashDamage', 60)),
-      r('tesladrone', 'Tesla Drones', 'Two coils break off and hunt on their own.', add('droneCount', 2), add('orbitDamage', 0)),
-      w('supercap', 'Supercapacitor', 'Higher ceiling.', mult('fireRate', 1.08)),
-      y('resonance', 'Resonance', 'The field crackles across everything near you.', mult('auraRadius', 1.3), mult('chainDamage', 1.2)),
-      r('powerplant', 'POWER PLANT', 'You are the generator: a huge live field, constant discharge, nothing gets to stand near you.', mult('auraRadius', 1.6), flag('staticField'), mult('fireRate', 1.2))
-    ])
-  ]);
+  /* ============================================================ ARC ============================================================ */
+  TREES.arc = tree('arc', 'ARC',
+    w('root', 'Coil Primer', 'Primes the coil. Charge mode adds 1 more meter per hit.', add('meterGain', 1)),
+    [
+      arch('capacitor', 'Capacitor', '#8ad8ff',
+        'Capacitor is about filling the meter. Live Windings adds meter per hit in Charge mode and Flywheel raises the rate of fire that feeds it, so a Discharge is never more than a few seconds away. It does nothing for the damage of the Discharge itself.',
+        { difficulty: 'Low', damage: 'Medium', defense: 'Low', range: 'Medium', speed: 'High' }),
+      arch('discharge', 'Discharge', '#ff8aff',
+        'Discharge is about spending. Overcharge raises Discharge damage from 3.2x to 4.0x and Deep Reserve cuts the meter cost so a full bar lasts longer. Every point spent here is dead weight while you are in Charge mode, which is most of the fight.',
+        { difficulty: 'Medium', damage: 'High', defense: 'Low', range: 'Medium', speed: 'Low' }),
+      arch('conduction', 'Conduction', '#c8b4ff',
+        'Conduction spreads whatever mode you are in. Lattice adds arcs to every hit, Staggering Arc slows anything an arc touches by 60% for 0.8s, and Full Current stops arcs losing damage per jump. It is the only lane that works equally well in both modes.',
+        { difficulty: 'Low', damage: 'Medium', defense: 'Medium', range: 'High', speed: 'Medium' })
+    ], {
+    capacitor: [
+      w('windings', 'Live Windings', 'Charge mode adds 1 more meter per hit.', add('meterGain', 1)),
+      w('flywheel', 'Flywheel', '+8% fire rate.', mult('fireRate', 1.08)),
+      w('busbar', 'Bus Bar', 'Charge mode adds 1 more meter per hit.', add('meterGain', 1)),
+      y('fastcoil', 'Fast Coil', '+12% fire rate, and Charge mode adds 1 more meter per hit.', mult('fireRate', 1.12), add('meterGain', 1)),
+      w('grounding', 'Grounding', '+25 max HP.', add('maxHp', 25)),
+      r('staticfield', 'Static Field', 'Everything within 140 units takes 16 damage per second, and each tick fills the meter like any other hit.', flag('staticField')),
+      w('throughput', 'Throughput', '+9% fire rate.', mult('fireRate', 1.09)),
+      y('supercap', 'Supercapacitor', 'Charge mode adds 2 more meter per hit.', add('meterGain', 2)),
+      r('powerplant', 'POWER PLANT', 'Charge mode adds 3 more meter per hit, +20% fire rate, and everything within 140 units takes 16 damage per second.', add('meterGain', 3), mult('fireRate', 1.20), flag('staticField'))
+    ],
+    discharge: [
+      w('reserve', 'Reserve Cell', 'Discharge shots deal 3.6x instead of 3.2x.', add('dischargePower', 0.4)),
+      w('conduit', 'Heavy Conduit', '+7% damage.', mult('damage', 1.07)),
+      w('spark', 'Spark Gap', 'Discharge shots arc to 1 more enemy.', add('dischargeChain', 1)),
+      y('overcharge', 'Overcharge', 'Discharge shots deal 4.0x instead of 3.2x.', add('dischargePower', 0.8)),
+      w('insulation', 'Insulation', '+25 max HP.', add('maxHp', 25)),
+      r('arcdash', 'Arc Dash', 'Dashing drags a live cable through everything you pass, dealing 60 damage plus a full set of arcs.', flag('arcDash'), flag('dashStrike')),
+      w('capacitance', 'Capacitance', 'Discharge shots deal 3.6x instead of 3.2x.', add('dischargePower', 0.4)),
+      y('deepreserve', 'Deep Reserve', 'Discharge shots arc to 2 more enemies and deal 3.6x instead of 3.2x.', add('dischargeChain', 2), add('dischargePower', 0.4)),
+      r('annihilator', 'ANNIHILATOR', 'Discharge shots deal 5.4x instead of 3.2x and arc to 2 more enemies. Charge mode gains nothing from this.', add('dischargePower', 2.2), add('dischargeChain', 2))
+    ],
+    conduction: [
+      w('conduct', 'Conduction', 'Every hit arcs to 1 more enemy.', add('chainCount', 1)),
+      w('amp', 'Amplifier', 'Arcs deal 20% more damage.', mult('chainDamage', 1.20)),
+      w('copper', 'Copper Core', 'Every hit arcs to 1 more enemy.', add('chainCount', 1)),
+      y('lattice', 'Lattice', 'Every hit arcs to 1 more enemy and arcs deal 25% more damage.', add('chainCount', 1), mult('chainDamage', 1.25)),
+      w('reach', 'Extended Reach', 'Every hit arcs to 1 more enemy.', add('chainCount', 1)),
+      r('stagger', 'Staggering Arc', 'Anything an arc hits is slowed 60% for 0.8s.', flag('chainStun')),
+      w('relay', 'Relay', 'Arcs deal 20% more damage.', mult('chainDamage', 1.20)),
+      y('cascade', 'Cascade', 'Every hit arcs to 2 more enemies.', add('chainCount', 2)),
+      r('fullcurrent', 'FULL CURRENT', 'Arcs stop losing damage per jump and hit as hard as the original, every hit arcs to 2 more enemies, and arcs slow by 60% for 0.8s.', flag('arcShot'), add('chainCount', 2), flag('chainStun'))
+    ],
+    capacitor_discharge: [
+      y('quickvent', 'Quick Vent', '+10% fire rate and Discharge shots deal 3.6x instead of 3.2x.', mult('fireRate', 1.10), add('dischargePower', 0.4)),
+      r('flipflop', 'Flip-Flop', 'Charge mode adds 2 more meter per hit and Discharge shots deal 4.0x instead of 3.2x, so swapping pays both ways.', add('meterGain', 2), add('dischargePower', 0.8)),
+      y('reservoir', 'Reservoir', 'Charge mode adds 2 more meter per hit and Discharge arcs to 1 more enemy.', add('meterGain', 2), add('dischargeChain', 1)),
+      r('perpetualcycle', 'PERPETUAL CYCLE', 'Charge mode adds 3 more meter per hit, Discharge shots deal 4.6x instead of 3.2x, and everything within 140 units takes 16 damage per second that also fills the meter.', add('meterGain', 3), add('dischargePower', 1.4), flag('staticField'))
+    ],
+    discharge_conduction: [
+      y('forkedbolt', 'Forked Bolt', 'Discharge arcs to 1 more enemy and all arcs deal 20% more damage.', add('dischargeChain', 1), mult('chainDamage', 1.20)),
+      r('chainreaction', 'Chain Reaction', 'Every kill releases an arc to 2 more enemies, and every hit arcs to 1 more.', add('killChainCount', 2), add('chainCount', 1)),
+      y('conductor', 'Conductor', 'Arcs slow by 60% for 0.8s and Discharge shots deal 3.6x instead of 3.2x.', flag('chainStun'), add('dischargePower', 0.4)),
+      r('thunderhead', 'THUNDERHEAD', 'Arcs hit as hard as the original shot, Discharge shots deal 4.6x and arc to 2 more enemies, and every kill releases 2 more arcs.', flag('arcShot'), add('dischargePower', 1.4), add('dischargeChain', 2), add('killChainCount', 2))
+    ]
+  });
 
-  /* ============================================================
-     VEX - Marksman. Longshot.
-     ============================================================ */
-  TREES.vex = tree('vex', 'Optic Uplink', 'Range the target.', add('critChance', 0.04),
-    [arch('precision', 'Precision', '#ffd77a', 'Every shot a critical.'),
-     arch('penetration', 'Penetration', '#ff9a3d', 'One round, the whole line.'),
-     arch('execution', 'Execution', '#ff5c6e', 'Finish what is already hurt.')], [
-    lane('vex', 'precision', 1, [
-      w('focus', 'Focus', 'Steadier hold.', add('critChance', 0.06)),
-      w('caliber', 'Heavy Caliber', 'More mass.', mult('damage', 1.08)),
-      w('hollow', 'Hollow Points', 'Wider wound.', add('critDamage', 0.25)),
-      y('marksman', 'Marksmanship', 'Your critical hits come often and land like artillery.', add('critChance', 0.1), add('critDamage', 0.4)),
-      w('glass', 'Glass Optics', 'Find the seam.', add('critChance', 0.06)),
-      w('handload', 'Handloads', 'Better powder.', mult('damage', 1.08)),
-      r('steady', 'Steady Aim', 'Hold still half a second and the next round is guaranteed to crit.', flag('steadyAim'), add('critChance', 0.05)),
-      r('killshot', 'Killshot', 'Critical hits detonate on impact.', flag('critBoom'), mult('explosionSize', 1.2)),
-      w('trueline', 'True Line', 'Nothing wasted.', add('critDamage', 0.3)),
-      y('coldblood', 'Cold Blood', 'Crits hit harder the longer you hold your nerve.', add('critDamage', 0.5)),
-      r('oneshot', 'ONE SHOT, ONE KILL', 'Crits tear through every body in the line and hit for nearly triple.', add('critDamage', 1.2), flag('critPierce'), add('critChance', 0.15))
-    ]),
-    lane('vex', 'penetration', 4, [
-      w('ap', 'AP Core', 'Through the first.', add('pierce', 1)),
-      w('sabot', 'Sabot', 'Faster round.', mult('damage', 1.07)),
-      w('rifling', 'Deep Rifling', 'Straighter flight.', add('critChance', 0.04)),
-      y('throughandthrough', 'Through and Through', 'Rounds carry on through a crowd without losing their edge.', add('pierce', 2), flag('noFalloff')),
-      w('tungsten', 'Tungsten', 'Denser core.', mult('damage', 1.1)),
-      w('longbarrel', 'Long Barrel', 'More of the charge on target.', mult('damage', 1.08)),
-      r('railshot', 'Rail Shot', 'The weapon winds up: far slower, but each round is devastating and unstoppable.', mult('fireRate', 0.6), mult('damage', 2.2), add('pierce', 3)),
-      r('splitcore', 'Split Core', 'Rounds break into two on the way out. Twice the line, less per hit.', add('projectiles', 1), mult('damage', 0.82), add('pierce', 1)),
-      w('hardpoint', 'Hardpoint', 'Heavier still.', mult('damage', 1.08)),
-      y('overpenetrate', 'Overpenetration', 'Nothing is cover any more.', add('pierce', 3)),
-      r('lancer', 'LANCER', 'One round, one line, every body on it, full damage to the last.', add('pierce', 6), flag('noFalloff'), mult('damage', 1.3))
-    ]),
-    lane('vex', 'execution', 7, [
-      w('wound', 'Wound Channel', 'They bleed.', mult('damage', 1.06)),
-      w('scan', 'Threat Scan', 'Pick the hurt one.', add('critChance', 0.05)),
-      w('cull', 'Cull', 'Finish the weak.', add('execute', 0.05)),
-      y('executioner', 'Executioner', 'Anything badly wounded simply stops when you look at it.', add('execute', 0.10), flag('executioner')),
-      w('deadweight', 'Dead Weight', 'Heavier finisher.', mult('damage', 1.08)),
-      w('bounty', 'Bounty Tags', 'Paid per body.', add('scoreBonus', 0.15)),
-      r('deathmark', 'Death Mark', 'Every fifth hit brands a target. Marked, it takes half again from everything.', flag('deathMark')),
-      r('headhunter', 'Headhunter', 'Kills wind the rifle up and hand back the damage you spent getting there.', flag('frenzy'), add('killHealAmount', 6)),
-      w('finisher', 'Finisher', 'Higher threshold.', add('execute', 0.05)),
-      y('reaper', 'Reaper\'s Eye', 'The wounded are already dead.', add('execute', 0.08), flag('executioner')),
-      r('terminator', 'TERMINATOR', 'A quarter health is a death sentence, and every execution marks the next target.', add('execute', 0.12), flag('deathMark'), add('onKillBlast', 55))
-    ])
-  ]);
+  /* ============================================================ VEX ============================================================ */
+  TREES.vex = tree('vex', 'VEX',
+    w('root', 'Optic Uplink', 'Ranges the target. +4% critical hit chance.', add('critChance', 0.04)),
+    [
+      arch('windup', 'Wind-Up', '#ffd77a',
+        'Wind-Up is about the held shot. Hair Spring cuts the time to a full charge from 0.91s to 0.63s and Heavy Charge raises a full shot from 3.2x to 4.0x. Holding the trigger produces no fire at all, so every point here makes the gaps between shots more expensive to waste.',
+        { difficulty: 'High', damage: 'High', defense: 'Low', range: 'High', speed: 'Low' }),
+      arch('penetration', 'Penetration', '#ff9a3d',
+        'Penetration makes one round cover a line. Through and Through adds 2 pierce and stops damage falling off per body, and Lancer takes it to 6. It is worth nothing against a single target, so it wants crowds lined up.',
+        { difficulty: 'Medium', damage: 'Medium', defense: 'Low', range: 'High', speed: 'Medium' }),
+      arch('execution', 'Execution', '#ff5c6e',
+        'Execution finishes what is already hurt. Executioner kills anything under 12% health outright, Death Mark brands every fifth hit for 50% extra damage, and Headhunter turns each kill into 1s of 25% extra fire rate. It contributes nothing to opening a fight.',
+        { difficulty: 'Medium', damage: 'High', defense: 'Low', range: 'Medium', speed: 'Medium' })
+    ], {
+    windup: [
+      w('spring', 'Hair Spring', 'The rifle reaches a full wind-up in 0.77s instead of 0.91s.', add('chargeRate', 0.2)),
+      w('powder', 'Match Powder', 'A full wind-up deals 3.5x instead of 3.2x.', add('chargePower', 0.3)),
+      w('brace', 'Shoulder Brace', '+7% damage.', mult('damage', 1.07)),
+      y('heavycharge', 'Heavy Charge', 'A full wind-up deals 4.0x instead of 3.2x.', add('chargePower', 0.8)),
+      w('spring2', 'Twin Spring', 'The rifle reaches a full wind-up 0.2s sooner.', add('chargeRate', 0.3)),
+      r('steady', 'Steady Aim', 'Standing still for 0.5s guarantees the next shot is a critical hit, and critical hits deal +0.4x.', flag('steadyAim'), add('critDamage', 0.4)),
+      w('grain', 'Fine Grain', 'A full wind-up deals 3.5x instead of 3.2x.', add('chargePower', 0.3)),
+      y('release', 'Fast Release', 'The rifle reaches a full wind-up in about 0.5s, and a full shot deals 3.5x.', add('chargeRate', 0.5), add('chargePower', 0.3)),
+      r('railgun', 'RAILGUN', 'A full wind-up deals 6.0x instead of 3.2x and passes through 3 more enemies at full damage. Snap shots are unchanged and still weak.', add('chargePower', 2.8), add('pierce', 3), flag('noFalloff'))
+    ],
+    penetration: [
+      w('ap', 'AP Core', 'Rounds pass through 1 more enemy.', add('pierce', 1)),
+      w('sabot', 'Sabot', '+8% damage.', mult('damage', 1.08)),
+      w('rifling', 'Deep Rifling', '+5% critical hit chance.', add('critChance', 0.05)),
+      y('through', 'Through and Through', 'Rounds pass through 2 more enemies and keep full damage through every one.', add('pierce', 2), flag('noFalloff')),
+      w('tungsten', 'Tungsten', '+10% damage.', mult('damage', 1.10)),
+      r('splitcore', 'Split Core', 'Every shot fires 1 more projectile. Each one deals 18% less damage.', add('projectiles', 1), mult('damage', 0.82)),
+      w('hardpoint', 'Hardpoint', 'Rounds pass through 1 more enemy.', add('pierce', 1)),
+      y('overpen', 'Overpenetration', 'Rounds pass through 2 more enemies.', add('pierce', 2)),
+      r('lancer', 'LANCER', 'Rounds pass through 6 more enemies at full damage, and deal 30% more.', add('pierce', 6), flag('noFalloff'), mult('damage', 1.30))
+    ],
+    execution: [
+      w('wound', 'Wound Channel', '+7% damage.', mult('damage', 1.07)),
+      w('scan', 'Threat Scan', '+5% critical hit chance.', add('critChance', 0.05)),
+      w('cull', 'Cull', 'Instantly kills enemies below 5% health.', add('execute', 0.05)),
+      y('executioner', 'Executioner', 'Instantly kills enemies below 17% health. Bosses are immune.', flag('executioner'), add('execute', 0.05)),
+      w('hollow', 'Hollow Points', 'Critical hits deal +0.3x.', add('critDamage', 0.30)),
+      r('deathmark', 'Death Mark', 'Every fifth hit brands a target for 6s; a branded target takes 50% more damage from every source.', flag('deathMark')),
+      w('bounty', 'Bounty Tags', '+15% score, which is also +15% cores banked.', add('scoreBonus', 0.15)),
+      y('headhunter', 'Headhunter', 'Every kill grants 1s of +25% fire rate and heals you for 6.', flag('frenzy'), add('killHealAmount', 6)),
+      r('terminator', 'TERMINATOR', 'Instantly kills enemies below 24% health, brands every fifth hit for 50% extra damage, and every kill detonates for 55.', add('execute', 0.12), flag('deathMark'), add('onKillBlast', 55))
+    ],
+    windup_penetration: [
+      y('heavyround', 'Heavy Round', 'A full wind-up deals 3.6x, and rounds pass through 1 more enemy.', add('chargePower', 0.4), add('pierce', 1)),
+      r('lancecharge', 'Lance Charge', 'A full wind-up deals 4.0x and rounds pass through 2 more enemies at full damage.', add('chargePower', 0.8), add('pierce', 2), flag('noFalloff')),
+      y('quickpierce', 'Quick Pierce', 'The rifle winds up 0.2s sooner and rounds pass through 1 more enemy.', add('chargeRate', 0.3), add('pierce', 1)),
+      r('spearofdawn', 'SPEAR OF DAWN', 'A full wind-up deals 5.2x and passes through 5 more enemies at full damage, and the rifle winds up in about 0.6s.', add('chargePower', 2.0), add('pierce', 5), flag('noFalloff'), add('chargeRate', 0.4))
+    ],
+    penetration_execution: [
+      y('bleeder', 'Bleeder Rounds', 'Rounds pass through 1 more enemy and instantly kill below 5% health.', add('pierce', 1), add('execute', 0.05)),
+      r('cullingline', 'Culling Line', 'Rounds pass through 2 more enemies at full damage and instantly kill below 12% health.', add('pierce', 2), flag('noFalloff'), flag('executioner')),
+      y('marksline', 'Marked Line', 'Every fifth hit brands a target for 50% extra damage, and rounds pass through 1 more enemy.', flag('deathMark'), add('pierce', 1)),
+      r('massexecution', 'MASS EXECUTION', 'Rounds pass through 4 more enemies at full damage, instantly kill below 22% health, and every kill detonates for 55.', add('pierce', 4), flag('noFalloff'), add('execute', 0.10), flag('executioner'), add('onKillBlast', 55))
+    ]
+  });
 
-  /* ============================================================
-     NYX - Blade Dancer. Twin Pistols.
-     ============================================================ */
-  TREES.nyx = tree('nyx', 'Servo Prime', 'Spin up the legs.', mult('moveSpeed', 1.04),
-    [arch('momentum', 'Momentum', '#9dff5c', 'Speed is the stat. Everything scales off it.'),
-     arch('bladestorm', 'Bladestorm', '#cfe6ff', 'Let the blades do the close work.'),
-     arch('phase', 'Phase', '#7cffe0', 'Be somewhere else. Arrive hurting.')], [
-    lane('nyx', 'momentum', 1, [
-      w('light', 'Light Frame', 'Less to carry.', mult('moveSpeed', 1.06)),
-      w('tread', 'Grip Tread', 'Better purchase.', mult('moveSpeed', 1.05)),
-      w('twitch', 'Twitch Reflex', 'Faster hands.', mult('fireRate', 1.07)),
-      y('sprint', 'Sprinter', 'You simply move faster than the fight does.', mult('moveSpeed', 1.14)),
-      w('cadence', 'Cadence', 'Faster trigger.', mult('fireRate', 1.08)),
-      w('featherweight', 'Featherweight', 'Nothing spare.', mult('moveSpeed', 1.06)),
-      r('bloodrush', 'Bloodrush', 'Every kill floods you: speed spikes and the guns run hot.', flag('adrenaline'), flag('frenzy')),
-      r('kinetic', 'Kinetic Conversion', 'Your speed becomes damage. The faster you run, the harder you hit.', mult('damage', 1.3), mult('moveSpeed', 1.1)),
-      w('overdrive', 'Overdrive', 'Push harder.', mult('moveSpeed', 1.06)),
-      y('runandgun', 'Run and Gun', 'Moving no longer costs you output.', mult('fireRate', 1.15)),
-      r('perpetual', 'PERPETUAL MOTION', 'Never stop: blistering speed, a permanent rush, and damage that rides all of it.', mult('moveSpeed', 1.25), mult('damage', 1.25), flag('adrenaline'))
-    ]),
-    lane('nyx', 'bladestorm', 4, [
-      w('blade', 'First Blade', 'One blade rides your orbit.', flag('bladestorm'), add('orbitDamage', 12)),
-      w('edge', 'Honed Edge', 'Sharper.', add('orbitDamage', 10)),
-      w('balance', 'Balance', 'Wider orbit.', add('orbitCount', 1)),
-      y('whirl', 'Whirlwind', 'More blades, and they bite properly.', add('orbitCount', 1), add('orbitDamage', 16)),
-      w('serrate', 'Serrated', 'Ragged cuts.', add('orbitDamage', 12)),
-      w('spin', 'Spin Up', 'Faster orbit.', add('orbitCount', 1)),
-      r('shredder', 'Shredder', 'The blades carve anything they finish into a detonation.', add('onKillBlast', 55), add('orbitDamage', 14)),
-      r('bloodedge', 'Blood Edge', 'The blades feed you with every cut they take.', add('lifesteal', 0.06), add('orbitDamage', 10)),
-      w('vortex', 'Vortex', 'One more blade.', add('orbitCount', 1)),
-      y('cyclone', 'Cyclone', 'A wall of steel at arm\'s length.', add('orbitCount', 1), add('orbitDamage', 18)),
-      r('bladestorm', 'BLADESTORM', 'Nothing survives contact: a full ring of blades, each one lethal.', add('orbitCount', 2), add('orbitDamage', 30), flag('bladestorm'))
-    ]),
-    lane('nyx', 'phase', 7, [
-      w('coil', 'Phase Coil', 'Recharge sooner.', mult('dashCooldown', 0.88)),
-      w('charge', 'Spare Charge', 'One more blink.', add('dashCharges', 1)),
-      w('edge2', 'Razor Entry', 'Arrive hurting.', add('dashDamage', 40), flag('dashStrike')),
-      y('phasestep', 'Phase Step', 'The blink lasts longer and nothing can touch you inside it.', flag('phaseDash'), mult('dashCooldown', 0.85)),
-      w('slipstream', 'Slipstream', 'Quicker recovery.', mult('dashCooldown', 0.85)),
-      w('cutting', 'Cutting Entry', 'Harder arrival.', add('dashDamage', 50)),
-      r('blink', 'Blink Protocol', 'The dash stops being movement: everything on the line takes the trip badly.', flag('blink'), add('dashDamage', 70)),
-      r('afterimage', 'Afterimage', 'You leave something behind that keeps killing.', flag('afterimage'), flag('dashBlast')),
-      w('recharge', 'Fast Recharge', 'Charges return sooner.', mult('dashCooldown', 0.85)),
-      y('resetter', 'Reset', 'Kills hand the blink straight back.', flag('dashRefund'), add('dashCharges', 1)),
-      r('unseen', 'UNSEEN', 'Three charges that refill on every kill, each one a killing blow.', add('dashCharges', 2), flag('dashRefund'), add('dashDamage', 90), flag('phaseDash'))
-    ])
-  ]);
+  /* ============================================================ NYX ============================================================ */
+  TREES.nyx = tree('nyx', 'NYX',
+    w('root', 'Servo Prime', 'Spins up the legs. +4% move speed, which is also +4% rate of fire.', mult('moveSpeed', 1.04)),
+    [
+      arch('velocity', 'Velocity', '#9dff5c',
+        'Velocity is damage, because the Twin Pistols fire from your speed and nothing else. Servo Legs and Overdrive raise move speed, which raises rate of fire in lockstep; Bloodrush adds 30% more for 2s on every kill. Standing still still fires nothing, so it has no answer to being cornered.',
+        { difficulty: 'Medium', damage: 'High', defense: 'Low', range: 'Medium', speed: 'High' }),
+      arch('bladestorm', 'Bladestorm', '#cfe6ff',
+        'Bladestorm adds damage that does not depend on speed at all. Orbit Blades ride a ring around you and cut anything that closes, and Cyclone takes the ring to six. It only reaches melee range, so it covers exactly the situation Velocity is worst at.',
+        { difficulty: 'Low', damage: 'Medium', defense: 'Medium', range: 'Low', speed: 'Medium' }),
+      arch('phase', 'Phase', '#7cffe0',
+        'Phase turns the dash into the attack. Blink Protocol makes the dash deal 80 damage to everything it crosses, Phase Step adds 0.35s of invulnerability to it, and Reset refunds a charge on every kill. Dashing constantly also keeps your speed high, which keeps the pistols firing.',
+        { difficulty: 'High', damage: 'Medium', defense: 'High', range: 'Low', speed: 'High' })
+    ], {
+    velocity: [
+      w('light', 'Light Frame', '+6% move speed and rate of fire.', mult('moveSpeed', 1.06)),
+      w('tread', 'Grip Tread', '+5% move speed and rate of fire.', mult('moveSpeed', 1.05)),
+      w('twitch', 'Twitch Reflex', '+7% fire rate on top of whatever your speed provides.', mult('fireRate', 1.07)),
+      y('servo', 'Servo Legs', '+14% move speed and rate of fire.', mult('moveSpeed', 1.14)),
+      w('cadence', 'Cadence', '+8% fire rate.', mult('fireRate', 1.08)),
+      r('bloodrush', 'Bloodrush', 'Every kill grants +30% move speed for 2s, which is also +30% rate of fire.', flag('adrenaline')),
+      w('feather', 'Featherweight', '+6% move speed and rate of fire.', mult('moveSpeed', 1.06)),
+      y('overdrive', 'Overdrive', '+12% move speed and +10% fire rate.', mult('moveSpeed', 1.12), mult('fireRate', 1.10)),
+      r('perpetual', 'PERPETUAL MOTION', '+25% move speed and rate of fire, +20% fire rate, and every kill grants a further 30% speed for 2s.', mult('moveSpeed', 1.25), mult('fireRate', 1.20), flag('adrenaline'))
+    ],
+    bladestorm: [
+      w('blade', 'First Blade', 'Two blades orbit you, dealing 22 damage on contact.', flag('bladestorm')),
+      w('edge', 'Honed Edge', 'Orbit blades deal 10 more damage.', add('orbitDamage', 10)),
+      w('balance', 'Balance', '+1 orbit blade.', add('orbitCount', 1)),
+      y('whirl', 'Whirlwind', '+1 orbit blade, and blades deal 16 more damage.', add('orbitCount', 1), add('orbitDamage', 16)),
+      w('serrate', 'Serrated', 'Orbit blades deal 12 more damage.', add('orbitDamage', 12)),
+      r('bloodedge', 'Blood Edge', 'You heal for 6% of all damage dealt, and orbit blades deal 12 more damage.', add('lifesteal', 0.06), add('orbitDamage', 12)),
+      w('spin', 'Spin Up', '+1 orbit blade.', add('orbitCount', 1)),
+      y('cyclone', 'Cyclone', '+1 orbit blade, and blades deal 18 more damage.', add('orbitCount', 1), add('orbitDamage', 18)),
+      r('bladestorm_cap', 'BLADESTORM', '+2 orbit blades and blades deal 30 more damage. Blades hit every 0.45s per enemy, so more blades means more frequent hits.', add('orbitCount', 2), add('orbitDamage', 30))
+    ],
+    phase: [
+      w('coil', 'Phase Coil', 'Dash recharges 12% faster.', mult('dashCooldown', 0.88)),
+      w('charge', 'Spare Charge', '+1 dash charge.', add('dashCharges', 1)),
+      w('entry', 'Razor Entry', 'Dashing deals 40 damage to everything you pass through.', flag('dashStrike')),
+      y('phasestep', 'Phase Step', 'Dashes grant 0.35s of invulnerability and recharge 15% faster.', flag('phaseDash'), mult('dashCooldown', 0.85)),
+      w('slipstream', 'Slipstream', 'Dash recharges 15% faster.', mult('dashCooldown', 0.85)),
+      r('blink', 'Blink Protocol', 'Dashing deals 80 damage to everything you cross and grants 0.1s more invulnerability.', flag('blink')),
+      w('cutting', 'Cutting Entry', 'Dashes deal 50 more damage.', add('dashDamage', 50)),
+      y('reset', 'Reset', 'Every kill refunds a dash charge, and you gain 1 more.', flag('dashRefund'), add('dashCharges', 1)),
+      r('unseen', 'UNSEEN', '+2 dash charges, dashes deal 90 more damage, every kill refunds a charge, and dashes grant 0.35s of invulnerability.', add('dashCharges', 2), add('dashDamage', 90), flag('dashRefund'), flag('phaseDash'))
+    ],
+    velocity_bladestorm: [
+      y('spinup', 'Rotor Spin', '+8% move speed and rate of fire, and +1 orbit blade.', mult('moveSpeed', 1.08), add('orbitCount', 1)),
+      r('carousel', 'Carousel', '+2 orbit blades dealing 20 more damage, and +10% move speed and rate of fire.', add('orbitCount', 2), add('orbitDamage', 20), mult('moveSpeed', 1.10)),
+      y('shear', 'Shear', 'Orbit blades deal 20 more damage and you heal for 3% of all damage dealt.', add('orbitDamage', 20), add('lifesteal', 0.03)),
+      r('meatgrinder', 'MEAT GRINDER', '+3 orbit blades dealing 30 more damage, +20% move speed and rate of fire, and every kill grants 30% more speed for 2s.', add('orbitCount', 3), add('orbitDamage', 30), mult('moveSpeed', 1.20), flag('adrenaline'))
+    ],
+    bladestorm_phase: [
+      y('bladedash', 'Blade Dash', 'Dashing deals 40 damage to everything you pass, and +1 orbit blade.', flag('dashStrike'), add('orbitCount', 1)),
+      r('whirlblink', 'Whirl Blink', 'Dashes deal 80 damage to everything you cross, and orbit blades deal 20 more damage.', flag('blink'), add('orbitDamage', 20)),
+      y('afterblade', 'Afterblade', 'Every kill refunds a dash charge, and +1 orbit blade.', flag('dashRefund'), add('orbitCount', 1)),
+      r('stormpiercer', 'STORM PIERCER', '+2 orbit blades dealing 25 more damage, dashes deal 80 damage and grant 0.35s of invulnerability, and every kill refunds a charge.', add('orbitCount', 2), add('orbitDamage', 25), flag('blink'), flag('phaseDash'), flag('dashRefund'))
+    ]
+  });
 
-  /* ============================================================
-     COG - Engineer. Nail Driver.
-     ============================================================ */
-  TREES.cog = tree('cog', 'Workshop Uplink', 'Spin up the fabricator.', add('droneCount', 1),
-    [arch('fabrication', 'Fabrication', '#b8c6d8', 'More units in the air.'),
-     arch('support', 'Support', '#9dff5c', 'The drones keep you alive.'),
-     arch('ordnance', 'Ordnance', '#ff8a3d', 'Arm them properly.')], [
-    lane('cog', 'fabrication', 1, [
-      w('assembly', 'Assembly Line', 'Another unit.', add('droneCount', 1)),
-      w('servos', 'Servos', 'Faster fire.', mult('droneRate', 0.9)),
-      w('calibrate', 'Calibration', 'Better aim.', add('critChance', 0.04)),
-      y('massproduce', 'Mass Production', 'The bay runs hot: more drones, cycling faster.', add('droneCount', 1), mult('droneRate', 0.85)),
-      w('tuning', 'Tuning', 'Harder rounds.', mult('damage', 1.08)),
-      w('rapid', 'Rapid Servos', 'Faster still.', mult('droneRate', 0.85)),
-      r('swarm', 'Swarm Protocol', 'The bay never stops: a full escort, all of it firing.', add('droneCount', 3), mult('droneRate', 0.85)),
-      r('heavyunit', 'Heavy Units', 'Fewer, bigger, and each one hits like your own weapon.', add('droneCount', 1), mult('damage', 1.35), flag('droneBoom')),
-      w('overclock', 'Overclock', 'Push the servos.', mult('droneRate', 0.88)),
-      y('production', 'Production Line', 'One more off the rack.', add('droneCount', 1)),
-      r('hivemind', 'HIVE MIND', 'A full wing of drones, cycling twice as fast as anything should.', add('droneCount', 2), mult('droneRate', 0.6))
-    ]),
-    lane('cog', 'support', 4, [
-      w('repair', 'Repair Bots', 'They patch you up.', add('droneRepair', 1.2)),
-      w('plating', 'Spare Plating', 'More frame.', add('maxHp', 25)),
-      w('field', 'Field Kit', 'Steady recovery.', add('regen', 0.8)),
-      y('medbay', 'Mobile Med Bay', 'The escort keeps you standing through anything.', add('droneRepair', 1.2), add('regen', 1.2)),
-      w('barrier', 'Barrier Node', 'A little shielding.', add('shield', 30)),
-      w('scrap', 'Scrapper', 'More salvage from the dead.', add('dropBonus', 0.6)),
-      r('shieldgen', 'Shield Generator', 'Each drone projects a slice of shielding onto you.', flag('droneShield'), add('shield', 40)),
-      r('sacrifice', 'Sacrificial Protocol', 'A drone will take a killing blow for you, once per wave.', flag('secondWind'), add('droneRepair', 1.2)),
-      w('redundancy', 'Redundancy', 'Tougher frame.', add('maxHp', 30)),
-      y('logistics', 'Logistics', 'The salvage keeps coming.', add('dropBonus', 0.8), add('magnet', 60)),
-      r('failsafe', 'FAILSAFE', 'The escort will not let you die: heavy shielding, constant repair, a life held in reserve.', add('shield', 70), add('droneRepair', 1.2), flag('secondWind'))
-    ]),
-    lane('cog', 'ordnance', 7, [
-      w('payload', 'Payload', 'Heavier rounds.', mult('damage', 1.07)),
-      w('warhead', 'Warheads', 'Drones carry explosives.', flag('droneBoom')),
-      w('propellant', 'Propellant', 'Bigger blasts.', mult('explosionSize', 1.15)),
-      y('demolition', 'Demolition Package', 'Every drone round is a grenade.', flag('droneBoom'), mult('explosionDamage', 1.25)),
-      w('shrapnel', 'Shrapnel', 'Wider spray.', mult('explosionSize', 1.15)),
-      w('charges', 'Shaped Charges', 'Focused force.', mult('explosionDamage', 1.2)),
-      r('cluster', 'Cluster Munitions', 'Every blast scatters bomblets.', add('clusterCount', 3)),
-      r('minefield', 'Minefield', 'Whatever the drones kill goes up with them.', add('onKillBlast', 55), mult('explosionSize', 1.3)),
-      w('highyield', 'High Yield', 'More force.', mult('explosionDamage', 1.2)),
-      y('saturation', 'Saturation', 'The bomblets carry bomblets.', add('clusterCount', 3), flag('carpet')),
-      r('bombardment', 'BOMBARDMENT', 'The whole escort drops ordnance without pause. Nothing holds ground.', flag('droneBoom'), add('clusterCount', 3), mult('explosionSize', 1.4))
-    ])
-  ]);
+  /* ============================================================ COG ============================================================ */
+  TREES.cog = tree('cog', 'COG',
+    w('root', 'Workshop Uplink', 'Spins up the fabricator. +1 drone.', add('droneCount', 1)),
+    [
+      arch('fabrication', 'Fabrication', '#b8c6d8',
+        'Fabrication is drone count and drone rate. Assembly Line adds units, Rapid Servos cuts their fire interval by 15% a step, and Hive Mind takes both to the ceiling. Drone shots run the same modifiers your own do, so multishot and pierce are multiplied across the whole escort.',
+        { difficulty: 'Low', damage: 'High', defense: 'Low', range: 'High', speed: 'Low' }),
+      arch('command', 'Command', '#9dff5c',
+        'Command is about the FOCUS order. Target Uplink extends it from 4s to 7s and Priority Fire raises focused damage from +40% to +90%, turning the escort into a single-target execution squad. Off cooldown it does nothing at all, so it rewards picking the right target.',
+        { difficulty: 'High', damage: 'High', defense: 'Medium', range: 'High', speed: 'Medium' }),
+      arch('ordnance', 'Ordnance', '#ff8a3d',
+        'Ordnance arms the escort. Warheads make every drone round explode for 46 in a blast, Cluster Munitions splits each explosion into 3 bomblets, and Saturation makes the bomblets split again. Friendly explosions cannot hurt you, but the screen noise is the price.',
+        { difficulty: 'Medium', damage: 'High', defense: 'Low', range: 'Medium', speed: 'Medium' })
+    ], {
+    fabrication: [
+      w('assembly', 'Assembly Line', '+1 drone. Each drone fires every 0.55s for 14 damage.', add('droneCount', 1)),
+      w('servos', 'Servos', 'Drones fire 10% faster.', mult('droneRate', 0.90)),
+      w('calibrate', 'Calibration', '+5% critical hit chance, which drone shots also roll.', add('critChance', 0.05)),
+      y('massproduce', 'Mass Production', '+1 drone, and drones fire 15% faster.', add('droneCount', 1), mult('droneRate', 0.85)),
+      w('tuning', 'Tuning', '+8% damage, which drone shots also receive.', mult('damage', 1.08)),
+      r('swarm', 'Swarm Protocol', '+2 drones and drones fire 15% faster.', add('droneCount', 2), mult('droneRate', 0.85)),
+      w('overclock', 'Overclock', 'Drones fire 12% faster.', mult('droneRate', 0.88)),
+      y('production', 'Production Line', '+1 drone, and that drone carries every modifier you own.', add('droneCount', 1)),
+      r('hivemind', 'HIVE MIND', '+2 drones and drones fire 40% faster.', add('droneCount', 2), mult('droneRate', 0.60))
+    ],
+    command: [
+      w('uplink', 'Target Uplink', 'FOCUS lasts 1s longer (4s to 5s).', add('focusTime', 1)),
+      w('priority', 'Priority Fire', 'Focused drones deal +55% instead of +40%.', add('focusPower', 0.15)),
+      w('relay', 'Command Relay', 'FOCUS lasts 1s longer.', add('focusTime', 1)),
+      y('designator', 'Designator', 'Focused drones deal +70% instead of +40%, and FOCUS lasts 1s longer.', add('focusPower', 0.30), add('focusTime', 1)),
+      w('repair', 'Repair Bots', 'Each drone repairs you for 1.2 HP per second.', add('droneRepair', 1.2)),
+      r('killorder', 'Kill Order', 'Focused drones deal +90% instead of +40%, and every fifth hit brands a target for 50% extra damage.', add('focusPower', 0.50), flag('deathMark')),
+      w('shielding', 'Shield Generator', 'Each drone grants you 20 shield.', flag('droneShield')),
+      y('overwatch', 'Overwatch', 'FOCUS lasts 2s longer and focused drones deal +55% instead of +40%.', add('focusTime', 2), add('focusPower', 0.15)),
+      r('warmachine', 'WAR MACHINE', 'Focused drones deal +140% instead of +40%, FOCUS lasts 7s, and every kill heals you for 6.', add('focusPower', 1.0), add('focusTime', 3), add('killHealAmount', 6))
+    ],
+    ordnance: [
+      w('payload', 'Payload', '+7% damage.', mult('damage', 1.07)),
+      w('warhead', 'Warheads', 'Drone rounds explode for 46 damage on impact.', flag('droneBoom')),
+      w('propellant', 'Propellant', 'Explosions are 15% larger.', mult('explosionSize', 1.15)),
+      y('demolition', 'Demolition Package', 'Explosions deal 25% more damage and are 15% larger.', mult('explosionDamage', 1.25), mult('explosionSize', 1.15)),
+      w('shrapnel', 'Shrapnel', 'Explosions are 15% larger.', mult('explosionSize', 1.15)),
+      r('cluster', 'Cluster Munitions', 'Every explosion throws 3 bomblets that each explode for 55% of the original damage.', add('clusterCount', 3)),
+      w('highyield', 'High Yield', 'Explosions deal 20% more damage.', mult('explosionDamage', 1.20)),
+      y('saturation', 'Saturation', 'Bomblets throw bomblets of their own, and explosions throw 2 more.', flag('carpet'), add('clusterCount', 2)),
+      r('bombardment', 'BOMBARDMENT', 'Drone rounds explode for 46, every explosion throws 3 bomblets, and explosions are 40% larger.', flag('droneBoom'), add('clusterCount', 3), mult('explosionSize', 1.40))
+    ],
+    fabrication_command: [
+      y('taskforce', 'Task Force', '+1 drone and FOCUS lasts 1s longer.', add('droneCount', 1), add('focusTime', 1)),
+      r('strikewing', 'Strike Wing', '+2 drones and focused drones deal +70% instead of +40%.', add('droneCount', 2), add('focusPower', 0.30)),
+      y('tightbeam', 'Tight Beam', 'Drones fire 15% faster and FOCUS lasts 2s longer.', mult('droneRate', 0.85), add('focusTime', 2)),
+      r('deathsquad', 'DEATH SQUAD', '+3 drones firing 25% faster, focused drones deal +90% instead of +40%, and FOCUS lasts 6s.', add('droneCount', 3), mult('droneRate', 0.75), add('focusPower', 0.50), add('focusTime', 2))
+    ],
+    command_ordnance: [
+      y('markedtarget', 'Marked Target', 'Focused drones deal +55% instead of +40%, and explosions are 15% larger.', add('focusPower', 0.15), mult('explosionSize', 1.15)),
+      r('callinstrike', 'Called Strike', 'Drone rounds explode for 46 and focused drones deal +70% instead of +40%.', flag('droneBoom'), add('focusPower', 0.30)),
+      y('firemission', 'Fire Mission', 'Explosions deal 25% more damage and FOCUS lasts 2s longer.', mult('explosionDamage', 1.25), add('focusTime', 2)),
+      r('orbitalsupport', 'ORBITAL SUPPORT', 'Drone rounds explode for 46, every explosion throws 3 bomblets, and focused drones deal +90% instead of +40%.', flag('droneBoom'), add('clusterCount', 3), add('focusPower', 0.50))
+    ]
+  });
 
-  /* ============================================================
-     BOOM - Demolitionist. Grenade Launcher.
-     ============================================================ */
-  TREES.boom = tree('boom', 'Ordnance Uplink', 'Check the fuses.', mult('explosionSize', 1.05),
-    [arch('payload', 'Payload', '#ff6b4a', 'Make each one bigger.'),
-     arch('submunitions', 'Submunitions', '#ffc857', 'One shell, many holes.'),
-     arch('shockwave', 'Shockwave', '#8ad8ff', 'The blast is the crowd control.')], [
-    lane('boom', 'payload', 1, [
-      w('charge', 'Bigger Charge', 'More filler.', mult('explosionDamage', 1.15)),
-      w('casing', 'Thin Casing', 'Wider spread.', mult('explosionSize', 1.12)),
-      w('fuse', 'Fast Fuse', 'Quicker cycling.', mult('fireRate', 1.08)),
-      y('highexplosive', 'High Explosive', 'Every shell lands harder and reaches further.', mult('explosionDamage', 1.3), mult('explosionSize', 1.15)),
-      w('tamper', 'Tamper Plate', 'Focus the force.', mult('explosionDamage', 1.18)),
-      w('propellant', 'Propellant', 'Longer reach.', mult('explosionSize', 1.15)),
-      r('fatman', 'Fat Man', 'Every sixth shell is enormous: triple damage, more than double the radius.', flag('megaShell'), mult('explosionSize', 1.15)),
-      r('volatile', 'Volatile Rounds', 'Everything you fire detonates, not just the shells.', flag('volatile'), mult('explosionDamage', 1.15)),
-      w('yield', 'High Yield', 'More force.', mult('explosionDamage', 1.2)),
-      y('overcharge', 'Overcharge', 'The shells barely fit the tube.', mult('explosionDamage', 1.3), mult('explosionSize', 1.1)),
-      r('daisycutter', 'DAISY CUTTER', 'One shell clears a quarter of the arena. Mind the splash.', mult('explosionSize', 1.8), mult('explosionDamage', 1.5), flag('megaShell'))
-    ]),
-    lane('boom', 'submunitions', 4, [
-      w('bomblet', 'Bomblets', 'The shell splits.', add('clusterCount', 3)),
-      w('scatter', 'Scatter Pack', 'Wider spread.', mult('explosionSize', 1.12)),
-      w('timer', 'Short Timers', 'They land sooner.', mult('fireRate', 1.07)),
-      y('clusterpack', 'Cluster Pack', 'Each shell throws a handful of smaller ones.', add('clusterCount', 3), mult('explosionDamage', 1.2)),
-      w('spread', 'Wide Pattern', 'Cover more ground.', mult('explosionSize', 1.15)),
-      w('filler', 'Dense Filler', 'Each bomblet bites.', mult('explosionDamage', 1.18)),
-      r('carpet', 'Carpet Bombing', 'The bomblets carry bomblets. The ground stops existing.', flag('carpet'), add('clusterCount', 3)),
-      r('sticky', 'Sticky Charges', 'Anything killed by a blast becomes one.', add('onKillBlast', 55), mult('explosionSize', 1.2)),
-      w('multi', 'Multi-Pack', 'More per shell.', mult('explosionDamage', 1.15)),
-      y('saturation', 'Saturation', 'Nothing walks out of the pattern.', add('clusterCount', 3), mult('explosionSize', 1.2)),
-      r('steelrain', 'STEEL RAIN', 'One trigger pull becomes a sustained bombardment that keeps splitting.', add('clusterCount', 3), flag('carpet'), mult('explosionDamage', 1.4))
-    ]),
-    lane('boom', 'shockwave', 7, [
-      w('concussion', 'Concussion', 'The blast staggers.', add('slowPower', 0.2)),
-      w('bracing', 'Bracing', 'Ride your own blasts.', add('armor', 0.06)),
-      w('overpressure', 'Overpressure', 'Longer stagger.', mult('statusDuration', 1.25)),
-      y('shockplate', 'Shock Plate', 'Survivors of a blast are dragged to a crawl.', flag('gravityWell'), add('slowPower', 0.15)),
-      w('blastshield', 'Blast Shield', 'Armour against the backwash.', add('armor', 0.08)),
-      w('kinetics', 'Kinetics', 'Heavier push.', mult('explosionSize', 1.15)),
-      r('demodash', 'Demo Dash', 'Every dash ends in a detonation.', flag('dashBlast'), add('dashDamage', 50)),
-      r('wellmaker', 'Well Maker', 'Blasts collapse into wells that hold everything caught in them.', flag('gravityWell'), flag('stasis')),
-      w('resonance', 'Resonance', 'Deeper shock.', add('slowPower', 0.15)),
-      y('groundzero', 'Ground Zero', 'Nothing near a blast moves properly again.', add('slowPower', 0.2), mult('statusDuration', 1.3)),
-      r('seismic', 'SEISMIC', 'Every explosion locks the arena down: crushed, held, and finished where they stand.', flag('gravityWell'), flag('stasis'), mult('explosionSize', 1.4))
-    ])
-  ]);
+  /* ============================================================ BOOM ============================================================ */
+  TREES.boom = tree('boom', 'BOOM',
+    w('root', 'Ordnance Uplink', 'Checks the fuses. Explosions are 5% larger.', mult('explosionSize', 1.05)),
+    [
+      arch('payload', 'Payload', '#ff6b4a',
+        'Payload makes each shell bigger. High Explosive stacks blast damage and radius, and Fat Man turns every sixth shell into a 2.4x radius, 3x damage round. It fires no faster, so a missed shell is a long wait.',
+        { difficulty: 'Low', damage: 'High', defense: 'Low', range: 'Medium', speed: 'Low' }),
+      arch('submunitions', 'Submunitions', '#ffc857',
+        'Submunitions turns one shell into a pattern. Cluster Pack throws 3 bomblets from every explosion and Saturation makes those bomblets split again, covering ground you never aimed at. The bomblets land where they like, so it is unreliable against one moving target.',
+        { difficulty: 'Medium', damage: 'High', defense: 'Low', range: 'Medium', speed: 'Medium' }),
+      arch('shockwave', 'Shockwave', '#8ad8ff',
+        'Shockwave uses the blast to hold the room. Shock Plate slows anything that survives an explosion by 50% for 2s, Gravity Well drags them in, and Stasis shatters the slowed survivors below 20% health. It converts your damage into control, so it kills slower on purpose.',
+        { difficulty: 'Medium', damage: 'Medium', defense: 'High', range: 'Medium', speed: 'Low' })
+    ], {
+    payload: [
+      w('charge', 'Bigger Charge', 'Explosions deal 15% more damage.', mult('explosionDamage', 1.15)),
+      w('casing', 'Thin Casing', 'Explosions are 12% larger.', mult('explosionSize', 1.12)),
+      w('fuse', 'Fast Fuse', '+8% fire rate.', mult('fireRate', 1.08)),
+      y('he', 'High Explosive', 'Explosions deal 30% more damage and are 15% larger.', mult('explosionDamage', 1.30), mult('explosionSize', 1.15)),
+      w('tamper', 'Tamper Plate', 'Explosions deal 18% more damage.', mult('explosionDamage', 1.18)),
+      r('fatman', 'Fat Man', 'Every sixth shell is a mega shell: 2.4x radius and 3x damage. The five shells between are unchanged.', flag('megaShell')),
+      w('propel', 'Propellant', 'Explosions are 15% larger.', mult('explosionSize', 1.15)),
+      y('overcharge', 'Overcharge', 'Explosions deal 30% more damage and are 10% larger.', mult('explosionDamage', 1.30), mult('explosionSize', 1.10)),
+      r('daisycutter', 'DAISY CUTTER', 'Explosions are 80% larger and deal 50% more damage, and every sixth shell is a mega shell.', mult('explosionSize', 1.80), mult('explosionDamage', 1.50), flag('megaShell'))
+    ],
+    submunitions: [
+      w('bomblet', 'Bomblets', 'Every explosion throws 3 bomblets dealing 55% of its damage.', add('clusterCount', 3)),
+      w('scatter', 'Scatter Pack', 'Explosions are 12% larger.', mult('explosionSize', 1.12)),
+      w('timer', 'Short Timers', '+7% fire rate.', mult('fireRate', 1.07)),
+      y('clusterpack', 'Cluster Pack', 'Explosions throw 2 more bomblets and deal 20% more damage.', add('clusterCount', 2), mult('explosionDamage', 1.20)),
+      w('spread', 'Wide Pattern', 'Explosions are 15% larger.', mult('explosionSize', 1.15)),
+      r('carpet', 'Carpet Bombing', 'Bomblets throw bomblets of their own, one layer deeper. Capped at 80 live bomblets.', flag('carpet')),
+      w('filler', 'Dense Filler', 'Explosions deal 18% more damage.', mult('explosionDamage', 1.18)),
+      y('saturation', 'Saturation', 'Explosions throw 3 more bomblets.', add('clusterCount', 3)),
+      r('steelrain', 'STEEL RAIN', 'Explosions throw 4 more bomblets, bomblets split again, and explosions deal 40% more damage.', add('clusterCount', 4), flag('carpet'), mult('explosionDamage', 1.40))
+    ],
+    shockwave: [
+      w('concussion', 'Concussion', 'Slows applied by any source slow 20% harder.', add('slowPower', 0.20)),
+      w('bracing', 'Bracing', '6% damage reduction.', add('armor', 0.06)),
+      w('overpressure', 'Overpressure', 'Slows last 25% longer.', mult('statusDuration', 1.25)),
+      y('shockplate', 'Shock Plate', 'Anything that survives one of your explosions is slowed 50% for 2s.', flag('gravityWell'), add('slowPower', 0.15)),
+      w('blastshield', 'Blast Shield', '8% damage reduction.', add('armor', 0.08)),
+      r('demodash', 'Demo Dash', 'Every dash ends in a 90-damage explosion and deals 50 damage to everything you cross.', flag('dashBlast'), flag('dashStrike')),
+      w('resonance', 'Resonance', 'Slows slow 15% harder.', add('slowPower', 0.15)),
+      y('groundzero', 'Ground Zero', 'Slows last 30% longer and slow 20% harder.', mult('statusDuration', 1.30), add('slowPower', 0.20)),
+      r('seismic', 'SEISMIC', 'Explosion survivors are slowed 50% for 2s, slowed enemies below 20% health shatter, and explosions are 40% larger.', flag('gravityWell'), flag('stasis'), mult('explosionSize', 1.40))
+    ],
+    payload_submunitions: [
+      y('heavycluster', 'Heavy Cluster', 'Explosions throw 2 more bomblets and deal 20% more damage.', add('clusterCount', 2), mult('explosionDamage', 1.20)),
+      r('mother', 'Mother Shell', 'Every sixth shell is a mega shell, and every explosion throws 3 bomblets.', flag('megaShell'), add('clusterCount', 3)),
+      y('widepattern', 'Wide Pattern', 'Explosions are 25% larger and throw 1 more bomblet.', mult('explosionSize', 1.25), add('clusterCount', 1)),
+      r('carpetnuke', 'CARPET NUKE', 'Every sixth shell is a mega shell, explosions throw 4 more bomblets that split again, and blasts are 30% larger.', flag('megaShell'), add('clusterCount', 4), flag('carpet'), mult('explosionSize', 1.30))
+    ],
+    submunitions_shockwave: [
+      y('minefield', 'Minefield', 'Explosions throw 2 more bomblets and slows slow 15% harder.', add('clusterCount', 2), add('slowPower', 0.15)),
+      r('quagmire', 'Quagmire', 'Explosion survivors are slowed 50% for 2s, and every explosion throws 3 bomblets.', flag('gravityWell'), add('clusterCount', 3)),
+      y('tremor', 'Tremor', 'Slows last 30% longer and explosions are 20% larger.', mult('statusDuration', 1.30), mult('explosionSize', 1.20)),
+      r('nomansland', "NO MAN'S LAND", 'Explosions throw 4 more splitting bomblets, survivors are slowed 50% for 2s, and slowed enemies below 20% health shatter.', add('clusterCount', 4), flag('carpet'), flag('gravityWell'), flag('stasis'))
+    ]
+  });
 
-  /* ============================================================
-     MOURN - Reaper. Soul Scythe.
-     ============================================================ */
-  TREES.mourn = tree('mourn', 'Reaper\'s Pact', 'Sign it.', add('lifesteal', 0.02),
-    [arch('hunger', 'Hunger', '#d08bff', 'Their lives are your health bar.'),
-     arch('wrath', 'Wrath', '#ff5c6e', 'The closer to death, the harder you hit.'),
-     arch('harvest', 'Harvest', '#8affb0', 'Every kill pays out.')], [
-    lane('mourn', 'hunger', 1, [
-      w('bite', 'First Bite', 'Take a little back.', add('lifesteal', 0.03)),
-      w('thirst', 'Thirst', 'Drink deeper.', add('lifesteal', 0.03)),
-      w('edge', 'Keen Edge', 'Harder cuts.', mult('damage', 1.07)),
-      y('feed', 'Feeding Frenzy', 'The scythe drinks properly now.', add('lifesteal', 0.05), mult('damage', 1.1)),
-      w('gorge', 'Gorge', 'More per wound.', add('lifesteal', 0.03)),
-      w('vitality', 'Vitality', 'A bigger vessel.', add('maxHp', 25)),
-      r('exsanguinate', 'Exsanguinate', 'Every kill tears a chunk of life straight back into you.', add('killHealAmount', 6), add('lifesteal', 0.03)),
-      r('leech', 'Leech Field', 'The dying feed you from across the room.', add('soulHeal', 6), add('magnet', 90)),
-      w('sate', 'Sated', 'Hold more.', add('maxHp', 25)),
-      y('glut', 'Glutton', 'The wounds never close.', add('lifesteal', 0.06)),
-      r('undying', 'UNDYING', 'You heal faster than they can hurt you, and death itself gets one refusal.', add('lifesteal', 0.08), add('killHealAmount', 6), flag('secondWind'))
-    ]),
-    lane('mourn', 'wrath', 4, [
-      w('spite', 'Spite', 'Pain sharpens.', add('berserk', 0.03)),
-      w('fury', 'Fury', 'Swing harder.', mult('damage', 1.07)),
-      w('scar', 'Scar Tissue', 'Stay standing.', add('armor', 0.06)),
-      y('bloodrage', 'Blood Rage', 'Every wound you carry makes you worse to face.', add('berserk', 0.05)),
-      w('reckless', 'Reckless', 'Hit harder.', mult('damage', 1.1)),
-      w('adrenal', 'Adrenal Spike', 'Move when hurt.', flag('desperate')),
-      r('deathwish', 'Death Wish', 'Strip the armour entirely. What you lose in safety you gain in ruin.', mult('damage', 1.45), add('maxHp', -25)),
-      r('lastrites', 'Last Rites', 'At the edge of death you cannot be finished, once per wave.', flag('secondWind'), flag('desperate')),
-      w('malice', 'Malice', 'Deeper cuts.', mult('damage', 1.1)),
-      y('deathmark', 'Death Mark', 'Every fifth strike brands a target for slaughter.', flag('deathMark')),
-      r('wrathincarnate', 'WRATH INCARNATE', 'Wounded, you are unstoppable: enormous damage scaling and speed to chase it down.', add('berserk', 0.08), flag('desperate'), mult('damage', 1.2))
-    ]),
-    lane('mourn', 'harvest', 7, [
-      w('gleaner', 'Gleaner', 'Souls drift free.', add('soulHeal', 6)),
-      w('pull', 'Soul Pull', 'They come to you.', add('magnet', 70)),
-      w('toll', 'Toll', 'Paid per body.', add('scoreBonus', 0.15)),
-      y('reaping', 'Reaping', 'Every death leaves something worth taking.', add('soulHeal', 6), add('dropBonus', 0.6)),
-      w('tithe', 'Tithe', 'A larger cut.', add('scoreBonus', 0.15)),
-      w('wake', 'Wake', 'Recover between cuts.', add('regen', 1.0)),
-      r('soulreaper', 'Soul Reaper', 'Each kill heals you and winds the scythe up for the next.', add('killHealAmount', 6), flag('frenzy')),
-      r('massgrave', 'Mass Grave', 'The dead take the living with them.', add('onKillBlast', 55), add('killChainCount', 2)),
-      w('harvester', 'Harvester', 'More from each.', add('dropBonus', 0.5)),
-      y('deathspiral', 'Death Spiral', 'One kill makes the next easier, and the next.', flag('frenzy'), flag('adrenaline')),
-      r('endless', 'ENDLESS HARVEST', 'Killing sustains you completely: every death heals, hastens and spreads to the next.', add('killHealAmount', 6), flag('frenzy'), add('onKillBlast', 55))
-    ])
-  ]);
+  /* ============================================================ MOURN ============================================================ */
+  TREES.mourn = tree('mourn', 'MOURN',
+    w('root', "Reaper's Pact", 'Signs it. You heal for 2% of all damage dealt.', add('lifesteal', 0.02)),
+    [
+      arch('hunger', 'Hunger', '#d08bff',
+        'Hunger keeps a 75 HP operative alive by feeding. Feeding Frenzy raises lifesteal to 5% of all damage, Exsanguinate heals 6 per kill, and Undying adds a once-per-wave survival at 25 HP. Every point spent here is a point not spent on the damage that makes the lifesteal worth anything.',
+        { difficulty: 'Medium', damage: 'Low', defense: 'High', range: 'Low', speed: 'Medium' }),
+      arch('wrath', 'Wrath', '#ff5c6e',
+        'Wrath pays you for being nearly dead. Blood Rage adds 5% damage per 10% missing HP and Death Wish strips 25 max HP to add 45% damage outright. It fights Hunger directly: healing back up turns Wrath off.',
+        { difficulty: 'High', damage: 'High', defense: 'Low', range: 'Low', speed: 'Medium' }),
+      arch('harvest', 'Harvest', '#8affb0',
+        'Harvest turns kills into resources. Reaping drops soul orbs that heal 6, Soul Reaper adds 1s of +25% fire rate per kill, and Mass Grave makes every corpse detonate for 55. It needs a crowd; against one boss it produces nothing.',
+        { difficulty: 'Low', damage: 'Medium', defense: 'Medium', range: 'Medium', speed: 'High' })
+    ], {
+    hunger: [
+      w('bite', 'First Bite', 'You heal for 3% more of all damage dealt.', add('lifesteal', 0.03)),
+      w('thirst', 'Thirst', 'You heal for 3% more of all damage dealt.', add('lifesteal', 0.03)),
+      w('vitality', 'Vitality', '+25 max HP.', add('maxHp', 25)),
+      y('feed', 'Feeding Frenzy', 'You heal for 5% more of all damage dealt and deal 10% more damage.', add('lifesteal', 0.05), mult('damage', 1.10)),
+      w('gorge', 'Gorge', 'You heal for 3% more of all damage dealt.', add('lifesteal', 0.03)),
+      r('exsanguinate', 'Exsanguinate', 'Every kill heals you for 6, and you heal for 3% more of all damage dealt.', add('killHealAmount', 6), add('lifesteal', 0.03)),
+      w('sate', 'Sated', '+30 max HP.', add('maxHp', 30)),
+      y('glut', 'Glutton', 'You heal for 6% more of all damage dealt.', add('lifesteal', 0.06)),
+      r('undying', 'UNDYING', 'You heal for 8% more of all damage dealt, every kill heals 6, and once per wave a killing blow leaves you at 25 HP with 1.6s of invulnerability.', add('lifesteal', 0.08), add('killHealAmount', 6), flag('secondWind'))
+    ],
+    wrath: [
+      w('spite', 'Spite', '+3% damage per 10% of max HP missing, up to +30%.', add('berserk', 0.03)),
+      w('fury', 'Fury', '+7% damage.', mult('damage', 1.07)),
+      w('scar', 'Scar Tissue', '6% damage reduction.', add('armor', 0.06)),
+      y('bloodrage', 'Blood Rage', '+5% damage per 10% of max HP missing, up to +50%.', add('berserk', 0.05)),
+      w('reckless', 'Reckless', '+10% damage.', mult('damage', 1.10)),
+      r('deathwish', 'Death Wish', '+45% damage and -25 max HP. On a 75 HP operative that is a third of your health.', mult('damage', 1.45), add('maxHp', -25)),
+      w('adrenal', 'Adrenal Spike', '+20% move speed while below 40% health.', flag('desperate')),
+      y('malice', 'Malice', '+12% damage and +3% damage per 10% missing HP.', mult('damage', 1.12), add('berserk', 0.03)),
+      r('wrathincarnate', 'WRATH INCARNATE', '+8% damage per 10% missing HP (up to +80%), +20% damage, and +20% move speed below 40% health.', add('berserk', 0.08), mult('damage', 1.20), flag('desperate'))
+    ],
+    harvest: [
+      w('gleaner', 'Gleaner', 'Kills drop soul orbs that heal 6 on pickup.', add('soulHeal', 6)),
+      w('pull', 'Soul Pull', 'Pickups are drawn from 70 units further away.', add('magnet', 70)),
+      w('toll', 'Toll', '+15% score, which is also +15% cores banked.', add('scoreBonus', 0.15)),
+      y('reaping', 'Reaping', 'Soul orbs heal 6 more, and 60% more pickups drop.', add('soulHeal', 6), add('dropBonus', 0.6)),
+      w('wake', 'Wake', 'You regenerate 1 HP per second.', add('regen', 1.0)),
+      r('soulreaper', 'Soul Reaper', 'Every kill grants 1s of +25% fire rate and heals you for 6.', flag('frenzy'), add('killHealAmount', 6)),
+      w('harvester', 'Harvester', '50% more pickups drop.', add('dropBonus', 0.5)),
+      y('massgrave', 'Mass Grave', 'Every kill detonates for 55 damage in an 80-unit radius.', add('onKillBlast', 55)),
+      r('endless', 'ENDLESS HARVEST', 'Every kill heals 6, grants 1s of +25% fire rate, and detonates for 55 damage.', add('killHealAmount', 6), flag('frenzy'), add('onKillBlast', 55))
+    ],
+    hunger_wrath: [
+      y('bloodprice', 'Blood Price', 'You heal for 3% more of all damage dealt and gain +3% damage per 10% missing HP.', add('lifesteal', 0.03), add('berserk', 0.03)),
+      r('bloodpact', 'Blood Pact', '+5% damage per 10% missing HP and you heal for 5% more of all damage dealt, so the damage climbs while the healing holds you there.', add('berserk', 0.05), add('lifesteal', 0.05)),
+      y('rend', 'Rend', '+12% damage and you heal for 3% more of all damage dealt.', mult('damage', 1.12), add('lifesteal', 0.03)),
+      r('crimsontide', 'CRIMSON TIDE', '+6% damage per 10% missing HP, 8% more lifesteal, and once per wave a killing blow leaves you at 25 HP.', add('berserk', 0.06), add('lifesteal', 0.08), flag('secondWind'))
+    ],
+    wrath_harvest: [
+      y('cullingrage', 'Culling Rage', '+3% damage per 10% missing HP, and every kill heals 6.', add('berserk', 0.03), add('killHealAmount', 6)),
+      r('deathspiral', 'Death Spiral', 'Every kill grants 1s of +25% fire rate and detonates for 55 damage.', flag('frenzy'), add('onKillBlast', 55)),
+      y('bloodharvest', 'Blood Harvest', '+12% damage and soul orbs heal 6 more.', mult('damage', 1.12), add('soulHeal', 6)),
+      r('apocalypse', 'APOCALYPSE', '+6% damage per 10% missing HP, every kill detonates for 55 and grants 1s of +25% fire rate, and +20% speed below 40% health.', add('berserk', 0.06), add('onKillBlast', 55), flag('frenzy'), flag('desperate'))
+    ]
+  });
 
-  /* ============================================================
-     IRIS - Prism. Prism Beam.
-     ============================================================ */
-  TREES.iris = tree('iris', 'Prism Array', 'Split the beam.', add('projectiles', 1),
-    [arch('refraction', 'Refraction', '#7cffe0', 'The walls are part of your weapon.'),
-     arch('seeker', 'Seeker', '#6ec6ff', 'Shots that do not miss.'),
-     arch('spectrum', 'Spectrum', '#e08bff', 'More beams, always more beams.')], [
-    lane('iris', 'refraction', 1, [
-      w('bounce', 'First Bounce', 'Shots come off the geometry.', add('bounces', 1)),
-      w('angle', 'Angle Optics', 'Cleaner reflections.', mult('damage', 1.06)),
-      w('elastic', 'Elastic Rounds', 'They keep their speed.', add('pierce', 1)),
-      y('refract', 'Refraction', 'Shots bounce again and hit harder each time.', add('bounces', 1), flag('amplify')),
-      w('polish', 'Polished Core', 'Less loss per bounce.', mult('damage', 1.08)),
-      w('carom', 'Carom', 'Another wall.', add('bounces', 1)),
-      r('splitbeam', 'Split Beam', 'Every bounce splits the shot in two.', flag('bounceSplit')),
-      r('amplifier', 'Amplifier', 'Each bounce winds the round up instead of wearing it down.', flag('amplify'), mult('damage', 1.15)),
-      w('mirror', 'Mirror Finish', 'More bounces.', add('bounces', 1)),
-      y('resonant', 'Resonant Cavity', 'The room fills with returning fire.', flag('bounceSplit'), flag('amplify')),
-      r('kaleidoscope', 'KALEIDOSCOPE', 'The arena becomes a crossfire of your own making.', add('bounces', 1), flag('bounceSplit'), flag('amplify'), add('projectiles', 1))
-    ]),
-    lane('iris', 'seeker', 4, [
-      w('tracker', 'Tracker', 'Shots lean toward targets.', add('homingStrength', 2.6)),
-      w('lens', 'Focus Lens', 'Harder light.', mult('damage', 1.08)),
-      w('gyro', 'Gyro Stabiliser', 'Tighter turns.', add('homingStrength', 2.6)),
-      y('seeking', 'Seeking Optics', 'Your fire curves hard onto whatever is closest.', add('homingStrength', 2.6), mult('damage', 1.12)),
-      w('guidance', 'Guidance', 'Better lock.', add('critChance', 0.05)),
-      w('sensor', 'Sensor Pod', 'Wider search.', mult('damage', 1.08)),
-      r('swarmfire', 'Swarm Fire', 'The beam breaks into a flock that hunts on its own.', add('projectiles', 2), mult('damage', 0.78), add('homingStrength', 2.6)),
-      r('lockon', 'Lock On', 'Nothing escapes a marked target, and marked targets fall apart.', flag('deathMark'), add('homingStrength', 2.6)),
-      w('tuned', 'Tuned Array', 'Harder light.', mult('damage', 1.1)),
-      y('relentless', 'Relentless', 'The shots simply do not give up.', add('homingStrength', 2.6), add('pierce', 2)),
-      r('inescapable', 'INESCAPABLE', 'Every round finds a body. There is no cover and no outrunning it.', add('homingStrength', 2.6), add('pierce', 3), mult('damage', 1.25))
-    ]),
-    lane('iris', 'spectrum', 7, [
-      w('split', 'Split', 'One more beam.', add('projectiles', 1)),
-      w('coherence', 'Coherence', 'Tighter grouping.', mult('damage', 1.07)),
-      w('cycle', 'Fast Cycle', 'Quicker pulses.', mult('fireRate', 1.08)),
-      y('spectrum', 'Full Spectrum', 'The array opens up: more beams, faster.', add('projectiles', 1), mult('fireRate', 1.1)),
-      w('prismatic', 'Prismatic', 'Cleaner split.', mult('damage', 1.08)),
-      w('rapid', 'Rapid Array', 'Faster still.', mult('fireRate', 1.1)),
-      r('scatter', 'Scatter Array', 'A wall of light every pull, each beam thinner.', add('projectiles', 3), mult('damage', 0.7)),
-      r('lance', 'Focused Lance', 'All the beams into one: slower, but it goes through everything.', add('projectiles', -1), mult('damage', 2.1), add('pierce', 4)),
-      w('output', 'Output', 'More power.', mult('damage', 1.1)),
-      y('overdrive', 'Overdrive', 'The array runs past its rating.', mult('fireRate', 1.18)),
-      r('whitelight', 'WHITE LIGHT', 'Everything at once: a saturating spread at full power.', add('projectiles', 2), mult('fireRate', 1.2), mult('damage', 1.15))
-    ])
-  ]);
+  /* ============================================================ IRIS ============================================================ */
+  TREES.iris = tree('iris', 'IRIS',
+    w('root', 'Prism Array', 'Splits the beam. +1 projectile per shot.', add('projectiles', 1)),
+    [
+      arch('refraction', 'Refraction', '#7cffe0',
+        'Refraction makes the walls part of the weapon. Carom adds wall bounces, Split Beam divides a shot in two on every bounce, and Amplify adds 30% damage per bounce instead of losing it. In open ground with no walls to work with, it does nothing.',
+        { difficulty: 'High', damage: 'High', defense: 'Low', range: 'High', speed: 'Medium' }),
+      arch('seeker', 'Seeker', '#6ec6ff',
+        'Seeker removes aiming from the equation. Tracker curves every shot toward the nearest enemy and Relentless adds pierce so a curving round keeps working after the first body. It steers toward whatever is closest, which is not always what you wanted dead.',
+        { difficulty: 'Low', damage: 'Medium', defense: 'Low', range: 'High', speed: 'Medium' }),
+      arch('spectrum', 'Spectrum', '#e08bff',
+        'Spectrum is raw projectile count. Full Spectrum adds beams and rate, and Scatter Array adds three more at 30% less damage each. Every projectile carries every on-hit effect you own, so it multiplies burn, chain and bounce alike - and it empties the screen budget fastest.',
+        { difficulty: 'Low', damage: 'High', defense: 'Low', range: 'Medium', speed: 'High' })
+    ], {
+    refraction: [
+      w('bounce', 'First Bounce', 'Shots bounce off walls 1 more time.', add('bounces', 1)),
+      w('angle', 'Angle Optics', '+6% damage.', mult('damage', 1.06)),
+      w('carom', 'Carom', 'Shots bounce off walls 1 more time.', add('bounces', 1)),
+      y('refract', 'Refraction', 'Shots bounce 1 more time and gain 30% damage per bounce instead of losing it.', add('bounces', 1), flag('amplify')),
+      w('polish', 'Polished Core', '+8% damage.', mult('damage', 1.08)),
+      r('splitbeam', 'Split Beam', 'Every bounce splits the shot into 2, each dealing 60% of the parent. Capped at 180 live projectiles.', flag('bounceSplit')),
+      w('mirror', 'Mirror Finish', 'Shots bounce off walls 1 more time.', add('bounces', 1)),
+      y('resonant', 'Resonant Cavity', 'Shots bounce 2 more times and gain 30% damage per bounce.', add('bounces', 2), flag('amplify')),
+      r('kaleidoscope', 'KALEIDOSCOPE', 'Shots bounce 2 more times, split in two on every bounce, and gain 30% damage per bounce.', add('bounces', 2), flag('bounceSplit'), flag('amplify'))
+    ],
+    seeker: [
+      w('tracker', 'Tracker', 'Shots curve toward the nearest enemy within 460 units.', add('homingStrength', 2.6)),
+      w('lens', 'Focus Lens', '+8% damage.', mult('damage', 1.08)),
+      w('gyro', 'Gyro Stabiliser', 'Shots curve 2.6 faster toward their target.', add('homingStrength', 2.6)),
+      y('seeking', 'Seeking Optics', 'Shots curve 2.6 faster and deal 12% more damage.', add('homingStrength', 2.6), mult('damage', 1.12)),
+      w('guidance', 'Guidance', '+5% critical hit chance.', add('critChance', 0.05)),
+      r('swarmfire', 'Swarm Fire', '+2 projectiles that each deal 22% less damage, all of them homing.', add('projectiles', 2), mult('damage', 0.78), add('homingStrength', 2.6)),
+      w('sensor', 'Sensor Pod', '+8% damage.', mult('damage', 1.08)),
+      y('relentless', 'Relentless', 'Shots pass through 2 more enemies and curve 2.6 faster.', add('pierce', 2), add('homingStrength', 2.6)),
+      r('inescapable', 'INESCAPABLE', 'Shots curve 5.2 faster, pass through 3 more enemies, and deal 25% more damage.', add('homingStrength', 5.2), add('pierce', 3), mult('damage', 1.25))
+    ],
+    spectrum: [
+      w('split', 'Split', '+1 projectile per shot.', add('projectiles', 1)),
+      w('coherence', 'Coherence', '+7% damage.', mult('damage', 1.07)),
+      w('cycle', 'Fast Cycle', '+8% fire rate.', mult('fireRate', 1.08)),
+      y('spectrum', 'Full Spectrum', '+1 projectile and +10% fire rate.', add('projectiles', 1), mult('fireRate', 1.10)),
+      w('prismatic', 'Prismatic', '+8% damage.', mult('damage', 1.08)),
+      r('scatter', 'Scatter Array', '+3 projectiles per shot. Every projectile deals 30% less damage.', add('projectiles', 3), mult('damage', 0.70)),
+      w('rapid', 'Rapid Array', '+10% fire rate.', mult('fireRate', 1.10)),
+      y('overdrive', 'Overdrive', '+18% fire rate.', mult('fireRate', 1.18)),
+      r('whitelight', 'WHITE LIGHT', '+2 projectiles, +20% fire rate and +15% damage.', add('projectiles', 2), mult('fireRate', 1.20), mult('damage', 1.15))
+    ],
+    refraction_seeker: [
+      y('curvedmirror', 'Curved Mirror', 'Shots bounce 1 more time and curve 2.6 faster.', add('bounces', 1), add('homingStrength', 2.6)),
+      r('ricochethunt', 'Ricochet Hunt', 'Shots bounce 2 more times, gain 30% damage per bounce, and curve toward targets after each bounce.', add('bounces', 2), flag('amplify'), add('homingStrength', 2.6)),
+      y('trackingcarom', 'Tracking Carom', 'Shots pass through 1 more enemy and bounce 1 more time.', add('pierce', 1), add('bounces', 1)),
+      r('impossibleangle', 'IMPOSSIBLE ANGLE', 'Shots bounce 3 more times, split on every bounce, curve 2.6 faster, and gain 30% damage per bounce.', add('bounces', 3), flag('bounceSplit'), add('homingStrength', 2.6), flag('amplify'))
+    ],
+    seeker_spectrum: [
+      y('scattertrack', 'Scatter Track', '+1 projectile, all of them curving toward targets.', add('projectiles', 1), add('homingStrength', 2.6)),
+      r('flock', 'Flock', '+2 projectiles that curve 2.6 faster and pass through 1 more enemy.', add('projectiles', 2), add('homingStrength', 2.6), add('pierce', 1)),
+      y('wideseek', 'Wide Seek', '+12% fire rate and shots curve 2.6 faster.', mult('fireRate', 1.12), add('homingStrength', 5.2)),
+      r('starfall', 'STARFALL', '+3 projectiles curving 5.2 faster, +15% fire rate, and shots pass through 2 more enemies. Each projectile deals 15% less.', add('projectiles', 3), add('homingStrength', 5.2), mult('fireRate', 1.15), add('pierce', 2), mult('damage', 0.85))
+    ]
+  });
 
-  /* display names, so the tree can title itself without the game telling it */
-  const NAMES = {
-    vanguard: 'ROOK', cinder: 'CINDER', halcyon: 'HALCYON', arc: 'ARC', vex: 'VEX',
-    nyx: 'NYX', cog: 'COG', boom: 'BOOM', mourn: 'MOURN', iris: 'IRIS'
-  };
-  for (const id in TREES) TREES[id].name = NAMES[id] || id.toUpperCase();
-
-  /* the tree shown when the game has no character context */
   const DEFAULT_CHAR = 'vanguard';
-
   return { TREES, DEFAULT_CHAR, STAT_BASE, FLAGS, TIER_COST, TIER_LABEL, COLS };
 });
 </script>
@@ -883,9 +1046,11 @@ h2{margin:0 0 14px; font-size:clamp(20px,4.5vw,30px); letter-spacing:.08em; colo
   /* ---------------- points ---------------- */
 
   /* the single hook the game calls. One point per level, a bonus every fifth. */
+  /* Deliberately scarce: a full tree costs ~86 points, and a level-40 run
+     banks ~32, so a build covers roughly a third of it. */
   function pointsForLevel(level) {
     const l = Math.max(0, Math.floor(level || 0));
-    return l + Math.floor(l / 5);
+    return Math.ceil(l * 0.8);
   }
 
   function costOf(nodeOrId, charId) {
@@ -987,12 +1152,15 @@ h2{margin:0 0 14px; font-size:clamp(20px,4.5vw,30px); letter-spacing:.08em; colo
     }
 
     const reqs = node.reqs || {};
-    if (reqs.archetypeMin) {
-      const { name, count } = reqs.archetypeMin;
-      const have = archetypeCounts(state)[name] || 0;
-      if (have < count) {
-        const label = idx.archetypes[name] ? idx.archetypes[name].name : name;
-        reasons.push('Requires ' + count + ' ' + label + ' abilities (you have ' + have + ')');
+    const mins = reqs.archetypeMins || (reqs.archetypeMin ? [reqs.archetypeMin] : []);
+    if (mins.length) {
+      const counts = archetypeCounts(state);
+      for (const m of mins) {
+        const have = counts[m.name] || 0;
+        if (have < m.count) {
+          const label = idx.archetypes[m.name] ? idx.archetypes[m.name].name : m.name;
+          reasons.push('Requires ' + m.count + ' ' + label + ' abilities (you have ' + have + ')');
+        }
       }
     }
     if (reqs.pointsSpentMin) {
@@ -1179,10 +1347,9 @@ h2{margin:0 0 14px; font-size:clamp(20px,4.5vw,30px); letter-spacing:.08em; colo
    Rendering approach: absolutely positioned DOM tiles over one SVG pipe
    layer - DOM gives hover, focus, keyboard and scrolling for free, while a
    single SVG plane lets parent->child elbows be deduplicated into shared
-   trunks so multi-parent joins land on one clean pipe instead of N overlaps.
+   trunks, so the three columns can cross and converge on one clean pipe.
 
-   Reads the rules only through AbilityTree.canUnlock / .unlock. No second
-   copy of the rule logic lives here.
+   Reads the rules only through AbilityTree.canUnlock / .unlock.
    ============================================================ */
 (function (root, factory) {
   const T = (typeof module !== 'undefined' && module.exports) ? require('./tree.logic.js') : root.AbilityTree;
@@ -1192,79 +1359,81 @@ h2{margin:0 0 14px; font-size:clamp(20px,4.5vw,30px); letter-spacing:.08em; colo
 })(typeof globalThis !== 'undefined' ? globalThis : this, function (T) {
   'use strict';
 
-  const CELL_W = 104, CELL_H = 98;      // grid pitch
-  const TILE_W = 84, TILE_H = 70;       // tile size inside the cell
+  const CELL_W = 152, CELL_H = 94;
+  const TILE_W = 132, TILE_H = 74;
   const SVG_NS = 'http://www.w3.org/2000/svg';
-
   const TIER_GLYPH = { white: '◆', yellow: '◈', red: '✦' };
+  const RATING_ORDER = ['difficulty', 'damage', 'defense', 'range', 'speed'];
+  const RATING_PIPS = { Low: 1, Medium: 2, High: 3 };
 
   const CSS = `
-.atree{--w:#cfe6ff;--y:#ffc857;--r:#ff4d6d;
-  display:flex; flex-direction:column; height:100%; min-height:0;
+.atree{display:flex; flex-direction:column; height:100%; min-height:0; position:relative;
   color:#cfe6ff; font:14px/1.4 "Segoe UI",Roboto,-apple-system,Helvetica,Arial,sans-serif;
-  background:#070a12; border-radius:12px; overflow:hidden; position:relative;}
+  background:#070a12; border-radius:12px; overflow:hidden;}
 .atree *{box-sizing:border-box;}
-.atree-hud{display:flex; flex-wrap:wrap; align-items:center; gap:10px;
-  padding:10px 14px; background:rgba(12,20,36,.96); border-bottom:1px solid rgba(120,150,190,.22); flex:0 0 auto;}
-.atree-pts{font-weight:800; font-size:17px; color:#eaf6ff; letter-spacing:.04em;}
+.atree-hud{display:flex; flex-wrap:wrap; align-items:center; gap:10px; flex:0 0 auto;
+  padding:9px 14px; background:rgba(12,20,36,.96); border-bottom:1px solid rgba(120,150,190,.22);}
 .atree-who{font-weight:800; font-size:15px; letter-spacing:.06em; color:#eaf6ff;}
 .atree-who small{display:block; font-size:10px; font-weight:600; letter-spacing:.14em; color:#7e9bc4; text-transform:uppercase;}
+.atree-pts{font-weight:800; font-size:17px; color:#eaf6ff;}
 .atree-pts small{display:block; font-size:10px; font-weight:600; letter-spacing:.14em; color:#7e9bc4; text-transform:uppercase;}
-.atree-arch{display:flex; gap:8px; flex-wrap:wrap;}
-.atree-chip{display:flex; align-items:center; gap:6px; padding:4px 10px; border-radius:20px;
-  background:rgba(255,255,255,.04); border:1px solid rgba(120,150,190,.22); font-size:12px;}
-.atree-chip b{font-size:14px; color:#eaf6ff;}
-.atree-chip.dom{box-shadow:0 0 0 1px currentColor inset;}
-.atree-dot{width:8px; height:8px; border-radius:50%; background:currentColor;}
 .atree-spacer{flex:1 1 auto;}
 .atree-btn{padding:7px 14px; border:1px solid rgba(255,77,109,.5); border-radius:8px; cursor:pointer;
   background:transparent; color:#ff8fa3; font:700 12px/1 inherit; letter-spacing:.08em; text-transform:uppercase;}
 .atree-btn:hover{background:rgba(255,77,109,.14);}
 .atree-note{width:100%; font-size:12px; color:#ffc857;}
-.atree-scroll{flex:1 1 auto; min-height:0; overflow:auto; padding:18px;}
+/* archetype column headers */
+.atree-heads{position:relative; flex:0 0 auto; height:66px; background:rgba(9,15,28,.97);
+  border-bottom:1px solid rgba(120,150,190,.18); overflow:hidden;}
+.atree-headinner{position:relative; margin:0 auto; height:100%;}
+.atree-head{position:absolute; top:8px; height:50px; padding:6px 8px; border-radius:9px; cursor:help;
+  text-align:center; border:1px solid currentColor; background:rgba(255,255,255,.03);}
+.atree-head b{display:block; font-size:13px; letter-spacing:.08em; text-transform:uppercase;}
+.atree-head span{display:block; font-size:11px; color:#8fb2d8; margin-top:2px;}
+.atree-head.dom{background:rgba(255,255,255,.10); box-shadow:0 0 14px currentColor;}
+/* grid */
+.atree-scroll{flex:1 1 auto; min-height:0; overflow:auto; padding:16px;}
 .atree-grid{position:relative; margin:0 auto;}
 .atree-pipes{position:absolute; inset:0; overflow:visible; pointer-events:none;}
-.atree-node{position:absolute; margin:0; padding:5px 6px; cursor:pointer; text-align:center;
-  background:rgba(10,18,34,.96); border:1px solid rgba(120,150,190,.25); border-radius:10px;
-  color:#8fb2d8; font:inherit; transition:transform .1s, box-shadow .1s, border-color .1s, opacity .1s;
-  display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px;}
-.atree-node .g{font-size:17px; line-height:1;}
-.atree-node .n{font-size:10.5px; font-weight:700; line-height:1.15; letter-spacing:.01em;}
+.atree-node{position:absolute; margin:0; padding:5px 7px; cursor:pointer; text-align:center; z-index:1;
+  background:rgba(10,18,34,.96); border:1px solid rgba(120,150,190,.25); border-radius:9px;
+  color:#8fb2d8; font:inherit; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1px;
+  transition:transform .1s, box-shadow .1s, border-color .1s, opacity .1s;}
+.atree-node .g{font-size:14px; line-height:1;}
+.atree-node .n{font-size:11px; font-weight:700; line-height:1.15; color:#cfe6ff;}
 .atree-node .c{font-size:9px; letter-spacing:.1em; color:#5f7ba3;}
 .atree-node:focus{outline:2px solid #40e0ff; outline-offset:2px;}
-/* tier */
-.atree-node.t-white .g{color:var(--w);} .atree-node.t-yellow .g{color:var(--y);} .atree-node.t-red .g{color:var(--r);}
 .atree-node.t-yellow{border-style:dashed;}
-.atree-node.t-red{border-width:2px; border-radius:14px;}
-/* status */
-.atree-node.s-locked{opacity:.34;}
-.atree-node.s-available{opacity:.72;}
-.atree-node.s-reachable{border-color:#40e0ff; color:#cfe6ff; box-shadow:0 0 14px rgba(64,224,255,.25);}
-.atree-node.s-reachable:hover{transform:translateY(-2px); box-shadow:0 0 22px rgba(64,224,255,.45);}
-.atree-node.s-unlocked{color:#eaf6ff; background:rgba(18,38,28,.96); border-color:#9dff5c;}
-.atree-node.s-unlocked.t-yellow{background:rgba(44,36,14,.96); border-color:var(--y);}
-.atree-node.s-unlocked.t-red{background:rgba(48,16,26,.96); border-color:var(--r); box-shadow:0 0 20px rgba(255,77,109,.3);}
-.atree-node.s-blocked{opacity:.4; border-color:rgba(255,77,109,.6); cursor:not-allowed;}
+.atree-node.t-red{border-width:2px; border-radius:13px;}
+.atree-node.dual{border-style:double; border-width:3px;}
+.atree-node.s-locked{opacity:.3;}
+.atree-node.s-available{opacity:.62;}
+.atree-node.s-reachable{box-shadow:0 0 0 1px currentColor, 0 0 16px -2px currentColor;}
+.atree-node.s-reachable:hover{transform:translateY(-2px); box-shadow:0 0 0 1px currentColor, 0 0 26px -2px currentColor;}
+.atree-node.s-unlocked{box-shadow:0 0 0 2px currentColor, 0 0 22px -4px currentColor;}
+.atree-node.s-unlocked .n{color:#ffffff;}
+.atree-node.s-blocked{opacity:.34; cursor:not-allowed;}
 .atree-node.s-blocked .n{text-decoration:line-through;}
-.atree-node .arch{position:absolute; left:0; top:8px; bottom:8px; width:3px; border-radius:2px; background:currentColor;}
 /* tooltip */
-.atree-tip{position:fixed; z-index:60; max-width:290px; padding:11px 13px; pointer-events:none; opacity:0;
+.atree-tip{position:fixed; z-index:60; max-width:310px; padding:11px 13px; pointer-events:none; opacity:0;
   background:rgba(8,14,26,.985); border:1px solid rgba(120,150,190,.35); border-radius:10px;
   box-shadow:0 10px 34px rgba(0,0,0,.6); transition:opacity .08s; font-size:12.5px;}
 .atree-tip.show{opacity:1;}
 .atree-tip h4{margin:0 0 2px; font-size:14.5px; color:#eaf6ff; letter-spacing:.03em;}
 .atree-tip .meta{font-size:10.5px; letter-spacing:.12em; text-transform:uppercase; margin-bottom:7px;}
-.atree-tip .desc{color:#a8c6e8; line-height:1.5; margin-bottom:7px;}
-.atree-tip .eff{color:#9dff5c; font-size:12px; line-height:1.5;}
-.atree-tip .eff.neg{color:#ff8fa3;}
+.atree-tip .desc{color:#cfe6ff; line-height:1.55; margin-bottom:6px;}
 .atree-tip .why{margin-top:8px; padding-top:7px; border-top:1px solid rgba(120,150,190,.2); color:#ff8fa3; line-height:1.55;}
 .atree-tip .why b{display:block; color:#ffc857; font-size:10.5px; letter-spacing:.12em; text-transform:uppercase; margin-bottom:3px;}
-.atree-tip .got{margin-top:8px; padding-top:7px; border-top:1px solid rgba(157,255,92,.25); color:#9dff5c;}
+.atree-tip .got{margin-top:7px; padding-top:6px; border-top:1px solid rgba(157,255,92,.25); color:#9dff5c;}
+.atree-tip table{width:100%; border-collapse:collapse; margin-top:7px; font-size:11.5px;}
+.atree-tip td{padding:2px 0; color:#8fb2d8;}
+.atree-tip td.v{text-align:right; color:#eaf6ff; font-weight:600;}
+.atree-tip .pips{letter-spacing:2px;}
 /* confirm */
 .atree-confirm{position:absolute; inset:0; z-index:70; display:none; align-items:center; justify-content:center;
   background:rgba(4,8,16,.82); padding:20px;}
 .atree-confirm.show{display:flex;}
-.atree-confirm .box{max-width:380px; text-align:center; padding:22px 20px; border-radius:12px;
+.atree-confirm .box{max-width:390px; text-align:center; padding:22px 20px; border-radius:12px;
   background:#0c1424; border:1px solid rgba(255,77,109,.45);}
 .atree-confirm h3{margin:0 0 8px; color:#eaf6ff; font-size:19px;}
 .atree-confirm p{margin:0 0 16px; color:#a8c6e8; font-size:13px; line-height:1.55;}
@@ -1272,7 +1441,7 @@ h2{margin:0 0 14px; font-size:clamp(20px,4.5vw,30px); letter-spacing:.08em; colo
 .atree-confirm button{padding:9px 18px; border-radius:8px; cursor:pointer; font:700 12px/1 inherit;
   letter-spacing:.08em; text-transform:uppercase; border:1px solid rgba(120,150,190,.3); background:transparent; color:#a8c6e8;}
 .atree-confirm button.yes{background:#ff4d6d; border-color:#ff4d6d; color:#2a0410;}
-@media (max-width:640px){ .atree-scroll{padding:10px;} .atree-hud{padding:8px 10px; gap:7px;} }
+@media (max-width:700px){ .atree-scroll{padding:8px;} .atree-hud{padding:7px 10px; gap:7px;} }
 `;
 
   function injectCss() {
@@ -1291,37 +1460,19 @@ h2{margin:0 0 14px; font-size:clamp(20px,4.5vw,30px); letter-spacing:.08em; colo
   };
   const cx = n => n.col * CELL_W + CELL_W / 2;
   const cy = n => n.row * CELL_H + CELL_H / 2;
-  const archColor = (idx, a) => (a && idx.archetypes[a] ? idx.archetypes[a].color : '#8fb2d8');
 
-  /* human readable effect lines, also used by the tooltip */
-  const norm = s => String(s).toLowerCase().replace(/[^a-z0-9]/g, '');
-  function effectLines(node) {
-    const list = node.effects || (node.effect ? [node.effect] : []);
-    const out = [];
-    for (const e of list) {
-      // a flag that just restates the node name adds nothing to the tooltip
-      if (e.flag && norm(node.name).startsWith(norm(e.flag))) continue;
-      out.push(e);
-    }
-    return out.map(e => {
-      if (e.flag) return { text: flagText(e.flag), neg: false };
-      const nice = e.stat.replace(/([A-Z])/g, ' $1').replace(/^./, c => c.toUpperCase());
-      if (e.op === 'mult') {
-        const pct = Math.round((e.value - 1) * 100);
-        return { text: (pct >= 0 ? '+' : '') + pct + '% ' + nice, neg: pct < 0 };
-      }
-      const v = e.value;
-      const pctStat = /chance|power|armor/i.test(e.stat);
-      const shown = pctStat ? Math.round(v * 100) + '%' : v;
-      return { text: (v >= 0 ? '+' : '') + shown + ' ' + nice, neg: v < 0 };
-    });
-  }
-  function flagText(flag) {
-    const words = flag.replace(/([A-Z])/g, ' $1').toLowerCase().trim();
-    return 'Unlocks: ' + words.charAt(0).toUpperCase() + words.slice(1);
+  /* a node's colour is its archetype's; a convergence wears both */
+  function nodeColors(idx, n) {
+    if (n.dual) return n.dual.map(a => (idx.archetypes[a] ? idx.archetypes[a].color : '#8fb2d8'));
+    if (n.archetype && idx.archetypes[n.archetype]) return [idx.archetypes[n.archetype].color];
+    return ['#8fb2d8'];
   }
 
-  /* ---------------- mount ---------------- */
+  function pips(value) {
+    const n = RATING_PIPS[value] || 1;
+    return '<span class="pips">' + '●'.repeat(n) + '<span style="color:#3a4a5e">' + '●'.repeat(3 - n) + '</span></span>';
+  }
+
   function mount(container, opts) {
     injectCss();
     opts = opts || {};
@@ -1332,61 +1483,85 @@ h2{margin:0 0 14px; font-size:clamp(20px,4.5vw,30px); letter-spacing:.08em; colo
     const hud = el('div', 'atree-hud');
     const who = el('div', 'atree-who');
     const pts = el('div', 'atree-pts');
-    const chips = el('div', 'atree-arch');
     const spacer = el('div', 'atree-spacer');
     const resetBtn = el('button', 'atree-btn', 'Reset tree');
     const note = el('div', 'atree-note');
-    hud.append(who, pts, chips, spacer, resetBtn, note);
+    hud.append(who, pts, spacer, resetBtn, note);
+
+    const heads = el('div', 'atree-heads');
+    const headInner = el('div', 'atree-headinner');
+    heads.appendChild(headInner);
 
     const scroll = el('div', 'atree-scroll');
     const tip = el('div', 'atree-tip');
     const confirm = el('div', 'atree-confirm',
-      '<div class="box"><h3>Reset this ability tree?</h3>' +
-      '<p id="atree-confirm-text"></p>' +
+      '<div class="box"><h3>Reset this ability tree?</h3><p id="atree-confirm-text"></p>' +
       '<div class="row"><button class="yes">Reset</button><button class="no">Cancel</button></div></div>');
-    rootEl.append(hud, scroll, tip, confirm);
+    rootEl.append(hud, heads, scroll, tip, confirm);
     container.innerHTML = '';
     container.appendChild(rootEl);
 
-    /* rebuilt whenever the active character changes */
-    let idx = null, tiles = {}, segs = null, junctionDots = [], svg = null, builtFor = null;
+    let idx = null, tiles = {}, segs = null, svg = null, builtFor = null, headEls = [];
 
     function build() {
       idx = T.activeTree(state);
       builtFor = idx.charId;
-      tiles = {};
-      segs = new Map();
-      junctionDots = [];
-      scroll.innerHTML = '';
+      tiles = {}; segs = new Map(); headEls = [];
+      scroll.innerHTML = ''; headInner.innerHTML = '';
 
       const rows = Math.max.apply(null, idx.nodes.map(n => n.row)) + 1;
       const cols = T.COLS || (Math.max.apply(null, idx.nodes.map(n => n.col)) + 1);
+      const width = cols * CELL_W;
 
+      headInner.style.width = width + 'px';
       const grid = el('div', 'atree-grid');
-      grid.style.width = cols * CELL_W + 'px';
+      grid.style.width = width + 'px';
       grid.style.height = rows * CELL_H + 'px';
       svg = document.createElementNS(SVG_NS, 'svg');
       svg.setAttribute('class', 'atree-pipes');
-      svg.setAttribute('width', cols * CELL_W);
+      svg.setAttribute('width', width);
       svg.setAttribute('height', rows * CELL_H);
       grid.appendChild(svg);
       scroll.appendChild(grid);
 
+      /* one header per archetype, sitting over its column */
+      idx.archList.forEach((a, i) => {
+        const col = i * 2;                                  // lanes live at columns 0, 2, 4
+        const h = el('div', 'atree-head');
+        h.style.color = a.color;
+        h.style.left = (col * CELL_W + 6) + 'px';
+        h.style.width = (CELL_W - 12) + 'px';
+        h.innerHTML = '<b>' + a.name + '</b><span><i class="cnt">0</i> allocated</span>';
+        h.addEventListener('mouseenter', ev => showArchTip(a, ev.currentTarget));
+        h.addEventListener('mouseleave', hideTip);
+        h.addEventListener('click', ev => showArchTip(a, ev.currentTarget));   // touch has no hover
+        h.tabIndex = 0;
+        h.addEventListener('focus', ev => showArchTip(a, ev.currentTarget));
+        headInner.appendChild(h);
+        headEls.push({ a: a, el: h });
+      });
+      // keep the headers lined up with the scrolled grid
+      scroll.addEventListener('scroll', () => { headInner.style.transform = 'translateX(' + -scroll.scrollLeft + 'px)'; });
+
       for (const n of idx.nodes) {
-        const b = el('button', 'atree-node t-' + n.tier);
+        const b = el('button', 'atree-node t-' + n.tier + (n.dual ? ' dual' : ''));
         b.type = 'button';
         b.style.left = (cx(n) - TILE_W / 2) + 'px';
         b.style.top = (cy(n) - TILE_H / 2) + 'px';
         b.style.width = TILE_W + 'px';
         b.style.height = TILE_H + 'px';
-        b.innerHTML = '<span class="g">' + (TIER_GLYPH[n.tier] || '\u25c6') + '</span>' +
+        const cols2 = nodeColors(idx, n);
+        b.style.color = cols2[0];
+        if (cols2.length > 1) {
+          b.style.borderColor = 'transparent';
+          b.style.backgroundImage = 'linear-gradient(rgba(10,18,34,.96),rgba(10,18,34,.96)), ' +
+            'linear-gradient(100deg, ' + cols2[0] + ' 0%, ' + cols2[0] + ' 45%, ' + cols2[1] + ' 55%, ' + cols2[1] + ' 100%)';
+          b.style.backgroundOrigin = 'border-box';
+          b.style.backgroundClip = 'padding-box, border-box';
+        }
+        b.innerHTML = '<span class="g">' + (TIER_GLYPH[n.tier] || '◆') + '</span>' +
                       '<span class="n">' + n.name + '</span>' +
                       '<span class="c">' + T.costOf(n) + ' pt' + (T.costOf(n) === 1 ? '' : 's') + '</span>';
-        if (n.archetype) {
-          const bar = el('span', 'arch');
-          bar.style.color = archColor(idx, n.archetype);
-          b.appendChild(bar);
-        }
         b.addEventListener('click', () => clickNode(n.id));
         b.addEventListener('mouseenter', ev => showTip(n, ev.currentTarget));
         b.addEventListener('focus', ev => showTip(n, ev.currentTarget));
@@ -1396,18 +1571,13 @@ h2{margin:0 0 14px; font-size:clamp(20px,4.5vw,30px); letter-spacing:.08em; colo
         tiles[n.id] = b;
       }
 
-      /* pipes: parent -> child elbows, deduplicated into shared trunks */
-      const joins = new Map();
+      /* pipes, deduplicated so shared trunks are one line */
       function addSeg(x1, y1, x2, y2, parent, child) {
         if (x1 === x2 && y1 === y2) return;
         const key = [x1, y1, x2, y2].map(v => Math.round(v)).join(':');
         let s2 = segs.get(key);
         if (!s2) { s2 = { x1, y1, x2, y2, edges: [] }; segs.set(key, s2); }
         s2.edges.push({ parent, child });
-        for (const p of [[x1, y1], [x2, y2]]) {
-          const k = Math.round(p[0]) + ',' + Math.round(p[1]);
-          joins.set(k, (joins.get(k) || 0) + 1);
-        }
       }
       for (const n of idx.nodes) {
         for (const pid of (n.parents || [])) {
@@ -1415,12 +1585,13 @@ h2{margin:0 0 14px; font-size:clamp(20px,4.5vw,30px); letter-spacing:.08em; colo
           if (!p) continue;
           const px = cx(p), py = cy(p), nx = cx(n), ny = cy(n);
           const midY = (py + ny) / 2;
-          addSeg(px, py, px, midY, pid, n.id);     // down out of the parent
-          addSeg(px, midY, nx, midY, pid, n.id);   // across the gutter
-          addSeg(nx, midY, nx, ny, pid, n.id);     // down into the child
+          addSeg(px, py, px, midY, pid, n.id);
+          addSeg(px, midY, nx, midY, pid, n.id);
+          addSeg(nx, midY, nx, ny, pid, n.id);
         }
       }
-      for (const [, s2] of segs) {
+      for (const pair of segs) {
+        const s2 = pair[1];
         const line = document.createElementNS(SVG_NS, 'line');
         line.setAttribute('x1', s2.x1); line.setAttribute('y1', s2.y1);
         line.setAttribute('x2', s2.x2); line.setAttribute('y2', s2.y2);
@@ -1429,45 +1600,29 @@ h2{margin:0 0 14px; font-size:clamp(20px,4.5vw,30px); letter-spacing:.08em; colo
         svg.appendChild(line);
         s2.path = line;
       }
-      for (const [k, count] of joins) {
-        if (count < 3) continue;
-        const parts = k.split(',').map(Number);
-        const jx = parts[0], jy = parts[1];
-        if (idx.nodes.some(n => Math.round(cx(n)) === jx && Math.round(cy(n)) === jy)) continue;
-        const dot = document.createElementNS(SVG_NS, 'circle');
-        dot.setAttribute('cx', jx); dot.setAttribute('cy', jy); dot.setAttribute('r', 4.5);
-        svg.appendChild(dot);
-        junctionDots.push({ el: dot, x: jx, y: jy });
-      }
     }
 
-    /* --- painting --- */
-    const PIPE = { off: 'rgba(120,150,190,.20)', live: 'rgba(64,224,255,.55)', on: '#9dff5c' };
+    const PIPE = { off: 'rgba(120,150,190,.16)', live: 'rgba(120,200,255,.5)', on: '#9dff5c' };
     function paint() {
       const c = state.compiled;
-      const t = T.TREES[idx.charId];
+      who.innerHTML = (T.TREES[idx.charId].name || idx.charId.toUpperCase()) + '<small>ability tree</small>';
+      pts.innerHTML = c.pointsLeft + ' <small>points left &middot; ' + c.pointsSpent + ' of 86 spent</small>';
 
-      who.innerHTML = (t.name || idx.charId.toUpperCase()) + '<small>ability tree</small>';
-      pts.innerHTML = c.pointsLeft + ' <small>points left &middot; ' + c.pointsSpent + ' spent</small>';
-
-      chips.innerHTML = '';
-      for (const a of idx.archList) {
-        const chip = el('div', 'atree-chip' + (c.dominant === a.id ? ' dom' : ''));
-        chip.style.color = a.color;
-        chip.title = a.blurb;
-        chip.innerHTML = '<span class="atree-dot"></span><span style="color:#a8c6e8">' + a.name + '</span> <b>' +
-                         (c.archetypeCounts[a.id] || 0) + '</b>';
-        chips.appendChild(chip);
+      for (const h of headEls) {
+        const n = c.archetypeCounts[h.a.id] || 0;
+        h.el.querySelector('.cnt').textContent = n;
+        h.el.classList.toggle('dom', c.dominant === h.a.id);
       }
 
       for (const n of idx.nodes) {
         const st = T.nodeStatus(n.id, state);
         const b = tiles[n.id];
-        b.className = 'atree-node t-' + n.tier + ' s-' + st;
+        b.className = 'atree-node t-' + n.tier + (n.dual ? ' dual' : '') + ' s-' + st;
         b.setAttribute('aria-pressed', st === 'unlocked' ? 'true' : 'false');
       }
 
-      for (const [, s2] of segs) {
+      for (const pair of segs) {
+        const s2 = pair[1];
         let best = 'off';
         for (const e of s2.edges) {
           const pOn = T.has(state, e.parent), cOn = T.has(state, e.child);
@@ -1475,50 +1630,18 @@ h2{margin:0 0 14px; font-size:clamp(20px,4.5vw,30px); letter-spacing:.08em; colo
           if (pOn) best = 'live';
         }
         s2.path.setAttribute('stroke', PIPE[best]);
-        s2.state = best;
-      }
-      for (const d of junctionDots) {
-        let best = 'off';
-        for (const [, s2] of segs) {
-          const touches = (Math.round(s2.x1) === d.x && Math.round(s2.y1) === d.y) ||
-                          (Math.round(s2.x2) === d.x && Math.round(s2.y2) === d.y);
-          if (!touches) continue;
-          if (s2.state === 'on') { best = 'on'; break; }
-          if (s2.state === 'live') best = 'live';
-        }
-        d.el.setAttribute('fill', PIPE[best]);
+        s2.path.setAttribute('stroke-width', best === 'on' ? 5 : 4);
+        s2.path.style.filter = best === 'on' ? 'drop-shadow(0 0 5px rgba(157,255,92,.85))' : 'none';
       }
 
       note.textContent = state.refunded && state.refunded.length
-        ? 'A saved build referenced ' + state.refunded.length + ' ability that no longer exists \u2014 those points were refunded.'
+        ? 'A saved build referenced ' + state.refunded.length + ' ability that no longer exists — those points were refunded.'
         : '';
       if (tipNode && tiles[tipNode.id]) showTip(tipNode, tiles[tipNode.id]);
     }
 
-    /* --- tooltip --- */
     let tipNode = null;
-    function showTip(n, anchor) {
-      tipNode = n;
-      const unlocked = T.has(state, n.id);
-      const check = T.canUnlock(n.id, state);
-      const a = n.archetype ? idx.archetypes[n.archetype] : null;
-      const tierLabel = T.TIER_LABEL[n.tier] || n.tier;
-
-      let html = '<h4>' + n.name + '</h4>';
-      html += '<div class="meta" style="color:' + (n.tier === 'red' ? '#ff4d6d' : n.tier === 'yellow' ? '#ffc857' : '#8fb2d8') + '">' +
-              tierLabel + (a ? ' &middot; <span style="color:' + a.color + '">' + a.name + '</span>' : ' &middot; Neutral') +
-              ' &middot; ' + T.costOf(n) + ' pt' + (T.costOf(n) === 1 ? '' : 's') + '</div>';
-      html += '<div class="desc">' + n.desc + '</div>';
-      for (const e of effectLines(n)) html += '<div class="eff' + (e.neg ? ' neg' : '') + '">' + e.text + '</div>';
-      if (n.blocks && n.blocks.length) {
-        html += '<div class="eff neg">Locks out: ' + n.blocks.map(b => (idx.byId[b] ? idx.byId[b].name : b)).join(', ') + '</div>';
-      }
-      if (unlocked) html += '<div class="got">Unlocked</div>';
-      else if (!check.ok) html += '<div class="why"><b>Requires</b>' + check.reasons.map(r => '<div>' + r + '</div>').join('') + '</div>';
-      else html += '<div class="got">Click to unlock</div>';
-
-      tip.innerHTML = html;
-      tip.classList.add('show');
+    function place(anchor) {
       const r = anchor.getBoundingClientRect();
       const tw = tip.offsetWidth, th = tip.offsetHeight;
       let x = r.right + 12, y = r.top - 6;
@@ -1529,37 +1652,69 @@ h2{margin:0 0 14px; font-size:clamp(20px,4.5vw,30px); letter-spacing:.08em; colo
       tip.style.left = x + 'px';
       tip.style.top = y + 'px';
     }
+
+    function showArchTip(a, anchor) {
+      tipNode = null;
+      let html = '<h4 style="color:' + a.color + '">' + a.name + '</h4>';
+      html += '<div class="desc">' + a.desc + '</div><table>';
+      for (const k of RATING_ORDER) {
+        const label = k.charAt(0).toUpperCase() + k.slice(1);
+        html += '<tr><td>' + label + '</td><td class="v" style="color:' + a.color + '">' +
+                pips(a.ratings[k]) + ' <span style="color:#8fb2d8;font-weight:400">' + a.ratings[k] + '</span></td></tr>';
+      }
+      html += '</table>';
+      tip.innerHTML = html;
+      tip.classList.add('show');
+      place(anchor);
+    }
+
+    function showTip(n, anchor) {
+      tipNode = n;
+      const unlocked = T.has(state, n.id);
+      const check = T.canUnlock(n.id, state);
+      const tierLabel = T.TIER_LABEL[n.tier] || n.tier;
+      const names = n.dual
+        ? n.dual.map(a => idx.archetypes[a].name).join(' + ')
+        : (n.archetype ? idx.archetypes[n.archetype].name : 'Core');
+      const col = nodeColors(idx, n)[0];
+
+      let html = '<h4>' + n.name + '</h4>';
+      html += '<div class="meta" style="color:' + col + '">' + tierLabel + ' &middot; ' + names +
+              ' &middot; ' + T.costOf(n) + ' pt' + (T.costOf(n) === 1 ? '' : 's') + '</div>';
+      html += '<div class="desc">' + n.desc + '</div>';
+      if (n.blocks && n.blocks.length) {
+        html += '<div style="color:#ff8fa3">Taking this permanently locks out: ' +
+                n.blocks.map(b => (idx.byId[b] ? idx.byId[b].name : b)).join(', ') + '.</div>';
+      }
+      if (unlocked) html += '<div class="got">Unlocked</div>';
+      else if (!check.ok) html += '<div class="why"><b>Requires</b>' + check.reasons.map(r => '<div>' + r + '</div>').join('') + '</div>';
+      else html += '<div class="got">Click to unlock</div>';
+      tip.innerHTML = html;
+      tip.classList.add('show');
+      place(anchor);
+    }
     function hideTip() { tipNode = null; tip.classList.remove('show'); }
 
-    /* --- interaction --- */
     function clickNode(id) {
-      const res = T.unlock(id, state);      // re-checks the same canUnlock the UI painted with
-      if (res.ok) {
-        paint();
-        onChange(state);
-      } else {
+      const res = T.unlock(id, state);
+      if (res.ok) { paint(); onChange(state); }
+      else {
         const b = tiles[id];
         showTip(idx.byId[id], b);
-        b.animate(
-          [{ transform: 'translateX(0)' }, { transform: 'translateX(-4px)' }, { transform: 'translateX(4px)' }, { transform: 'translateX(0)' }],
-          { duration: 180 }
-        );
+        b.animate([{ transform: 'translateX(0)' }, { transform: 'translateX(-4px)' },
+                   { transform: 'translateX(4px)' }, { transform: 'translateX(0)' }], { duration: 180 });
       }
     }
 
     resetBtn.addEventListener('click', () => {
       confirm.querySelector('#atree-confirm-text').textContent =
-        'Every ability in this character\u2019s tree is cleared and all ' + state.compiled.pointsSpent +
+        'Every ability in this character’s tree is cleared and all ' + state.compiled.pointsSpent +
         ' spent points come back. Other characters are untouched.';
       confirm.classList.add('show');
     });
     confirm.querySelector('.no').addEventListener('click', () => confirm.classList.remove('show'));
     confirm.querySelector('.yes').addEventListener('click', () => {
-      T.reset(state);
-      state.refunded = null;
-      confirm.classList.remove('show');
-      paint();
-      onChange(state);
+      T.reset(state); state.refunded = null; confirm.classList.remove('show'); paint(); onChange(state);
     });
 
     build();
@@ -1567,17 +1722,13 @@ h2{margin:0 0 14px; font-size:clamp(20px,4.5vw,30px); letter-spacing:.08em; colo
 
     return {
       el: rootEl,
-      refresh(next) {
-        if (next) state = next;
-        if (state.active !== builtFor) build();     // the player switched character
-        paint();
-      },
+      refresh(next) { if (next) state = next; if (state.active !== builtFor) build(); paint(); },
       getState() { return state; },
       destroy() { hideTip(); container.innerHTML = ''; }
     };
   }
 
-  return { mount, CELL_W, CELL_H, effectLines };
+  return { mount, CELL_W, CELL_H };
 });
 </script>
 <!-- ability-tree:end -->
@@ -1650,6 +1801,8 @@ window.addEventListener('keydown', e => {
   if (keys[k]) return;
   keys[k] = true;
   if (k === ' ') dashQueued = true;
+  if (k === 'q') toggleArcMode();
+  if (k === 'e') focusDrones();
   if (k === 'escape' || k === 'p') togglePause();
 });
 window.addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
@@ -1830,7 +1983,7 @@ function makePlayer(charId) {
     dashCd: 0, dashTime: 0, dashDirX: 1, dashDirY: 0,
     invuln: 0, hurtFlash: 0, recoil: 0,
     weapon: 'pistol', ammo: Infinity,
-    level: 1, xp: 0, xpNext: 12,
+    level: 1, xp: 0, xpNext: 28,
     // upgrade-driven stats
     dmgMul: 1, rofMul: 1, speedMul: 1, bulletSpeedMul: 1,
     pierce: 0, extra: 0, crit: 0.05, critMul: 2, lifesteal: 0,
@@ -1857,55 +2010,87 @@ function playerFireInterval() {
   return Math.max(0.035, w.rof / (player.rofMul * frenzy));
 }
 
-function shoot() {
-  const w = WEAPONS[player.weapon];
-  if (player.ammo <= 0) { swapWeapon(player.sigWeapon || 'pistol'); return; }
-  player.fireCd = playerFireInterval();
+/* ============================================================
+   THE DAMAGE PIPELINE
+   Every projectile in the game is built by emitProjectiles().
+   Every point of player-owned damage is applied by dealDamage().
+   Nothing applies its own multipliers; there is no second path.
+   ============================================================ */
 
-  const total = Math.max(1, w.count + player.extra);
-  const muzzle = player.r + 12;
-  player.shotCount++;
-  const mega = player.megaEvery > 0 && player.shotCount % player.megaEvery === 0;
-  const side = w.alt ? (player.shotCount % 2 ? 7 : -7) : 0;
-  const bx = player.x + Math.cos(player.angle) * muzzle - Math.sin(player.angle) * side;
-  const by = player.y + Math.sin(player.angle) * muzzle + Math.cos(player.angle) * side;
-  const sureCrit = player.steady > 0 && player.stillT > 0.5;
-  if (sureCrit) player.stillT = 0;
+/* Builds projectiles for ANY source - the player's weapon, a drone, a split
+   beam, anything added later. Multishot, pierce, bounce, homing, explosive
+   rounds and on-hit riders are attached here, once, for everyone. */
+function emitProjectiles(spec) {
+  const count = Math.max(1, (spec.count || 1) + player.extra);   // multishot, every source
+  const spread = spec.spread || 0;
+  const speed = (spec.speed || 900) * player.bulletSpeedMul;
+  const out = [];
 
-  for (let i = 0; i < total; i++) {
-    const spread = w.spread * (total > 1 ? 1 : 0.8);
-    const off = total > 1 ? (i / (total - 1) - 0.5) * spread * 2 : 0;
-    const a = player.angle + off + rand(-w.spread, w.spread) * 0.35;
-    const isCrit = sureCrit || Math.random() < player.crit;
-    const speed = w.speed * player.bulletSpeedMul;
+  for (let i = 0; i < count; i++) {
+    const off = count > 1 ? (i / (count - 1) - 0.5) * spread * 2 : 0;
+    const a = spec.angle + off + rand(-spread, spread) * 0.35;
     const b = {
-      x: bx, y: by,
+      x: spec.x, y: spec.y,
       vx: Math.cos(a) * speed, vy: Math.sin(a) * speed,
-      r: w.size, life: w.life || 1.5,
-      dmg: w.dmg * player.dmgMul * (isCrit ? player.critMul : 1),
-      crit: isCrit,
+      r: spec.size || 4.5,
+      life: spec.life || 1.5,
+      base: spec.base,                       // pre-modifier damage; dealDamage scales it
+      source: spec.source || 'shot',
       friendly: true,
-      pierce: (w.pierce || 0) + player.pierce,
+      pierce: (spec.pierce || 0) + player.pierce,
       hit: null,
-      color: w.color,
-      explode: (w.explode || (player.explodeAll ? 52 : 0)) * player.explodeMul,
-      trail: w.speed > 1500 || w.trail,
-      // roguelite payload
-      burn: (w.burn || player.burnDps > 0) ? 1 : 0,
-      slow: (w.slow || player.slowPow > 0) ? 1 : 0,
-      chain: (w.chain || 0) + player.chains,
-      bounce: (w.bounce || 0) + player.bounce,
+      color: spec.color || '#7ceaff',
+      explode: (spec.explode || (player.explodeAll ? 52 : 0)) * player.explodeMul,
+      trail: !!spec.trail,
+      burn: (spec.burn || player.burnDps > 0) ? 1 : 0,
+      slow: (spec.slow || player.slowPow > 0) ? 1 : 0,
+      chain: (spec.chain || 0) + player.chains,
+      bounce: (spec.bounce || 0) + player.bounce,
       homing: player.homing,
-      curve: (w.curve || 0) * (i % 2 ? 1 : -1),
-      fade: w.fade ? 1 : 0
+      curve: (spec.curve || 0) * (i % 2 ? 1 : -1),
+      fade: spec.fade ? 1 : 0
     };
-    if (isCrit && player.critPierce) b.pierce += 8;
-    if (mega) {
-      b.mega = 1; b.dmg *= 3; b.r *= 1.7; b.color = '#ffe36b';
+    if (spec.mega) {
+      b.mega = 1; b.base *= 3; b.r *= 1.7; b.color = '#ffe36b';
       b.explode = Math.max(b.explode, 95) * 2.4;
     }
     bullets.push(b);
+    out.push(b);
   }
+  return out;
+}
+
+function shoot() {
+  const w = WEAPONS[player.weapon];
+  if (w.beam) return;                        // beams are held, not fired (updateBeam)
+  if (player.ammo <= 0) { swapWeapon(player.sigWeapon || 'pistol'); return; }
+  player.fireCd = playerFireInterval();
+
+  player.shotCount++;
+  const mega = player.megaEvery > 0 && player.shotCount % player.megaEvery === 0;
+  const side = w.alt ? (player.shotCount % 2 ? 7 : -7) : 0;
+  const muzzle = player.r + 12;
+  const bx = player.x + Math.cos(player.angle) * muzzle - Math.sin(player.angle) * side;
+  const by = player.y + Math.sin(player.angle) * muzzle + Math.cos(player.angle) * side;
+
+  let base = w.dmg;
+  if (player.chargeMax > 0) {                // VEX: released charge scales the shot
+    base *= 1 + player.charge * player.chargePower;
+    player.charge = 0;
+  }
+  if (player.mode === 'discharge') {         // ARC: spends the shared meter
+    if (player.meter < player.meterCost) { setArcMode('charge'); return; }
+    player.meter -= player.meterCost;
+    base *= player.dischargePower;
+  }
+
+  emitProjectiles({
+    x: bx, y: by, angle: player.angle, base: base, count: w.count,
+    spread: w.spread, speed: w.speed, size: w.size, life: w.life,
+    pierce: w.pierce, explode: w.explode, color: w.color, trail: w.speed > 1500 || w.trail,
+    burn: w.burn, slow: w.slow, chain: (w.chain || 0) + (player.mode === 'discharge' ? player.dischargeChain : 0),
+    bounce: w.bounce, curve: w.curve, fade: w.fade, mega: mega, source: 'shot'
+  });
 
   if (player.ammo !== Infinity) player.ammo--;
   player.recoil = Math.min(10, w.kick);
@@ -1969,12 +2154,186 @@ function gainXp(v) {
     player.xp -= player.xpNext;
     player.level++;
     player.pending++;             // a burst of xp can stack several picks
-    player.xpNext = Math.round(player.xpNext * 1.35 + 6);
+    player.xpNext = Math.round(16 + player.level * 11);   // linear: levels keep arriving
   }
   AbilityTree.grantPoints(treeState, player.level, player.charId);   // the one points hook
   AbilityTree.save(treeState);
   updateSpButton();
   if (player.pending > 0 && game.state === 'play') openLevelUp();
+}
+
+/* ============================================================
+   WEAPON BEHAVIOURS
+   Four operatives do not fire projectiles on a trigger at all. Each one
+   changes what the input to combat is, not the numbers behind it.
+   ============================================================ */
+
+/* distance along a ray to a box, or null if it misses */
+function rayBox(px, py, dx, dy, b) {
+  let t0 = 0, t1 = Infinity;
+  const axes = [[dx, b.x - px, b.x + b.w - px], [dy, b.y - py, b.y + b.h - py]];
+  for (const ax of axes) {
+    const d = ax[0];
+    if (Math.abs(d) < 1e-9) { if (ax[1] > 0 || ax[2] < 0) return null; continue; }
+    let ta = ax[1] / d, tb = ax[2] / d;
+    if (ta > tb) { const tmp = ta; ta = tb; tb = tmp; }
+    t0 = Math.max(t0, ta); t1 = Math.min(t1, tb);
+    if (t0 > t1) return null;
+  }
+  return t0 >= 0 ? t0 : null;
+}
+
+/* HALCYON - a held beam. No projectiles at all: a ray that damages continuously
+   and ramps the longer it stays connected to the same target. Multishot splits
+   it into extra rays; pierce carries each ray through more bodies. */
+function updateBeam(dt, firing) {
+  const w = WEAPONS[player.weapon];
+  if (!w.beam) { player.beamHeat = 0; player.beamHits = null; return; }
+
+  if (!firing) {
+    player.beamHeat = Math.max(0, player.beamHeat - dt * 1.6);
+    player.beamTarget = null;
+    player.beamHits = null;
+    return;
+  }
+
+  const rays = 1 + player.extra;                     // multishot = more beams
+  const maxTargets = 1 + player.pierce;              // pierce = more bodies per beam
+  const hits = [];
+  let primary = null;
+
+  for (let r = 0; r < rays; r++) {
+    const a = player.angle + (rays > 1 ? (r / (rays - 1) - 0.5) * 0.30 : 0);
+    const dx = Math.cos(a), dy = Math.sin(a);
+    let reach = w.range + player.beamRange;
+    for (const o of obstacles) {                     // walls stop the beam
+      const d = rayBox(player.x, player.y, dx, dy, o);
+      if (d !== null && d < reach) reach = d;
+    }
+    const found = [];
+    for (const e of enemies) {
+      if (e.dead || e.spawnT > 0) continue;
+      const t = (e.x - player.x) * dx + (e.y - player.y) * dy;
+      if (t < 0 || t > reach) continue;
+      const perp = Math.abs((e.x - player.x) * -dy + (e.y - player.y) * dx);
+      if (perp > e.r + w.width) continue;
+      found.push({ e: e, t: t });
+    }
+    found.sort((p, q) => p.t - q.t);
+    const take = found.slice(0, maxTargets);
+    if (r === 0 && take.length) primary = take[0].e;
+    const endT = take.length ? Math.min(reach, take[take.length - 1].t + 18) : reach;
+    hits.push({ a: a, len: endT, targets: take.map(x => x.e) });
+  }
+
+  // ramp: holding on the same target builds heat, switching targets bleeds it
+  if (primary && primary === player.beamTarget) {
+    player.beamHeat = Math.min(w.rampTime, player.beamHeat + dt);
+  } else if (primary) {
+    player.beamTarget = primary;
+    player.beamHeat = Math.max(0, player.beamHeat - dt * 0.8);
+  } else {
+    player.beamHeat = Math.max(0, player.beamHeat - dt * 1.6);
+  }
+
+  const ramp = 1 + (player.beamHeat / w.rampTime) * (w.rampMax - 1 + player.beamRamp);
+  const dps = (w.dps + player.beamPower) * ramp;
+  for (const ray of hits) {
+    for (const e of ray.targets) dealDamage(e, dps * dt, 'beam', { silent: true });
+  }
+  player.beamHits = hits;
+  player.beamRampShown = ramp;
+  if (hits[0] && Math.random() < dt * 34) {
+    burst(player.x + Math.cos(hits[0].a) * hits[0].len, player.y + Math.sin(hits[0].a) * hits[0].len, 2, w.color, 120, 2);
+  }
+}
+
+/* COG - the Nail Driver is a sidearm; the drones are the weapon. Focus sends
+   every drone onto one target, through walls, for a few seconds. */
+function focusDrones() {
+  if (player.drones <= 0 || game.state !== 'play') return;
+  let best = null, bestD = 1e9;
+  const ax = player.x + Math.cos(player.angle) * 260, ay = player.y + Math.sin(player.angle) * 260;
+  for (const e of enemies) {
+    if (e.dead || e.spawnT > 0) continue;
+    const d = len(e.x - ax, e.y - ay);
+    if (d < bestD) { bestD = d; best = e; }
+  }
+  if (!best) return;
+  player.droneFocus = best;
+  player.droneFocusT = player.focusTime;
+  floatText(best.x, best.y - best.r - 26, 'FOCUS', '#b8c6d8', 15);
+  for (const d of player.droneList) d.cd = Math.min(d.cd, 0.05);
+}
+
+/* ARC - two firing modes on one meter. Charge shots fill it, Discharge spends
+   it. Running it dry drops you back to Charge. */
+function setArcMode(mode) {
+  if (player.meterMax <= 0) return;
+  player.mode = mode;
+  player.fireCd = Math.max(player.fireCd, 0.12);
+  game.banner = { text: mode === 'discharge' ? 'DISCHARGE' : 'CHARGE', t: 0.8,
+                  color: mode === 'discharge' ? '#ff8aff' : '#c8b4ff' };
+}
+function toggleArcMode() {
+  if (player.meterMax <= 0 || game.state !== 'play') return;
+  setArcMode(player.mode === 'discharge' ? 'charge' : 'discharge');
+}
+
+/* The one place the game decides what pulling - or not pulling - the trigger means. */
+function updateWeapon(dt, firing) {
+  const w = WEAPONS[player.weapon];
+  player.fireCd -= dt;
+
+  // ARC's meter bleeds while Discharge is held open, so the mode is a commitment
+  if (player.meterMax > 0 && player.mode === 'discharge') {
+    player.meter = Math.max(0, player.meter - dt * 2);
+    if (player.meter < player.meterCost) setArcMode('charge');
+  }
+  // a focus order runs out on its own, or when its target dies
+  if (player.droneFocusT > 0) {
+    player.droneFocusT -= dt;
+    if (player.droneFocusT <= 0 || !player.droneFocus || player.droneFocus.dead) {
+      player.droneFocus = null; player.droneFocusT = 0;
+    }
+  }
+
+  if (w.beam) { updateBeam(dt, firing); return; }
+
+  if (w.autoMove) {
+    // NYX - no trigger at all. The guns fire from your own movement and aim themselves.
+    const spd = len(player.vx, player.vy) / Math.max(1, player.speed * player.speedMul);
+    player.moveFire = clamp(spd, 0, 1.5);
+    if (player.moveFire > 0.18) {
+      let best = null, bestD = 780;
+      for (const e of enemies) {
+        if (e.dead || e.spawnT > 0) continue;
+        const d = len(e.x - player.x, e.y - player.y);
+        if (d < bestD) { bestD = d; best = e; }
+      }
+      if (best) player.angle = angleLerp(player.angle, Math.atan2(best.y - player.y, best.x - player.x), Math.min(1, dt * 14));
+      if (player.fireCd <= 0) {
+        shoot();
+        player.fireCd = playerFireInterval() / (0.35 + player.moveFire);
+      }
+    }
+    return;
+  }
+
+  if (w.chargeUp) {
+    // VEX - hold to wind up, release to fire. Damage scales with the wind-up.
+    if (firing) {
+      player.charge = Math.min(1, player.charge + dt * player.chargeRate);
+      player.heldFire = true;
+    } else if (player.heldFire) {
+      player.heldFire = false;
+      if (player.charge > 0.12 && player.fireCd <= 0) shoot();
+      else player.charge = 0;
+    }
+    return;
+  }
+
+  if (firing && player.fireCd <= 0) shoot();
 }
 
 /* ---------------- projectiles, fx ---------------- */
@@ -2012,7 +2371,7 @@ function explode(x, y, radius, dmg, friendly, depth) {
       if (e.dead) continue;
       const d = len(e.x - x, e.y - y);
       if (d < radius + e.r) {
-        hurtEnemy(e, dmg * (1 - d / (radius + e.r)) * 0.9 + dmg * 0.1, x, y, false);
+        dealDamage(e, dmg * (1 - d / (radius + e.r)) * 0.9 + dmg * 0.1, 'blast', { silent: true, fromX: x, fromY: y });
         if (player.blastSlow > 0) applySlow(e, player.blastSlow, 2);
       }
     }
@@ -2047,9 +2406,9 @@ function spawnEnemy(type, x, y, scale) {
     hp: t.hp * s, maxHp: t.hp * s,
     speed: t.speed * (1 + Math.min(0.35, (game.wave - 1) * 0.018)),
     dmg: t.dmg * Math.min(2.2, s),
-    color: t.color, xp: t.xp, score: t.score,
+    color: t.color, xp: t.xp * (1 + (game.wave - 1) * 0.14), score: t.score,
     angle: rand(0, TAU), vx: 0, vy: 0,
-    hitFlash: 0, contactCd: 0, fireCd: rand(0.4, t.fireRate || 1),
+    hitFlash: 0, contactCd: 0, riderCd: 0, fireCd: rand(0.4, t.fireRate || 1),
     state: 'chase', stateT: 0, boss: !!t.boss, dead: false,
     spawnT: 0.35
   };
@@ -2057,35 +2416,100 @@ function spawnEnemy(type, x, y, scale) {
   return e;
 }
 
-function hurtEnemy(e, dmg, srcX, srcY, showNumber) {
-  if (e.dead) return;
+/* How much knockback a source imparts, and which riders it may trigger.
+   The only per-source rules in the whole pipeline are the recursion guards. */
+const SOURCE = {
+  shot:   { kb: 90,  riders: true },
+  drone:  { kb: 40,  riders: true },
+  beam:   { kb: 0,   riders: true },
+  blade:  { kb: 60,  riders: true },
+  dash:   { kb: 120, riders: true },
+  blast:  { kb: 0,   riders: true, noBlast: true },   // a blast cannot set off another blast
+  chain:  { kb: 0,   riders: true, noChain: true },   // an arc cannot arc again
+  burn:   { kb: 0,   riders: true },
+  frost:  { kb: 0,   riders: true },
+  aura:   { kb: 0,   riders: true },
+  thorns: { kb: 0,   riders: true },
+  onkill: { kb: 0,   riders: true, noBlast: true, noKill: true }
+};
+
+/* THE one damage entry point. Base damage in, every modifier applied here.
+   opts: {crit, silent, noCrit} */
+function dealDamage(target, base, source, opts) {
+  if (!target || target.dead || !(base > 0)) return { dmg: 0, crit: false, killed: false };
+  const S = SOURCE[source] || SOURCE.shot;
+  opts = opts || {};
+
+  /* 1. scaling that every source receives */
+  let dmg = base * player.dmgMul;
   if (player.berserk > 0) dmg *= 1 + player.berserk * ((1 - player.hp / player.maxHp) * 10);
-  if (player.shatter > 0 && e.slowT > 0) dmg *= 1 + player.shatter;
-  if (player.burnBonus > 0 && e.burnT > 0) dmg *= 1 + player.burnBonus;
-  if (player.markBonus > 0 && e.markT > 0) dmg *= 1 + player.markBonus;
-  e.hp -= dmg;
-  e.hitFlash = 0.12;
-  if (showNumber !== false) floatText(e.x + rand(-6, 6), e.y - e.r - 6, Math.round(dmg), dmg > 40 ? '#ffe36b' : '#e9f6ff', dmg > 40 ? 17 : 13);
-  if (srcX !== undefined) {
-    const a = Math.atan2(e.y - srcY, e.x - srcX);
-    const kb = e.boss ? 12 : (e.type === 'tank' ? 26 : 90);
-    e.vx += Math.cos(a) * kb; e.vy += Math.sin(a) * kb;
+  if (player.shatter > 0 && target.slowT > 0) dmg *= 1 + player.shatter;
+  if (player.burnBonus > 0 && target.burnT > 0) dmg *= 1 + player.burnBonus;
+  if (player.markBonus > 0 && target.markT > 0) dmg *= 1 + player.markBonus;
+
+  /* 2. crit - available to every source, including ticks and minions */
+  let crit = false;
+  if (!opts.noCrit) {
+    crit = opts.crit !== undefined ? opts.crit : Math.random() < player.crit;
+    if (crit) dmg *= player.critMul;
   }
-  burst(e.x, e.y, 3, e.color, 130, 2.2);
+
+  /* 3. apply */
+  target.hp -= dmg;
+  target.hitFlash = 0.12;
+  if (!opts.silent) {
+    floatText(target.x + rand(-6, 6), target.y - target.r - 6, Math.round(dmg),
+              crit ? '#ffe36b' : '#e9f6ff', crit ? 17 : 13);
+    if (crit) floatText(target.x, target.y - target.r - 22, 'CRIT', '#ffe36b', 12);
+  }
+  if (S.kb && opts.fromX !== undefined) {
+    const a = Math.atan2(target.y - opts.fromY, target.x - opts.fromX);
+    const kb = target.boss ? S.kb * 0.13 : (target.type === 'tank' ? S.kb * 0.3 : S.kb);
+    target.vx += Math.cos(a) * kb; target.vy += Math.sin(a) * kb;
+  }
+  burst(target.x, target.y, 3, target.color, 130, 2.2);
   if (player.lifesteal > 0) healPlayer(dmg * player.lifesteal);
-  if (e.hp > 0 && player.execute > 0 && !e.boss && e.hp / e.maxHp <= player.execute) {
-    floatText(e.x, e.y - e.r - 22, 'EXECUTE', '#ff6b9d', 15);
-    e.hp = 0;
+  if (player.meterMax > 0 && player.mode !== 'discharge') {
+    player.meter = Math.min(player.meterMax, player.meter + player.meterGain);
   }
-  if (e.hp <= 0) killEnemy(e);
+
+  /* 4. on-hit riders. Throttled per target so a 60Hz beam or a 4Hz burn tick
+        cannot machine-gun them, but no source is excluded. */
+  if (S.riders && target.riderCd <= 0) {
+    target.riderCd = 0.2;
+    if (player.burnDps > 0) applyBurn(target, player.burnDps, player.burnDur || 2);
+    if (player.slowPow > 0) applySlow(target, player.slowPow, player.slowDur || 1.2);
+    if (player.chains > 0 && !S.noChain) {
+      chainFrom(target, base * player.chainDmg, player.chains, [target]);
+    }
+    if (crit && player.critBoom > 0 && !S.noBlast) {
+      explode(target.x, target.y, 70 * player.explodeMul, player.critBoom, true);
+    }
+    if (player.markEvery > 0) {
+      player.hitCount++;
+      if (player.hitCount % player.markEvery === 0 && !target.dead) {
+        target.markT = 6;
+        floatText(target.x, target.y - target.r - 22, 'MARKED', '#d08bff', 13);
+      }
+    }
+  }
+
+  /* 5. execute and death */
+  if (target.hp > 0 && player.execute > 0 && !target.boss && target.hp / target.maxHp <= player.execute) {
+    floatText(target.x, target.y - target.r - 22, 'EXECUTE', '#ff6b9d', 15);
+    target.hp = 0;
+  }
+  const killed = target.hp <= 0;
+  if (killed) killEnemy(target, S.noKill);
+  return { dmg, crit, killed };
 }
 
-function killEnemy(e) {
+function killEnemy(e, noKillEffects) {
   if (e.dead) return;
   e.dead = true;
   game.kills++;
   game.score += Math.round(e.score * (player.scoreMul || 1));
-  onEnemyKilled(e);
+  if (!noKillEffects) onEnemyKilled(e);
   burst(e.x, e.y, e.boss ? 60 : 14, e.color, e.boss ? 420 : 240, e.boss ? 4 : 3);
   camera.shake = Math.min(30, camera.shake + (e.boss ? 26 : 2.5));
 
@@ -2225,7 +2649,7 @@ function updateEnemy(e, dt) {
   if (e.contactCd <= 0 && d < e.r + player.r) {
     damagePlayer(e.dmg, e.x, e.y);
     e.contactCd = 0.75;
-    if (player.thorns > 0) hurtEnemy(e, e.maxHp * player.thorns, player.x, player.y);
+    if (player.thorns > 0) dealDamage(e, e.maxHp * player.thorns, 'thorns', { fromX: player.x, fromY: player.y });
     if (e.type === 'charger' && e.state === 'dash') { e.state = 'rest'; e.stateT = 0; }
   }
 }
@@ -2536,28 +2960,13 @@ function updatePlayer(dt) {
   player.y += player.vy * dt;
   collideWorld(player);
 
-  // firing
-  player.fireCd -= dt;
-  if (firing && player.fireCd <= 0) shoot();
+  // firing - four operatives answer this very differently
+  updateWeapon(dt, firing);
 
   player.invuln = Math.max(0, player.invuln - dt);
   player.hurtFlash = Math.max(0, player.hurtFlash - dt);
   player.recoil = Math.max(0, player.recoil - dt * 42);
   if (player.regen > 0 && player.hp > 0) player.hp = Math.min(player.maxHp, player.hp + player.regen * dt);
-}
-
-function applyBulletEffects(b, e) {
-  if (b.burn) applyBurn(e, player.burnDps || 6, player.burnDur || 2);
-  if (b.slow) applySlow(e, player.slowPow || 0.2, player.slowDur || 1.2);
-  if (b.chain > 0) chainFrom(e, b.dmg * player.chainDmg, b.chain, [e]);
-  if (b.crit && player.critBoom > 0) explode(b.x, b.y, 70 * player.explodeMul, player.critBoom, true);
-  if (player.markEvery > 0) {
-    player.hitCount++;
-    if (player.hitCount % player.markEvery === 0 && !e.dead) {
-      e.markT = 6;
-      floatText(e.x, e.y - e.r - 22, 'MARKED', '#d08bff', 13);
-    }
-  }
 }
 
 function bounceBullet(b, px, py, box) {
@@ -2571,14 +2980,14 @@ function bounceBullet(b, px, py, box) {
   b.x = clamp(px, 3, WORLD.w - 3);
   b.y = clamp(py, 3, WORLD.h - 3);
   b.life = Math.max(b.life, 0.6);
-  if (player.bounceGain > 0) b.dmg *= 1 + player.bounceGain;
+  if (player.bounceGain > 0) b.base *= 1 + player.bounceGain;
   if (b.hit) b.hit.length = 0;          // a bounced shot may hit the same target again
   burst(b.x, b.y, 3, b.color, 120, 2);
   if (player.bounceSplit && !b.split && bullets.length < 180) {
     b.split = 1;
     const a = Math.atan2(b.vy, b.vx), sp = len(b.vx, b.vy);
     for (const off of [-0.45, 0.45]) {
-      const c = Object.assign({}, b, { hit: null, split: 1, dmg: b.dmg * 0.6 });
+      const c = Object.assign({}, b, { hit: null, split: 1, base: b.base * 0.6 });
       c.vx = Math.cos(a + off) * sp; c.vy = Math.sin(a + off) * sp;
       bullets.push(c);
     }
@@ -2626,7 +3035,7 @@ function updateBullets(dt) {
         if (!segHitsBox(px, py, b.x, b.y, o)) continue;
         if (b.friendly && b.bounce > 0) { bounceBullet(b, px, py, o); break; }
         burst(b.x, b.y, 4, b.color, 120, 2);
-        if (b.explode) explode(b.x, b.y, b.explode, b.dmg * 0.8, b.friendly);
+        if (b.explode) explode(b.x, b.y, b.explode, b.friendly ? b.base * 0.8 : b.dmg * 0.8, b.friendly);
         done = true;
         break;
       }
@@ -2638,14 +3047,12 @@ function updateBullets(dt) {
         const rr = e.r + b.r;
         if ((e.x - b.x) ** 2 + (e.y - b.y) ** 2 > rr * rr) continue;
         if (b.hit && b.hit.indexOf(e) !== -1) continue;
-        hurtEnemy(e, b.dmg, px, py);
-        if (b.crit) floatText(e.x, e.y - e.r - 20, 'CRIT', '#ffe36b', 12);
-        applyBulletEffects(b, e);
-        if (b.explode) { explode(b.x, b.y, b.explode, b.dmg * 0.7, true); done = true; break; }
+        dealDamage(e, b.base, b.source || 'shot', { fromX: px, fromY: py });
+        if (b.explode) { explode(b.x, b.y, b.explode, b.base * 0.7, true); done = true; break; }
         if (b.pierce > 0) {
           b.pierce--;
           (b.hit || (b.hit = [])).push(e);
-          if (!player.noFalloff) b.dmg *= 0.82;
+          if (!player.noFalloff) b.base *= 0.82;
         } else { done = true; }
         break;
       }
@@ -3082,6 +3489,47 @@ function drawHUD() {
   ctx.fillStyle = '#7e9bc4';
   ctx.fillText('SIGNATURE WEAPON', pad, pad + 79 + yOff);
 
+  // the operative's own mechanic gets its own readout
+  const wpn = WEAPONS[player.weapon];
+  let my = pad + 88 + yOff;
+  if (player.meterMax > 0) {
+    const dis = player.mode === 'discharge';
+    bar(pad, my, barW * 0.8, 10, player.meter / player.meterMax, dis ? '#ff8aff' : '#c8b4ff');
+    ctx.font = '700 10px "Segoe UI",Roboto,sans-serif';
+    ctx.fillStyle = '#04121c';
+    ctx.fillText((dis ? 'DISCHARGE' : 'CHARGE') + '  ' + Math.round(player.meter) + '/' + player.meterMax, pad + 5, my + 8);
+    my += 16;
+  }
+  if (wpn.beam) {
+    const heat = clamp((player.beamRampShown - 1) / Math.max(0.01, wpn.rampMax - 1), 0, 1);
+    bar(pad, my, barW * 0.8, 10, heat, heat > 0.85 ? '#ffffff' : '#8ad8ff');
+    ctx.font = '700 10px "Segoe UI",Roboto,sans-serif';
+    ctx.fillStyle = '#04121c';
+    ctx.fillText('BEAM  ' + player.beamRampShown.toFixed(2) + 'x', pad + 5, my + 8);
+    my += 16;
+  }
+  if (player.chargeMax > 0) {
+    bar(pad, my, barW * 0.8, 10, player.charge, player.charge > 0.95 ? '#ffffff' : '#ffd77a');
+    ctx.font = '700 10px "Segoe UI",Roboto,sans-serif';
+    ctx.fillStyle = '#04121c';
+    ctx.fillText('CHARGE  ' + (1 + player.charge * player.chargePower).toFixed(1) + 'x', pad + 5, my + 8);
+    my += 16;
+  }
+  if (wpn.autoMove) {
+    bar(pad, my, barW * 0.8, 10, player.moveFire / 1.5, player.moveFire > 0.18 ? '#9dff5c' : '#3a4a5e');
+    ctx.font = '700 10px "Segoe UI",Roboto,sans-serif';
+    ctx.fillStyle = player.moveFire > 0.18 ? '#04121c' : '#7e9bc4';
+    ctx.fillText(player.moveFire > 0.18 ? 'FIRING FROM MOVEMENT' : 'MOVE TO FIRE', pad + 5, my + 8);
+    my += 16;
+  }
+  if (player.drones > 0) {
+    ctx.font = '700 11px "Segoe UI",Roboto,sans-serif';
+    ctx.fillStyle = player.droneFocusT > 0 ? '#ffffff' : '#b8c6d8';
+    ctx.fillText(player.droneFocusT > 0
+      ? 'DRONES FOCUSED  ' + player.droneFocusT.toFixed(1) + 's'
+      : player.drones + ' DRONES' + (isTouch ? '' : '  (E to focus)'), pad, my + 9);
+  }
+
   // score / wave (top right)
   ctx.textAlign = 'right';
   ctx.font = '800 26px "Segoe UI",Roboto,sans-serif';
@@ -3210,11 +3658,12 @@ function coresFor(score, wave) { return Math.floor(score / 25) + wave * 15; }
 Object.assign(WEAPONS, {
   bulwark:  { name: 'Bulwark Rifle',    ico: '🛡', dmg: 15, rof: 0.11,  speed: 1000, spread: 0.05, count: 1, ammo: Infinity, kick: 2.4, size: 4.5, color: '#7ceaff' },
   flamer:   { name: 'Flame Projector',  ico: '🔥', dmg: 5,  rof: 0.035, speed: 560,  spread: 0.22, count: 1, ammo: Infinity, kick: 1.0, size: 7,   color: '#ff8a3d', life: 0.32, fade: true, burn: true },
-  cryo:     { name: 'Cryo Lance',       ico: '❄', dmg: 11, rof: 0.14,  speed: 1020, spread: 0.04, count: 1, ammo: Infinity, kick: 2.0, size: 5,   color: '#8ad8ff', slow: true },
-  coil:     { name: 'Arc Coil',         ico: '⚡', dmg: 13, rof: 0.20,  speed: 1150, spread: 0.03, count: 1, ammo: Infinity, kick: 2.2, size: 5,   color: '#c8b4ff', chain: 1 },
-  longshot: { name: 'Longshot',         ico: '🎯', dmg: 52, rof: 0.62,  speed: 1950, spread: 0.004, count: 1, ammo: Infinity, kick: 8,  size: 5.5, color: '#ffd77a', pierce: 2, trail: true },
-  twins:    { name: 'Twin Pistols',     ico: '🔪', dmg: 8,  rof: 0.062, speed: 1100, spread: 0.10, count: 1, ammo: Infinity, kick: 1.3, size: 4,   color: '#9dff5c', alt: true },
-  nailer:   { name: 'Nail Driver',      ico: '🔩', dmg: 11, rof: 0.13,  speed: 1250, spread: 0.06, count: 1, ammo: Infinity, kick: 1.8, size: 4,   color: '#b8c6d8', pierce: 1 },
+  cryo:     { name: 'Cryo Beam',        ico: '❄', beam: true, dps: 34, range: 430, width: 7, rampTime: 2.6, rampMax: 2.8,
+              rof: 0.1, dmg: 0, speed: 0, spread: 0, count: 1, ammo: Infinity, kick: 0, size: 5, color: '#8ad8ff', slow: true },
+  coil:     { name: 'Arc Coil',         ico: '⚡', dualMode: true, dmg: 9, rof: 0.13, speed: 1150, spread: 0.06, count: 1, ammo: Infinity, kick: 1.6, size: 4.5, color: '#c8b4ff', chain: 1 },
+  longshot: { name: 'Longshot',         ico: '🎯', chargeUp: true, dmg: 26, rof: 0.5, speed: 1950, spread: 0.004, count: 1, ammo: Infinity, kick: 8, size: 5.5, color: '#ffd77a', pierce: 2, trail: true },
+  twins:    { name: 'Twin Pistols',     ico: '🔪', autoMove: true, dmg: 9, rof: 0.085, speed: 1100, spread: 0.08, count: 1, ammo: Infinity, kick: 1.3, size: 4, color: '#9dff5c', alt: true },
+  nailer:   { name: 'Nail Driver',      ico: '🔩', droneMain: true, dmg: 5, rof: 0.16, speed: 1250, spread: 0.06, count: 1, ammo: Infinity, kick: 1.4, size: 4, color: '#b8c6d8', pierce: 1 },
   mortar:   { name: 'Grenade Launcher', ico: '💣', dmg: 22, rof: 0.62,  speed: 720,  spread: 0.05, count: 1, ammo: Infinity, kick: 5,  size: 7,   color: '#ff8a3d', explode: 74 },
   scythe:   { name: 'Soul Scythe',      ico: '🌙', dmg: 16, rof: 0.34,  speed: 840,  spread: 0.26, count: 3, ammo: Infinity, kick: 3.4, size: 6,   color: '#d08bff', curve: 1.5, life: 0.85 },
   prism:    { name: 'Prism Beam',       ico: '🔺', dmg: 10, rof: 0.17,  speed: 1080, spread: 0.06, count: 2, ammo: Infinity, kick: 2.0, size: 4.5, color: '#7cffe0', bounce: 1 }
@@ -3236,33 +3685,33 @@ const CHARACTERS = [
   },
   {
     id: 'halcyon', name: 'HALCYON', title: 'Cryomancer', ico: '❄', color: '#8ad8ff', cost: 400,
-    weapon: 'cryo', role: 'Nothing moves at full speed near you, and slowed things break easily.',
-    passive: 'Hits slow enemies by 30% for 1.5s',
+    weapon: 'cryo', role: 'Hold the beam on one target. No projectiles, no reload - only contact time, which is also your damage.',
+    passive: 'Beam ramps to 2.8x damage after 2.6s on one target; hits slow by 30%',
     apply: p => { p.slowPow = Math.max(p.slowPow, 0.30); p.slowDur = Math.max(p.slowDur, 1.5); }
   },
   {
     id: 'arc', name: 'ARC', title: 'Tesla', ico: '⚡', color: '#c8b4ff', cost: 550,
-    weapon: 'coil', role: 'One shot, many corpses. Damage jumps between everything in the room.',
-    passive: 'Shots arc to 1 nearby enemy',
-    apply: p => { p.chains += 1; }
+    weapon: 'coil', role: 'Two firing modes on one meter. Charge fills it, Discharge spends it in huge arcs. Swapping is the rhythm of the class.',
+    passive: '100-point meter: +3 per hit in Charge; Discharge costs 14 a shot for 3.2x damage and +2 arcs',
+    apply: p => { p.chains += 1; p.meterMax = 100; p.meter = 0; p.mode = 'charge'; }
   },
   {
     id: 'vex', name: 'VEX', title: 'Marksman', ico: '🎯', color: '#ffd77a', cost: 700,
-    weapon: 'longshot', role: 'Slow, heavy, precise. Every shot should remove something from the board.',
-    passive: '+20% crit chance, +0.8x crit damage',
-    apply: p => { p.crit += 0.20; p.critMul += 0.8; }
+    weapon: 'longshot', role: 'Hold the trigger to wind the rifle up, release to fire. A full wind-up is worth three snap shots.',
+    passive: 'Hold to charge: up to 3.2x damage over ~0.9s. +20% crit chance, +0.8x crit damage',
+    apply: p => { p.crit += 0.20; p.critMul += 0.8; p.chargeMax = 1; }
   },
   {
     id: 'nyx', name: 'NYX', title: 'Blade Dancer', ico: '🔪', color: '#9dff5c', cost: 0,
-    weapon: 'twins', role: 'Never stop moving. The dash is a weapon, not an escape.',
-    passive: '+20% move speed, dash deals 60 damage',
+    weapon: 'twins', role: 'There is no fire button. The pistols fire from your own movement and aim themselves - where you stand is the whole input.',
+    passive: 'Fires automatically while moving, faster the faster you go. Standing still fires nothing',
     apply: p => { p.speedMul *= 1.20; p.dashDmg += 60; }
   },
   {
     id: 'cog', name: 'COG', title: 'Engineer', ico: '🔧', color: '#b8c6d8', cost: 900,
-    weapon: 'nailer', role: 'You are not alone out there. Let the drones do half the shooting.',
-    passive: 'Deploys 1 combat drone',
-    apply: p => { p.drones += 1; p.droneDmg += 9; }
+    weapon: 'nailer', role: 'The sidearm barely scratches. The drones are the weapon, and you can order them all onto one target.',
+    passive: 'Deploys 3 drones. FOCUS (E) sends them onto one target for 4s at +40% damage',
+    apply: p => { p.drones += 3; p.droneDmg += 14; }
   },
   {
     id: 'boom', name: 'BOOM', title: 'Demolitionist', ico: '💣', color: '#ff6b4a', cost: 1200,
@@ -3291,6 +3740,12 @@ for (const c of CHARACTERS) CHAR_BY_ID[c.id] = c;
 function rogueStats() {
   return {
     charId: 'vanguard', sigWeapon: 'bulwark',
+    // weapon behaviours
+    beamHeat: 0, beamTarget: null, beamHits: null, beamPower: 0, beamRamp: 0, beamRange: 0, beamRampShown: 1,
+    droneFocus: null, droneFocusT: 0, focusTime: 4, focusPower: 1.4,
+    mode: 'charge', meter: 0, meterMax: 0, meterCost: 14, meterGain: 3,
+    dischargePower: 3.2, dischargeChain: 2,
+    charge: 0, chargeMax: 0, chargePower: 2.2, chargeRate: 1.1, heldFire: false, moveFire: 0,
     // defence
     shield: 0, shieldMax: 0, shieldRegen: 8, shieldDelay: 3.5, shieldTimer: 0,
     shieldBoom: 0, shieldDR: 0, shieldFlash: 0,
@@ -3344,7 +3799,7 @@ function tickEnemyStatus(e, dt) {
     if (e.burnTick >= 0.25) {
       const ticks = Math.floor(e.burnTick / 0.25);
       e.burnTick -= ticks * 0.25;
-      hurtEnemy(e, e.burnDps * 0.25 * ticks, undefined, undefined, false);
+      dealDamage(e, e.burnDps * 0.25 * ticks, 'burn', { silent: true });
       spawnParticle(e.x + rand(-e.r, e.r), e.y + rand(-e.r, e.r), rand(-14, 14), -rand(20, 50), 0.32, '#ff8a3d', rand(1.6, 3), true);
     }
   }
@@ -3352,7 +3807,7 @@ function tickEnemyStatus(e, dt) {
     e.slowT -= dt;
     if (player.frostbite > 0) {
       e.friskT = (e.friskT || 0) + dt;
-      if (e.friskT >= 0.25) { e.friskT = 0; hurtEnemy(e, player.frostbite * 0.25, undefined, undefined, false); }
+      if (e.friskT >= 0.25) { e.friskT = 0; dealDamage(e, player.frostbite * 0.25, 'frost', { silent: true }); }
     }
     if (Math.random() < dt * 6) spawnParticle(e.x + rand(-e.r, e.r), e.y + rand(-e.r, e.r), 0, rand(-10, 10), 0.4, '#8ad8ff', 2, true);
     if (player.slowExecute > 0 && !e.boss && !e.dead && e.hp / e.maxHp <= player.slowExecute) shatterEnemy(e);
@@ -3388,7 +3843,7 @@ function chainFrom(src, dmg, jumps, hitList) {
     }
     if (!best) return;
     arcs.push({ x1: from.x, y1: from.y, x2: best.x, y2: best.y, life: 0.16, max: 0.16 });
-    hurtEnemy(best, dmg, from.x, from.y, false);
+    dealDamage(best, dmg, 'chain', { silent: true, fromX: from.x, fromY: from.y });
     if (player.chainStun) applySlow(best, 0.6, 0.8);
     hit.push(best);
     from = best;
@@ -3433,7 +3888,7 @@ function updateOrbit(dt) {
       if (e.orbitCd > 0) continue;
       if (len(e.x - bx, e.y - by) > e.r + 14) continue;
       e.orbitCd = 0.45;
-      hurtEnemy(e, player.orbitDmg * player.dmgMul, bx, by);
+      dealDamage(e, player.orbitDmg, 'blade', { fromX: bx, fromY: by });
       burst(bx, by, 4, '#cfe6ff', 150, 2);
     }
   }
@@ -3461,21 +3916,25 @@ function updateDrones(dt) {
     if (d.cd > 0) continue;
 
     let best = null, bestD = 460;
-    for (const e of enemies) {
-      if (e.dead || e.spawnT > 0) continue;
-      const dd = len(e.x - d.x, e.y - d.y);
-      if (dd < bestD && lineOfSight(d.x, d.y, e.x, e.y)) { bestD = dd; best = e; }
+    if (player.droneFocus && !player.droneFocus.dead && player.droneFocusT > 0) {
+      best = player.droneFocus;                     // a focus order overrides line of sight
+    } else {
+      for (const e of enemies) {
+        if (e.dead || e.spawnT > 0) continue;
+        const dd = len(e.x - d.x, e.y - d.y);
+        if (dd < bestD && lineOfSight(d.x, d.y, e.x, e.y)) { bestD = dd; best = e; }
+      }
     }
     if (!best) { d.cd = 0.1; continue; }
     d.cd = player.droneRof;
     d.fire = 0.12;
     const a = Math.atan2(best.y - d.y, best.x - d.x);
-    const b = {
-      x: d.x, y: d.y, vx: Math.cos(a) * 900, vy: Math.sin(a) * 900, r: 3.5, life: 1.1,
-      dmg: player.droneDmg * player.droneDmgMul * player.dmgMul, friendly: true, pierce: 0,
-      hit: null, color: '#b8c6d8', explode: player.droneBoom * player.explodeMul, drone: 1
-    };
-    bullets.push(b);
+    emitProjectiles({
+      x: d.x, y: d.y, angle: a,
+      base: player.droneDmg * player.droneDmgMul * (best === player.droneFocus ? player.focusPower : 1),
+      count: 1, spread: 0.05, speed: 900, size: 3.5, life: 1.1,
+      color: '#b8c6d8', explode: player.droneBoom, source: 'drone'
+    });
     muzzleFlash(d.x, d.y, a, '#b8c6d8', 1);
   }
 }
@@ -3492,10 +3951,10 @@ function updateAuras(dt) {
     const d = len(e.x - player.x, e.y - player.y);
     if (player.burnAura > 0 && d < player.burnAuraR + e.r) {
       applyBurn(e, player.burnDps || player.burnAura, Math.max(player.burnDur, 1));
-      hurtEnemy(e, player.burnAura * t, undefined, undefined, false);
+      dealDamage(e, player.burnAura * t, 'aura', { silent: true });
     }
     if (player.staticAura > 0 && d < player.staticR + e.r) {
-      hurtEnemy(e, player.staticAura * t, undefined, undefined, false);
+      dealDamage(e, player.staticAura * t, 'aura', { silent: true });
       if (Math.random() < 0.35) arcs.push({ x1: player.x, y1: player.y, x2: e.x, y2: e.y, life: 0.12, max: 0.12 });
     }
     if (player.chillAura > 0 && d < player.chillAura + e.r) {
@@ -3529,7 +3988,7 @@ function updateDashDamage(dt) {
         if (e.dead || e.spawnT > 0 || player.dashHit.indexOf(e) !== -1) continue;
         if (len(e.x - player.x, e.y - player.y) > e.r + player.r + 8) continue;
         player.dashHit.push(e);
-        hurtEnemy(e, hitDmg * player.dmgMul, player.x, player.y);
+        dealDamage(e, hitDmg, 'dash', { fromX: player.x, fromY: player.y });
         if (player.dashZap > 0) chainFrom(e, player.dashZap * player.chainDmg, player.chains, [e]);
         burst(e.x, e.y, 8, '#eaf6ff', 220, 2.4);
       }
@@ -3577,7 +4036,7 @@ function updateRogue(dt) {
   player.frenzyT = Math.max(0, player.frenzyT - dt);
   if (len(player.vx, player.vy) < 12) player.stillT += dt; else player.stillT = 0;
 
-  for (const e of enemies) if (e.orbitCd > 0) e.orbitCd -= dt;
+  for (const e of enemies) { if (e.orbitCd > 0) e.orbitCd -= dt; if (e.riderCd > 0) e.riderCd -= dt; }
 
   for (let i = arcs.length - 1; i >= 0; i--) {
     arcs[i].life -= dt;
@@ -3664,6 +4123,38 @@ function drawRogueFx(ox, oy) {
       ctx.fillStyle = 'rgba(207,230,255,.22)'; ctx.fill(); ctx.stroke();
       ctx.restore();
     }
+  }
+
+  // the beam
+  if (player.beamHits) {
+    const w = WEAPONS[player.weapon];
+    const heat = clamp((player.beamRampShown - 1) / Math.max(0.01, w.rampMax - 1), 0, 1.4);
+    ctx.save();
+    ctx.lineCap = 'round';
+    for (const ray of player.beamHits) {
+      const x1 = player.x - ox, y1 = player.y - oy;
+      const x2 = x1 + Math.cos(ray.a) * ray.len, y2 = y1 + Math.sin(ray.a) * ray.len;
+      ctx.shadowBlur = 16 + heat * 22; ctx.shadowColor = w.color;
+      ctx.strokeStyle = 'rgba(138,216,255,' + (0.30 + heat * 0.35) + ')';
+      ctx.lineWidth = 9 + heat * 9;
+      ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+      ctx.strokeStyle = heat > 0.8 ? '#ffffff' : '#dff3ff';
+      ctx.lineWidth = 2.5 + heat * 2.5;
+      ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+      ctx.fillStyle = 'rgba(223,243,255,' + (0.5 + heat * 0.5) + ')';
+      ctx.beginPath(); ctx.arc(x2, y2, 5 + heat * 7, 0, TAU); ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  // a focused target wears the order
+  if (player.droneFocus && player.droneFocusT > 0 && !player.droneFocus.dead) {
+    const f = player.droneFocus;
+    ctx.save();
+    ctx.globalAlpha = 0.5 + Math.sin(game.time * 8) * 0.25;
+    ctx.strokeStyle = '#b8c6d8'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(f.x - ox, f.y - oy, f.r + 12, 0, TAU); ctx.stroke();
+    ctx.restore();
   }
 
   // shield bubble
@@ -3914,6 +4405,16 @@ function applyTreeToPlayer(p, live) {
   p.scoreMul += S.scoreBonus;
   p.dropMul += S.dropBonus;
   p.bounce += S.bounces;
+  p.beamPower += S.beamPower;
+  p.beamRamp += S.beamRamp;
+  p.beamRange += S.beamRange;
+  p.focusPower += S.focusPower;
+  p.focusTime += S.focusTime;
+  p.meterGain += S.meterGain;
+  p.dischargePower += S.dischargePower;
+  p.dischargeChain += S.dischargeChain;
+  p.chargePower += S.chargePower;
+  p.chargeRate += S.chargeRate;
   p.homing += S.homingStrength;
   p.cluster += S.clusterCount;
   p.frostbite += S.frostbiteDamage;
@@ -3947,6 +4448,21 @@ function applyTreeToPlayer(p, live) {
   }
 }
 
+function updateActButton() {
+  const b = document.getElementById('actBtn');
+  if (!b) return;
+  if (!player || game.state !== 'play') { b.style.display = 'none'; return; }
+  if (player.meterMax > 0) {
+    b.style.display = 'block';
+    b.textContent = (player.mode === 'discharge' ? 'CHARGE MODE' : 'DISCHARGE') + (isTouch ? '' : '  \u2014 Q');
+  } else if (player.drones > 0) {
+    b.style.display = 'block';
+    b.textContent = 'FOCUS DRONES' + (isTouch ? '' : '  \u2014 E');
+  } else {
+    b.style.display = 'none';
+  }
+}
+
 function updateSpButton() {
   const b = document.getElementById('spBtn');
   if (!b) return;
@@ -3954,6 +4470,7 @@ function updateSpButton() {
   const show = left > 0 && game.state === 'play';
   b.style.display = show ? 'block' : 'none';
   if (show) b.textContent = '\u2605 ' + left + ' ABILITY POINT' + (left === 1 ? '' : 'S') + (isTouch ? '' : ' \u2014 TAB');
+  updateActButton();
 }
 
 /* ---------------- shell ---------------- */
@@ -4048,6 +4565,10 @@ document.getElementById('csBack').addEventListener('click', () => {
 document.getElementById('stClose').addEventListener('click', closeSkillTree);
 document.getElementById('treeBtn').addEventListener('click', openSkillTree);
 document.getElementById('spBtn').addEventListener('click', openSkillTree);
+document.getElementById('actBtn').addEventListener('click', () => {
+  if (player && player.meterMax > 0) toggleArcMode();
+  else if (player && player.drones > 0) focusDrones();
+});
 document.getElementById('resumeBtn').addEventListener('click', togglePause);
 document.getElementById('quitBtn').addEventListener('click', () => {
   closeAllOverlays(); game.state = 'menu'; refreshMenu(); showOverlay('menu');

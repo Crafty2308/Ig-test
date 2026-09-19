@@ -39,6 +39,7 @@
   const allIds = new Set();
   const statKeys = new Set(Object.keys(T.STAT_BASE));
   const flagSet = new Set(T.FLAGS);
+  const BANNED = /\b(enhances?|improves?|empowers?|strengthens?|boosts?|better|greatly)\b/i;
 
   eq(T.CHAR_IDS.length, 10, 'ten characters have trees');
 
@@ -52,20 +53,23 @@
       allIds.add(n.id);
       ok(['white', 'yellow', 'red'].includes(n.tier), label + n.id + ' has a valid tier');
       ok(Number.isInteger(n.col) && Number.isInteger(n.row), label + n.id + ' sits on the grid');
-      for (const p of (n.parents || [])) ok(!!idx.byId[p], label + n.id + ' parent ' + p + ' exists in this tree');
-      for (const b of (n.blocks || [])) ok(!!idx.byId[b], label + n.id + ' blocks ' + b + ' in this tree');
-      if (n.tier !== 'white') ok(!!n.archetype, label + n.id + ' (' + n.tier + ') belongs to an archetype');
-      if (n.archetype) ok(!!idx.archetypes[n.archetype], label + n.id + ' archetype is declared');
+      for (const p of (n.parents || [])) ok(!!idx.byId[p], label + n.id + ' parent ' + p + ' exists');
+      for (const b of (n.blocks || [])) ok(!!idx.byId[b], label + n.id + ' blocks ' + b);
       const effs = n.effects || (n.effect ? [n.effect] : []);
       ok(effs.length > 0, label + n.id + ' does something');
       for (const e of effs) {
-        if (e.flag) ok(flagSet.has(e.flag), label + n.id + ' flag "' + e.flag + '" is in FLAGS');
+        if (e.flag) ok(flagSet.has(e.flag), label + n.id + ' flag "' + e.flag + '" is declared');
         else {
-          ok(statKeys.has(e.stat), label + n.id + ' stat "' + e.stat + '" is in STAT_BASE');
+          ok(statKeys.has(e.stat), label + n.id + ' stat "' + e.stat + '" is declared');
           ok(e.op === 'add' || e.op === 'mult', label + n.id + ' op is add or mult');
           ok(typeof e.value === 'number', label + n.id + ' value is numeric');
         }
       }
+      /* description rules: numbers, no vague verbs, real sentences */
+      ok(/\d/.test(n.desc), label + n.id + ' description states a number');
+      ok(!BANNED.test(n.desc), label + n.id + ' description avoids vague verbs');
+      ok(n.desc.length >= 10, label + n.id + ' description says something concrete');
+      ok(/[.!]$/.test(n.desc.trim()), label + n.id + ' description is punctuated');
     }
 
     const cells = new Set(nodes.map(n => n.col + ',' + n.row));
@@ -74,23 +78,41 @@
     const roots = nodes.filter(n => !n.parents || !n.parents.length);
     ok(roots.length === 1 && roots[0].id === charId + '_root', label + 'exactly one root');
 
-    /* tier spread: white is most of the tree */
+    /* three archetypes, each with an identity and five ratings */
+    eq(idx.archList.length, 3, label + 'three archetypes');
+    for (const a of idx.archList) {
+      ok(a.desc && a.desc.length > 150, label + a.id + ' has an identity paragraph');
+      ok(!BANNED.test(a.desc), label + a.id + ' identity avoids vague verbs');
+      for (const k of ['difficulty', 'damage', 'defense', 'range', 'speed']) {
+        ok(['Low', 'Medium', 'High'].includes(a.ratings[k]), label + a.id + ' rates ' + k);
+      }
+    }
+
+    /* three parallel lanes plus a convergence column between each pair */
+    for (const a of idx.archList) {
+      const lane = nodes.filter(n => n.archetype === a.id);
+      eq(lane.length, 9, label + a.id + ' lane has 9 nodes');
+      eq(new Set(lane.map(n => n.col)).size, 1, label + a.id + ' lane sits in one column');
+    }
+    const dual = nodes.filter(n => n.dual);
+    eq(dual.length, 8, label + '8 convergence nodes');
+    for (const d of dual) {
+      eq(d.dual.length, 2, label + d.id + ' joins exactly two archetypes');
+      ok(d.archetype === null, label + d.id + ' belongs to no single archetype');
+      ok(d.reqs && d.reqs.archetypeMins && d.reqs.archetypeMins.length === 2,
+         label + d.id + ' is gated on both archetypes');
+      ok([1, 3].includes(d.col), label + d.id + ' sits between two lanes');
+    }
+
+    /* tall, not wide */
+    const rows = Math.max.apply(null, nodes.map(n => n.row)) + 1;
+    ok(rows >= 12, label + 'the tree is tall (' + rows + ' rows)');
+    ok(Math.max.apply(null, nodes.map(n => n.col)) + 1 === 5, label + 'five grid columns');
+
+    /* white is most of the tree */
     const tiers = { white: 0, yellow: 0, red: 0 };
     for (const n of nodes) tiers[n.tier]++;
-    ok(tiers.white > tiers.yellow + tiers.red, label + 'white nodes are most of the tree');
-
-    /* reds: 3 per archetype */
-    const reds = {};
-    for (const n of nodes) if (n.tier === 'red') reds[n.archetype] = (reds[n.archetype] || 0) + 1;
-    eq(Object.keys(idx.archetypes).length, 3, label + 'three archetypes');
-    for (const a in idx.archetypes) eq(reds[a] || 0, 3, label + a + ' has 3 red nodes');
-
-    /* every yellow and red is gated on its own archetype */
-    for (const n of nodes) {
-      if (n.tier === 'white') continue;
-      ok(n.reqs && n.reqs.archetypeMin && n.reqs.archetypeMin.name === n.archetype,
-         label + n.id + ' is gated on its own archetype');
-    }
+    ok(tiers.white >= tiers.yellow && tiers.white >= tiers.red, label + 'white nodes are the bulk');
 
     /* reachability and acyclicity */
     const seen = new Set([charId + '_root']);
@@ -102,28 +124,23 @@
     for (const n of nodes) for (const p of (n.parents || [])) if (idx.byId[p].row >= n.row) cyclic++;
     eq(cyclic, 0, label + 'parent edges always go down a row');
 
-    /* capstones: one per archetype, each blocking the other two */
-    const caps = nodes.filter(n => n.capstone);
-    eq(caps.length, 3, label + 'three capstones');
-    for (const c of caps) eq((c.blocks || []).length, 2, label + c.id + ' blocks the other two capstones');
-
-    /* one mutually exclusive red pair per archetype */
-    for (const a in idx.archetypes) {
-      const pair = nodes.filter(n => n.archetype === a && n.tier === 'red' && n.row === 5);
-      eq(pair.length, 2, label + a + ' has an exclusive red pair');
-      ok(pair[0].blocks.includes(pair[1].id) && pair[1].blocks.includes(pair[0].id), label + a + ' pair blocks both ways');
-    }
+    /* five endings, all mutually exclusive: 3 pure capstones + 2 fusions */
+    const ends = nodes.filter(n => n.capstone);
+    eq(ends.length, 5, label + 'five mutually exclusive endings');
+    eq(ends.filter(n => n.dual).length, 2, label + 'two of them are fusions');
+    for (const c of ends) eq((c.blocks || []).length, 4, label + c.id + ' blocks the other four');
   }
 
   /* ---------- 2. costs and points ---------- */
   eq(T.costOf('vanguard_plate'), 1, 'white costs 1');
   eq(T.costOf('vanguard_hardlight'), 2, 'yellow costs 2');
-  eq(T.costOf('vanguard_immovable'), 4, 'red costs 4');
+  eq(T.costOf('vanguard_immovable'), 5, 'red costs 5');
   eq(T.pointsForLevel(0), 0, 'level 0 grants nothing');
-  eq(T.pointsForLevel(10), 12, 'level 10 grants 12');
+  eq(T.pointsForLevel(10), 8, 'level 10 grants 8');
+  eq(T.pointsForLevel(40), 32, 'level 40 grants 32, about a third of a tree');
 
   const gp = T.createState('vanguard');
-  eq(T.grantPoints(gp, 5), 6, 'grantPoints returns the gain');
+  eq(T.grantPoints(gp, 5), 4, 'grantPoints returns the gain');
   eq(T.grantPoints(gp, 3), 0, 'replaying a lower level grants nothing');
 
   /* points are banked per character */
@@ -149,71 +166,103 @@
   ok(!T.canUnlock('nope', s1).ok, 'unknown id never throws');
 
   /* archetype gate */
-  const s3 = take(fresh('vanguard', 20), ['vanguard_root', 'vanguard_plate']);
+  const s3 = take(fresh('vanguard', 40), ['vanguard_root', 'vanguard_plate', 'vanguard_cell']);
   const gate = T.canUnlock('vanguard_hardlight', s3);
-  ok(!gate.ok, 'archetype gate refuses at 1 of 2');
+  ok(!gate.ok, 'archetype gate refuses at 2 of 3');
   ok(gate.reasons.some(r => /Bulwark abilities/.test(r)), 'gate refusal names the archetype and count');
-  T.unlock('vanguard_cell', s3);
-  ok(T.canUnlock('vanguard_hardlight', s3).ok, 'gate opens at 2');
+  T.unlock('vanguard_coolant', s3);
+  ok(T.canUnlock('vanguard_hardlight', s3).ok, 'gate opens at 3');
 
-  /* multi-parent: either parent is enough */
-  ok(T.INDEX.vanguard.byId.vanguard_hardlight.parents.length === 2, 'the gate node has two parents');
+  /* a convergence needs BOTH neighbouring archetypes */
+  const conv = T.INDEX.vanguard.nodes.find(n => n.dual && n.row === 3);
+  const cv = T.canUnlock(conv.id, s3);
+  ok(!cv.ok, 'convergence refused with only one archetype invested');
+  ok(cv.reasons.some(r => /Retribution abilities/.test(r)), 'convergence names the second archetype');
 
-  /* ---------- 4. blocks are mutual and permanent until reset ---------- */
-  const s6 = take(fresh('vanguard', 30), laneIds('vanguard', 'bulwark', false).slice(0, 8));
-  ok(T.has(s6, 'vanguard_overshield'), 'one half of the exclusive pair taken');
-  const blocked = T.canUnlock('vanguard_siege', s6);
-  ok(!blocked.ok, 'its exclusive twin is refused');
-  ok(blocked.reasons.some(r => /Locked out by/.test(r)), 'refusal explains the lockout');
-  eq(blocked.reasons.filter(r => /Locked out by/.test(r)).length, 1, 'the lockout is reported once, not twice');
-  ok(T.nodeStatus('vanguard_siege', s6) === 'blocked', 'status paints as blocked');
-  T.reset(s6);
-  eq(T.pointsSpent(s6), 0, 'reset refunds everything');
-  ok(T.canUnlock('vanguard_siege', s6).ok === false, 'after a reset the twin still needs its parents');
+  /* ---------- 4. endings are mutually exclusive and reset refunds ---------- */
+  const pure = fresh('vanguard', 40);
+  T.unlock('vanguard_root', pure);
+  const bulwark = T.INDEX.vanguard.nodes.filter(n => n.archetype === 'bulwark').sort((a, b) => a.row - b.row);
+  for (const n of bulwark.slice(0, 8)) T.unlock(n.id, pure);
+  for (const n of T.INDEX.vanguard.nodes.filter(x => x.archetype === 'suppression').slice(0, 3)) T.unlock(n.id, pure);
+  const capId = bulwark[8].id;
+  ok(T.canUnlock(capId, pure).ok, 'a fully committed lane reaches its capstone');
+  T.unlock(capId, pure);
+  const others = T.INDEX.vanguard.nodes.filter(n => n.capstone && n.id !== capId);
+  ok(others.every(n => !T.canUnlock(n.id, pure).ok), 'every other ending is locked out');
+  ok(others.every(n => T.nodeStatus(n.id, pure) === 'blocked'), 'they paint as blocked');
+  const lockReasons = T.canUnlock(others[0].id, pure).reasons;
+  eq(lockReasons.filter(r => /Locked out by/.test(r)).length, 1, 'the lockout is reported once');
+  ok(T.pointsSpent(pure) <= T.pointsTotal(pure), 'never overspends');
+  T.reset(pure);
+  eq(T.pointsSpent(pure), 0, 'reset refunds everything');
+
+  /* a pure build can never reach a convergence */
+  const pure2 = fresh('vanguard', 40);
+  T.unlock('vanguard_root', pure2);
+  for (const n of bulwark.slice(0, 8)) T.unlock(n.id, pure2);
+  ok(T.INDEX.vanguard.nodes.filter(n => n.dual).every(n => !T.canUnlock(n.id, pure2).ok),
+     'convergences stay shut to a single-archetype build');
 
   /* ---------- 5. compilation: additive first, then multiplicative ---------- */
   const s7 = take(fresh('vanguard', 30), ['vanguard_root', 'vanguard_plate', 'vanguard_cell']);
   eq(s7.compiled.stats.damage, 1.04, 'root multiplier applies');
-  eq(s7.compiled.stats.maxHp, 20, 'additive stat sums');
-  eq(s7.compiled.stats.shield, 25, 'a second additive stat sums');
+  eq(s7.compiled.stats.maxHp, 25, 'additive stat sums');
+  eq(s7.compiled.stats.shield, 30, 'a second additive stat sums');
   eq(s7.compiled.stats.critChance, 0, 'untouched stats keep their base');
 
   const mixed = T.recomputeStats({ active: 'vanguard', chars: { vanguard: { level: 99, unlocked: ['vanguard_root', 'vanguard_counter', 'vanguard_vengeance'] } } });
-  eq(mixed.stats.damage, 1.04 * 1.06 * 1.08, 'multipliers compose');
+  eq(mixed.stats.damage, 1.04 * 1.07 * 1.09, 'multipliers compose');
 
   const flagged = take(fresh('cinder', 30), ['cinder_root', 'cinder_pilot']);
   ok(flagged.compiled.flags.has('immolate'), 'flags land in the Set');
   eq(flagged.compiled.stats.burnDamage, 2, 'the root grants burn damage');
+  const beam = take(fresh('halcyon', 30), ['halcyon_root', 'halcyon_focus1']);
+  eq(beam.compiled.stats.beamPower, 12, 'beam damage compiles for the beam class');
 
   /* ---------- 6. archetype counts and dominance ---------- */
   eq(s7.compiled.archetypeCounts.bulwark, 2, 'archetype count tracked');
+  eq(s7.compiled.archetypeCounts.retribution, 0, 'convergence-free lanes stay at zero');
   eq(s7.compiled.archetypeCounts.suppression, 0, 'other archetypes stay at zero');
   ok(s7.compiled.dominant === 'bulwark', 'dominant archetype exposed');
   const tie = take(fresh('vanguard', 30), ['vanguard_root', 'vanguard_plate', 'vanguard_spikes']);
   ok(tie.compiled.dominant === null, 'a tie has no dominant archetype');
   ok(T.createState('vanguard').compiled.dominant === null, 'an empty tree has no dominant archetype');
 
-  /* ---------- 7. capstones: reachable by commitment, exclusive to each other ---------- */
+  /* ---------- 7. every class can finish a build, pure or fused ---------- */
   for (const charId of T.CHAR_IDS) {
     const idx = T.INDEX[charId];
-    const archIds = Object.keys(idx.archetypes);
-    const s = fresh(charId, 40);
-    take(s, laneIds(charId, archIds[0], false));
-    const cap = idx.nodes.find(n => n.capstone && n.archetype === archIds[0]);
-    ok(T.has(s, cap.id), charId + ': ' + archIds[0] + ' capstone reachable by committing to that lane');
-    for (const other of archIds.slice(1)) {
-      const oc = idx.nodes.find(n => n.capstone && n.archetype === other);
-      ok(!T.canUnlock(oc.id, s).ok, charId + ': ' + other + ' capstone locked out');
-    }
-    ok(s.compiled.dominant === archIds[0], charId + ': committed build has the expected dominant archetype');
-  }
+    const archIds = idx.archList.map(a => a.id);
 
-  /* a grazer reaches no capstone */
-  const grazer = fresh('vanguard', 40);
-  take(grazer, ['vanguard_root', 'vanguard_plate', 'vanguard_spikes', 'vanguard_trigger',
-                'vanguard_cell', 'vanguard_counter', 'vanguard_belt']);
-  const anyCap = T.INDEX.vanguard.nodes.filter(n => n.capstone).some(n => T.canUnlock(n.id, grazer).ok);
-  ok(!anyCap, 'spreading across archetypes reaches no capstone');
+    // pure: all 8 of one lane, three cheap whites elsewhere for the spend gate, then the capstone
+    const s = fresh(charId, 40);
+    T.unlock(charId + '_root', s);
+    const lane = idx.nodes.filter(n => n.archetype === archIds[0]).sort((a, b) => a.row - b.row);
+    for (const n of lane.slice(0, 8)) T.unlock(n.id, s);
+    for (const n of idx.nodes.filter(x => x.archetype === archIds[2]).slice(0, 3)) T.unlock(n.id, s);
+    ok(T.canUnlock(lane[8].id, s).ok, charId + ': pure ' + archIds[0] + ' build reaches its capstone');
+    T.unlock(lane[8].id, s);
+    ok(T.pointsSpent(s) <= T.pointsTotal(s), charId + ': pure build fits in the points a run banks');
+    ok(s.compiled.dominant === archIds[0], charId + ': pure build is dominantly ' + archIds[0]);
+
+    // fused: five of two lanes plus the convergence spine
+    const f = fresh(charId, 40);
+    T.unlock(charId + '_root', f);
+    const laneA = idx.nodes.filter(n => n.archetype === archIds[0]).sort((a, b) => a.row - b.row);
+    const laneB = idx.nodes.filter(n => n.archetype === archIds[1]).sort((a, b) => a.row - b.row);
+    const spine = idx.nodes.filter(n => n.dual && n.col === 1).sort((a, b) => a.row - b.row);
+    for (let i = 0; i < 5; i++) {
+      T.unlock(laneA[i].id, f); T.unlock(laneB[i].id, f);
+      for (const c of spine) if (!c.capstone && T.canUnlock(c.id, f).ok) T.unlock(c.id, f);
+    }
+    ok(T.canUnlock(spine[3].id, f).ok, charId + ': a two-archetype build reaches the fusion ending');
+    T.unlock(spine[3].id, f);
+    ok(T.pointsSpent(f) <= T.pointsTotal(f), charId + ': fusion build fits in the points a run banks');
+    ok(idx.nodes.filter(n => n.capstone && n.id !== spine[3].id).every(n => !T.canUnlock(n.id, f).ok),
+       charId + ': the fusion locks out every other ending');
+    const cover = T.pointsSpent(f) / 86;
+    ok(cover > 0.2 && cover < 0.5, charId + ': a finished build covers roughly a third of the tree (' + Math.round(cover * 100) + '%)');
+  }
 
   /* ---------- 8. persistence ---------- */
   localStorage.removeItem(T.SAVE_KEY);
