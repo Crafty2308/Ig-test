@@ -140,7 +140,16 @@ the parent is unlocked.
 
 `shooter.html` replaced its ten per-operative trees with this one shared tree. It grants
 points from `gainXp`, opens the UI on Tab or the ★ button, and maps the compiled output
-onto the engine in one function, `applyTreeToPlayer()`. A few flags map onto the closest
+onto the engine in one function, `applyTreeToPlayer()`.
+
+The game ships as a single self-contained file, so it does not load these scripts over
+the network — `tools/inline-tree.js` copies them into `shooter.html` between marker
+comments. This folder stays the source of truth: edit here, then run
+
+    node tools/inline-tree.js
+
+to refresh the copy inside the game. (`demo.html` loads the real files, so it always
+exercises the module itself.) A few flags map onto the closest
 existing mechanic rather than a new one — `blinkProtocol` becomes a damaging dash rather
 than a true teleport, and `perpetualMotion` folds move speed into damage once at run
 start instead of per frame.
