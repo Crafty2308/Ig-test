@@ -28,7 +28,11 @@
 <body>
 <div id="tree"></div>
 <aside>
-  <h2>Simulated level</h2>
+  <h2>Character</h2>
+  <p class="hint">Each operative has its own tree, its own three archetypes and its own point pool.</p>
+  <select id="who" style="width:100%; padding:7px; border-radius:7px; background:#0a1220; color:#cfe6ff; border:1px solid rgba(64,224,255,.4)"></select>
+
+  <h2 style="margin-top:16px">Simulated level</h2>
   <p class="hint">grantPoints(level) is the only points hook. Replaying a level you already reached grants nothing.</p>
   <div>
     <button data-lvl="1">+1</button>
@@ -55,7 +59,7 @@
   function render() {
     const c = state.compiled;
     document.getElementById('lvl').textContent =
-      'Level ' + state.level + ' → ' + c.pointsTotal + ' points total';
+      AbilityTree.TREES[c.charId].name + ' level ' + c.level + ' → ' + c.pointsTotal + ' points';
 
     const base = AbilityTree.STAT_BASE;
     let rows = '';
@@ -71,9 +75,20 @@
     document.getElementById('dominant').textContent = 'dominant: ' + (c.dominant || 'none (spread too thin)');
   }
 
+  const who = document.getElementById('who');
+  who.innerHTML = AbilityTree.CHAR_IDS.map(id =>
+    '<option value="' + id + '">' + AbilityTree.TREES[id].name + '</option>').join('');
+  who.value = state.active;
+  who.addEventListener('change', () => {
+    AbilityTree.setCharacter(state, who.value);
+    AbilityTree.save(state);
+    ui.refresh(state);
+    render();
+  });
+
   for (const b of document.querySelectorAll('button[data-lvl]')) {
     b.addEventListener('click', () => {
-      AbilityTree.grantPoints(state, state.level + Number(b.dataset.lvl));
+      AbilityTree.grantPoints(state, state.compiled.level + Number(b.dataset.lvl));
       AbilityTree.save(state);
       ui.refresh(state);
       render();

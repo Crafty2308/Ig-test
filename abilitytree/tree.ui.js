@@ -32,6 +32,8 @@
 .atree-hud{display:flex; flex-wrap:wrap; align-items:center; gap:10px;
   padding:10px 14px; background:rgba(12,20,36,.96); border-bottom:1px solid rgba(120,150,190,.22); flex:0 0 auto;}
 .atree-pts{font-weight:800; font-size:17px; color:#eaf6ff; letter-spacing:.04em;}
+.atree-who{font-weight:800; font-size:15px; letter-spacing:.06em; color:#eaf6ff;}
+.atree-who small{display:block; font-size:10px; font-weight:600; letter-spacing:.14em; color:#7e9bc4; text-transform:uppercase;}
 .atree-pts small{display:block; font-size:10px; font-weight:600; letter-spacing:.14em; color:#7e9bc4; text-transform:uppercase;}
 .atree-arch{display:flex; gap:8px; flex-wrap:wrap;}
 .atree-chip{display:flex; align-items:center; gap:6px; padding:4px 10px; border-radius:20px;
@@ -114,7 +116,7 @@
   };
   const cx = n => n.col * CELL_W + CELL_W / 2;
   const cy = n => n.row * CELL_H + CELL_H / 2;
-  const archColor = a => (a && T.ARCHETYPES[a] ? T.ARCHETYPES[a].color : '#8fb2d8');
+  const archColor = (idx, a) => (a && idx.archetypes[a] ? idx.archetypes[a].color : '#8fb2d8');
 
   /* human readable effect lines, also used by the tooltip */
   const norm = s => String(s).toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -151,158 +153,171 @@
     let state = opts.state || T.load();
     const onChange = opts.onChange || function () {};
 
-    const rows = Math.max.apply(null, T.NODES.map(n => n.row)) + 1;
-    const cols = T.COLS || (Math.max.apply(null, T.NODES.map(n => n.col)) + 1);
-
     const rootEl = el('div', 'atree');
     const hud = el('div', 'atree-hud');
+    const who = el('div', 'atree-who');
     const pts = el('div', 'atree-pts');
     const chips = el('div', 'atree-arch');
     const spacer = el('div', 'atree-spacer');
     const resetBtn = el('button', 'atree-btn', 'Reset tree');
     const note = el('div', 'atree-note');
-    hud.append(pts, chips, spacer, resetBtn, note);
+    hud.append(who, pts, chips, spacer, resetBtn, note);
 
     const scroll = el('div', 'atree-scroll');
-    const grid = el('div', 'atree-grid');
-    grid.style.width = cols * CELL_W + 'px';
-    grid.style.height = rows * CELL_H + 'px';
-    const svg = document.createElementNS(SVG_NS, 'svg');
-    svg.setAttribute('class', 'atree-pipes');
-    svg.setAttribute('width', cols * CELL_W);
-    svg.setAttribute('height', rows * CELL_H);
-    grid.appendChild(svg);
-    scroll.appendChild(grid);
-
     const tip = el('div', 'atree-tip');
     const confirm = el('div', 'atree-confirm',
-      '<div class="box"><h3>Reset the ability tree?</h3>' +
+      '<div class="box"><h3>Reset this ability tree?</h3>' +
       '<p id="atree-confirm-text"></p>' +
       '<div class="row"><button class="yes">Reset</button><button class="no">Cancel</button></div></div>');
     rootEl.append(hud, scroll, tip, confirm);
     container.innerHTML = '';
     container.appendChild(rootEl);
 
-    /* --- nodes --- */
-    const tiles = {};
-    for (const n of T.NODES) {
-      const b = el('button', 'atree-node t-' + n.tier);
-      b.type = 'button';
-      b.style.left = (cx(n) - TILE_W / 2) + 'px';
-      b.style.top = (cy(n) - TILE_H / 2) + 'px';
-      b.style.width = TILE_W + 'px';
-      b.style.height = TILE_H + 'px';
-      b.innerHTML = '<span class="g">' + (TIER_GLYPH[n.tier] || '◆') + '</span>' +
-                    '<span class="n">' + n.name + '</span>' +
-                    '<span class="c">' + T.costOf(n) + ' pt' + (T.costOf(n) === 1 ? '' : 's') + '</span>';
-      if (n.archetype) {
-        const bar = el('span', 'arch');
-        bar.style.color = archColor(n.archetype);
-        b.appendChild(bar);
-      }
-      b.addEventListener('click', () => clickNode(n.id));
-      b.addEventListener('mouseenter', ev => showTip(n, ev.currentTarget));
-      b.addEventListener('focus', ev => showTip(n, ev.currentTarget));
-      b.addEventListener('mouseleave', hideTip);
-      b.addEventListener('blur', hideTip);
-      grid.appendChild(b);
-      tiles[n.id] = b;
-    }
+    /* rebuilt whenever the active character changes */
+    let idx = null, tiles = {}, segs = null, junctionDots = [], svg = null, builtFor = null;
 
-    /* --- pipes: build once, recolour on paint --- */
-    const segs = new Map();            // key -> {x1,y1,x2,y2, edges:[{parent,child}], path}
-    const joins = new Map();           // "x,y" -> count of segment endpoints
-    function addSeg(x1, y1, x2, y2, parent, child) {
-      if (x1 === x2 && y1 === y2) return;
-      const key = [x1, y1, x2, y2].map(v => Math.round(v)).join(':');
-      let s = segs.get(key);
-      if (!s) { s = { x1, y1, x2, y2, edges: [] }; segs.set(key, s); }
-      s.edges.push({ parent, child });
-      for (const p of [[x1, y1], [x2, y2]]) {
-        const k = Math.round(p[0]) + ',' + Math.round(p[1]);
-        joins.set(k, (joins.get(k) || 0) + 1);
+    function build() {
+      idx = T.activeTree(state);
+      builtFor = idx.charId;
+      tiles = {};
+      segs = new Map();
+      junctionDots = [];
+      scroll.innerHTML = '';
+
+      const rows = Math.max.apply(null, idx.nodes.map(n => n.row)) + 1;
+      const cols = T.COLS || (Math.max.apply(null, idx.nodes.map(n => n.col)) + 1);
+
+      const grid = el('div', 'atree-grid');
+      grid.style.width = cols * CELL_W + 'px';
+      grid.style.height = rows * CELL_H + 'px';
+      svg = document.createElementNS(SVG_NS, 'svg');
+      svg.setAttribute('class', 'atree-pipes');
+      svg.setAttribute('width', cols * CELL_W);
+      svg.setAttribute('height', rows * CELL_H);
+      grid.appendChild(svg);
+      scroll.appendChild(grid);
+
+      for (const n of idx.nodes) {
+        const b = el('button', 'atree-node t-' + n.tier);
+        b.type = 'button';
+        b.style.left = (cx(n) - TILE_W / 2) + 'px';
+        b.style.top = (cy(n) - TILE_H / 2) + 'px';
+        b.style.width = TILE_W + 'px';
+        b.style.height = TILE_H + 'px';
+        b.innerHTML = '<span class="g">' + (TIER_GLYPH[n.tier] || '\u25c6') + '</span>' +
+                      '<span class="n">' + n.name + '</span>' +
+                      '<span class="c">' + T.costOf(n) + ' pt' + (T.costOf(n) === 1 ? '' : 's') + '</span>';
+        if (n.archetype) {
+          const bar = el('span', 'arch');
+          bar.style.color = archColor(idx, n.archetype);
+          b.appendChild(bar);
+        }
+        b.addEventListener('click', () => clickNode(n.id));
+        b.addEventListener('mouseenter', ev => showTip(n, ev.currentTarget));
+        b.addEventListener('focus', ev => showTip(n, ev.currentTarget));
+        b.addEventListener('mouseleave', hideTip);
+        b.addEventListener('blur', hideTip);
+        grid.appendChild(b);
+        tiles[n.id] = b;
       }
-    }
-    for (const n of T.NODES) {
-      for (const pid of (n.parents || [])) {
-        const p = T.BY_ID[pid];
-        if (!p) continue;
-        const px = cx(p), py = cy(p), nx = cx(n), ny = cy(n);
-        const midY = (py + ny) / 2;
-        addSeg(px, py, px, midY, pid, n.id);     // down out of the parent
-        addSeg(px, midY, nx, midY, pid, n.id);   // across the gutter
-        addSeg(nx, midY, nx, ny, pid, n.id);     // down into the child
+
+      /* pipes: parent -> child elbows, deduplicated into shared trunks */
+      const joins = new Map();
+      function addSeg(x1, y1, x2, y2, parent, child) {
+        if (x1 === x2 && y1 === y2) return;
+        const key = [x1, y1, x2, y2].map(v => Math.round(v)).join(':');
+        let s2 = segs.get(key);
+        if (!s2) { s2 = { x1, y1, x2, y2, edges: [] }; segs.set(key, s2); }
+        s2.edges.push({ parent, child });
+        for (const p of [[x1, y1], [x2, y2]]) {
+          const k = Math.round(p[0]) + ',' + Math.round(p[1]);
+          joins.set(k, (joins.get(k) || 0) + 1);
+        }
       }
-    }
-    for (const [, s] of segs) {
-      const path = document.createElementNS(SVG_NS, 'line');
-      path.setAttribute('x1', s.x1); path.setAttribute('y1', s.y1);
-      path.setAttribute('x2', s.x2); path.setAttribute('y2', s.y2);
-      path.setAttribute('stroke-width', 4);
-      path.setAttribute('stroke-linecap', 'round');
-      svg.appendChild(path);
-      s.path = path;
-    }
-    // a dot wherever three or more pipe ends meet, so joins read as joins
-    const junctionDots = [];
-    for (const [k, count] of joins) {
-      if (count < 3) continue;
-      const [jx, jy] = k.split(',').map(Number);
-      if (T.NODES.some(n => Math.round(cx(n)) === jx && Math.round(cy(n)) === jy)) continue;
-      const dot = document.createElementNS(SVG_NS, 'circle');
-      dot.setAttribute('cx', jx); dot.setAttribute('cy', jy); dot.setAttribute('r', 4.5);
-      svg.appendChild(dot);
-      junctionDots.push({ el: dot, x: jx, y: jy });
+      for (const n of idx.nodes) {
+        for (const pid of (n.parents || [])) {
+          const p = idx.byId[pid];
+          if (!p) continue;
+          const px = cx(p), py = cy(p), nx = cx(n), ny = cy(n);
+          const midY = (py + ny) / 2;
+          addSeg(px, py, px, midY, pid, n.id);     // down out of the parent
+          addSeg(px, midY, nx, midY, pid, n.id);   // across the gutter
+          addSeg(nx, midY, nx, ny, pid, n.id);     // down into the child
+        }
+      }
+      for (const [, s2] of segs) {
+        const line = document.createElementNS(SVG_NS, 'line');
+        line.setAttribute('x1', s2.x1); line.setAttribute('y1', s2.y1);
+        line.setAttribute('x2', s2.x2); line.setAttribute('y2', s2.y2);
+        line.setAttribute('stroke-width', 4);
+        line.setAttribute('stroke-linecap', 'round');
+        svg.appendChild(line);
+        s2.path = line;
+      }
+      for (const [k, count] of joins) {
+        if (count < 3) continue;
+        const parts = k.split(',').map(Number);
+        const jx = parts[0], jy = parts[1];
+        if (idx.nodes.some(n => Math.round(cx(n)) === jx && Math.round(cy(n)) === jy)) continue;
+        const dot = document.createElementNS(SVG_NS, 'circle');
+        dot.setAttribute('cx', jx); dot.setAttribute('cy', jy); dot.setAttribute('r', 4.5);
+        svg.appendChild(dot);
+        junctionDots.push({ el: dot, x: jx, y: jy });
+      }
     }
 
     /* --- painting --- */
     const PIPE = { off: 'rgba(120,150,190,.20)', live: 'rgba(64,224,255,.55)', on: '#9dff5c' };
     function paint() {
       const c = state.compiled;
+      const t = T.TREES[idx.charId];
+
+      who.innerHTML = (t.name || idx.charId.toUpperCase()) + '<small>ability tree</small>';
       pts.innerHTML = c.pointsLeft + ' <small>points left &middot; ' + c.pointsSpent + ' spent</small>';
 
       chips.innerHTML = '';
-      for (const key in T.ARCHETYPES) {
-        const a = T.ARCHETYPES[key];
-        const chip = el('div', 'atree-chip' + (c.dominant === key ? ' dom' : ''));
+      for (const a of idx.archList) {
+        const chip = el('div', 'atree-chip' + (c.dominant === a.id ? ' dom' : ''));
         chip.style.color = a.color;
-        chip.innerHTML = '<span class="atree-dot"></span><span style="color:#a8c6e8">' + a.name + '</span> <b>' + c.archetypeCounts[key] + '</b>';
+        chip.title = a.blurb;
+        chip.innerHTML = '<span class="atree-dot"></span><span style="color:#a8c6e8">' + a.name + '</span> <b>' +
+                         (c.archetypeCounts[a.id] || 0) + '</b>';
         chips.appendChild(chip);
       }
 
-      for (const n of T.NODES) {
+      for (const n of idx.nodes) {
         const st = T.nodeStatus(n.id, state);
         const b = tiles[n.id];
         b.className = 'atree-node t-' + n.tier + ' s-' + st;
         b.setAttribute('aria-pressed', st === 'unlocked' ? 'true' : 'false');
-        b.disabled = false;   // still focusable so the tooltip can explain why not
       }
 
-      for (const [, s] of segs) {
+      for (const [, s2] of segs) {
         let best = 'off';
-        for (const e of s.edges) {
+        for (const e of s2.edges) {
           const pOn = T.has(state, e.parent), cOn = T.has(state, e.child);
           if (pOn && cOn) { best = 'on'; break; }
           if (pOn) best = 'live';
         }
-        s.path.setAttribute('stroke', PIPE[best]);
-        s.state = best;
+        s2.path.setAttribute('stroke', PIPE[best]);
+        s2.state = best;
       }
       for (const d of junctionDots) {
         let best = 'off';
-        for (const [, s] of segs) {
-          if (Math.round(s.x1) === d.x && Math.round(s.y1) === d.y || Math.round(s.x2) === d.x && Math.round(s.y2) === d.y) {
-            if (s.state === 'on') { best = 'on'; break; }
-            if (s.state === 'live') best = 'live';
-          }
+        for (const [, s2] of segs) {
+          const touches = (Math.round(s2.x1) === d.x && Math.round(s2.y1) === d.y) ||
+                          (Math.round(s2.x2) === d.x && Math.round(s2.y2) === d.y);
+          if (!touches) continue;
+          if (s2.state === 'on') { best = 'on'; break; }
+          if (s2.state === 'live') best = 'live';
         }
         d.el.setAttribute('fill', PIPE[best]);
       }
 
       note.textContent = state.refunded && state.refunded.length
-        ? 'Your saved build referenced ' + state.refunded.length + ' ability that no longer exists — every point was refunded.'
+        ? 'A saved build referenced ' + state.refunded.length + ' ability that no longer exists \u2014 those points were refunded.'
         : '';
-      if (tipNode) showTip(tipNode, tiles[tipNode.id]);   // keep an open tooltip truthful
+      if (tipNode && tiles[tipNode.id]) showTip(tipNode, tiles[tipNode.id]);
     }
 
     /* --- tooltip --- */
@@ -311,7 +326,7 @@
       tipNode = n;
       const unlocked = T.has(state, n.id);
       const check = T.canUnlock(n.id, state);
-      const a = n.archetype ? T.ARCHETYPES[n.archetype] : null;
+      const a = n.archetype ? idx.archetypes[n.archetype] : null;
       const tierLabel = T.TIER_LABEL[n.tier] || n.tier;
 
       let html = '<h4>' + n.name + '</h4>';
@@ -321,7 +336,7 @@
       html += '<div class="desc">' + n.desc + '</div>';
       for (const e of effectLines(n)) html += '<div class="eff' + (e.neg ? ' neg' : '') + '">' + e.text + '</div>';
       if (n.blocks && n.blocks.length) {
-        html += '<div class="eff neg">Locks out: ' + n.blocks.map(b => (T.BY_ID[b] ? T.BY_ID[b].name : b)).join(', ') + '</div>';
+        html += '<div class="eff neg">Locks out: ' + n.blocks.map(b => (idx.byId[b] ? idx.byId[b].name : b)).join(', ') + '</div>';
       }
       if (unlocked) html += '<div class="got">Unlocked</div>';
       else if (!check.ok) html += '<div class="why"><b>Requires</b>' + check.reasons.map(r => '<div>' + r + '</div>').join('') + '</div>';
@@ -343,13 +358,13 @@
 
     /* --- interaction --- */
     function clickNode(id) {
-      const res = T.unlock(id, state);          // re-checks the same canUnlock the UI painted with
+      const res = T.unlock(id, state);      // re-checks the same canUnlock the UI painted with
       if (res.ok) {
         paint();
         onChange(state);
       } else {
         const b = tiles[id];
-        showTip(T.BY_ID[id], b);
+        showTip(idx.byId[id], b);
         b.animate(
           [{ transform: 'translateX(0)' }, { transform: 'translateX(-4px)' }, { transform: 'translateX(4px)' }, { transform: 'translateX(0)' }],
           { duration: 180 }
@@ -359,7 +374,8 @@
 
     resetBtn.addEventListener('click', () => {
       confirm.querySelector('#atree-confirm-text').textContent =
-        'Every unlocked ability is cleared and all ' + state.compiled.pointsSpent + ' spent points come back. This cannot be undone.';
+        'Every ability in this character\u2019s tree is cleared and all ' + state.compiled.pointsSpent +
+        ' spent points come back. Other characters are untouched.';
       confirm.classList.add('show');
     });
     confirm.querySelector('.no').addEventListener('click', () => confirm.classList.remove('show'));
@@ -371,11 +387,16 @@
       onChange(state);
     });
 
+    build();
     paint();
 
     return {
       el: rootEl,
-      refresh(next) { if (next) state = next; paint(); },
+      refresh(next) {
+        if (next) state = next;
+        if (state.active !== builtFor) build();     // the player switched character
+        paint();
+      },
       getState() { return state; },
       destroy() { hideTip(); container.innerHTML = ''; }
     };

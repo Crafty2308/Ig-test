@@ -1,13 +1,15 @@
 # Ability Tree
 
-A Wynncraft-style ability tree as a drop-in module. No dependencies, no build step.
+A Wynncraft-style ability tree as a drop-in module — **one tree per character**, each
+with its own three archetypes, its own nodes and its own point pool. No dependencies,
+no build step.
 
 | file | role |
 |---|---|
-| `tree.data.js` | the tree itself: 39 nodes, three archetypes, plain data |
+| `tree.data.js` | the trees: 10 characters x 34 nodes, three archetypes each, plain data |
 | `tree.logic.js` | rules, compilation, persistence. Pure — no DOM, no game code |
 | `tree.ui.js` | rendering, tooltips, reset confirmation. Injects its own CSS |
-| `tree.test.js` | 219 console assertions. `node tree.test.js`, or load it last in a page |
+| `tree.test.js` | 4156 console assertions. `node tree.test.js`, or load it last in a page |
 | `demo.html` | standalone harness: simulate levels, watch the compiled stats update |
 
 The files are classic scripts with a UMD-ish wrapper, so they load straight off
@@ -26,8 +28,11 @@ data → logic → ui.
 // once, at boot
 const treeState = AbilityTree.load();          // never throws; unknown ids refund and reset
 
-// when the player levels — the only points hook
-AbilityTree.grantPoints(treeState, player.level);
+// whose tree are we looking at / playing
+AbilityTree.setCharacter(treeState, 'nyx');
+
+// when the player levels — the only points hook. Points bank per character.
+AbilityTree.grantPoints(treeState, player.level, player.charId);
 AbilityTree.save(treeState);
 
 // when you want the screen
@@ -38,7 +43,8 @@ AbilityTreeUI.mount(document.getElementById('treeMount'), {
 
 // the game reads the compiled object and nothing else
 function applyTree(p) {
-  const { stats, flags, dominant, archetypeCounts, pointsLeft } = treeState.compiled;
+  const { stats, flags, dominant, archetypeCounts, pointsLeft } =
+    AbilityTree.recomputeStats(treeState, p.charId);   // or treeState.compiled for the active one
   p.damageMul  *= stats.damage;                // multipliers arrive pre-multiplied
   p.fireRateMul*= stats.fireRate;
   p.maxHp      += stats.maxHp;                 // flat stats arrive pre-summed
@@ -50,8 +56,8 @@ function applyTree(p) {
 `treeState.compiled` is rebuilt on unlock, reset and load — never per frame. It holds:
 
 ```js
-{ stats: {...}, flags: Set, archetypeCounts: {onslaught, dominion, kinesis},
-  dominant: 'onslaught' | null, pointsTotal, pointsSpent, pointsLeft, level }
+{ charId, stats: {...}, flags: Set, archetypeCounts: {...that character's three...},
+  dominant: '<archetype>' | null, pointsTotal, pointsSpent, pointsLeft, level }
 ```
 
 ## Rules
@@ -76,15 +82,27 @@ Blocks are permanent until `reset(state)`, which refunds everything.
 
 ## Archetypes
 
-| | identity |
-|---|---|
-| **Onslaught** | aggression — damage, crits, executions |
-| **Dominion** | control — slows, chains, fields |
-| **Kinesis** | mobility — dash, speed, ricochets |
+Each character has three of its own, fitted to how it plays:
 
-Gating is what forces commitment: the three capstones each need 8 nodes of their own
-archetype plus 20 points spent, and each blocks the other two. Spreading evenly across
-the tree reaches no capstone at all.
+| character | archetypes |
+|---|---|
+| ROOK | Bulwark · Retribution · Suppression |
+| CINDER | Wildfire · Immolation · Backdraft |
+| HALCYON | Permafrost · Shatter · Whiteout |
+| ARC | Conduction · Overload · Capacitor |
+| VEX | Precision · Penetration · Execution |
+| NYX | Momentum · Bladestorm · Phase |
+| COG | Fabrication · Support · Ordnance |
+| BOOM | Payload · Submunitions · Shockwave |
+| MOURN | Hunger · Wrath · Harvest |
+| IRIS | Refraction · Seeker · Spectrum |
+
+Every tree has the same shape, so archetypes stay comparable: 34 nodes, 19 white,
+6 yellow, 9 red — exactly 3 reds per archetype, one of which is that archetype's
+capstone. Each lane carries a mutually exclusive red pair at row 5, and the three
+capstones block each other, so a tree can end in exactly one of them. Gating is what
+forces commitment: a capstone needs 8 nodes of its own archetype plus 12 points spent,
+which a lane only reaches by being taken almost whole. Spreading evenly reaches none.
 
 ## Schema
 
@@ -114,15 +132,17 @@ Compilation is additive first, then multiplicative, per stat:
 One key, `neon.abilityTree`:
 
 ```json
-{ "v": 1, "level": 12, "unlocked": ["core", "ons_1"] }
+{ "v": 2, "active": "nyx",
+  "chars": { "nyx": { "level": 12, "unlocked": ["nyx_root", "nyx_light"] }, "...": {} } }
 ```
 
-Points are derived from `level`, so a refund is automatic. `load()` never throws:
+Points are derived from each character's own `level`, so a refund is automatic. `load()` never throws:
 corrupt JSON, a `null` payload or blocked storage all return a fresh tree, an unknown
 node id wipes the build and hands every point back (reported in `state.refunded`, which
 the UI surfaces as a note), and a save that no longer satisfies the rules is trimmed
-rather than trusted. `MIGRATIONS` maps a save version to the next; a v0 payload (no `v`
-field) is upgraded rather than discarded.
+rather than trusted. `MIGRATIONS` maps a save version to the next; a v0 payload (no `v` field) and a v1
+payload (the earlier single shared tree) are both upgraded rather than discarded — a v1
+build cannot exist in the per-character trees, so it is refunded while the level is kept.
 
 ## Rendering
 
@@ -138,9 +158,11 @@ the parent is unlocked.
 
 ## In Neon Overrun
 
-`shooter.html` replaced its ten per-operative trees with this one shared tree. It grants
-points from `gainXp`, opens the UI on Tab or the ★ button, and maps the compiled output
-onto the engine in one function, `applyTreeToPlayer()`.
+`shooter.html` gives each of its ten operatives that operative's own tree. It grants
+points from `gainXp` against the operative being played, opens the UI on Tab or the ★
+button (the menu button opens the selected operative's tree), and maps the compiled
+output onto the engine in one function, `applyTreeToPlayer()`, with a `TREE_FLAGS` table
+that warns at boot if any flag is unmapped.
 
 The game ships as a single self-contained file, so it does not load these scripts over
 the network — `tools/inline-tree.js` copies them into `shooter.html` between marker

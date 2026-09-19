@@ -213,12 +213,13 @@ h2{margin:0 0 14px; font-size:clamp(20px,4.5vw,30px); letter-spacing:.08em; colo
 <script>/* abilitytree/tree.data.js */
 /* ============================================================
    ability tree - DATA
-   Pure data. No logic, no DOM. Safe to edit by hand.
+   One tree per operative. Each tree has its own three archetypes,
+   its own nodes, and its own capstones.
 
    node = {
      id, name, desc,
      tier:      'white' | 'yellow' | 'red'   -> drives cost, colour, tooltip framing
-     archetype: 'onslaught' | 'dominion' | 'kinesis' | null  (null = neutral, white only)
+     archetype: id of one of that tree's archetypes, or null (neutral, white only)
      col, row:  fixed column grid, rows unbounded
      parents:   [id]   - at least one must be unlocked (root = [])
      blocks:    [id]   - taking this permanently locks those, until reset
@@ -226,6 +227,10 @@ h2{margin:0 0 14px; font-size:clamp(20px,4.5vw,30px); letter-spacing:.08em; colo
      effect:    {stat, op:'add'|'mult', value} | {flag:'name'}
      effects:   [ ...same... ]   - optional list when one node does two things
    }
+
+   The w()/y()/r() and lane() helpers below only fill in the mechanical parts
+   (ids, grid position, parent chaining, tier gates). Every node's identity,
+   text and effects are written out by hand.
    ============================================================ */
 (function (root, factory) {
   const api = factory();
@@ -234,218 +239,606 @@ h2{margin:0 0 14px; font-size:clamp(20px,4.5vw,30px); letter-spacing:.08em; colo
 })(typeof globalThis !== 'undefined' ? globalThis : this, function () {
   'use strict';
 
-  /* cost is a function of tier - never stored per node */
   const TIER_COST = { white: 1, yellow: 2, red: 4 };
+  const TIER_LABEL = { white: 'Minor', yellow: 'Modifier', red: 'Build-defining' };
+  const COLS = 9;
 
-  const TIER_LABEL = {
-    white:  'Minor',
-    yellow: 'Modifier',
-    red:    'Build-defining'
-  };
+  /* effect constructors */
+  const add = (stat, value) => ({ stat, op: 'add', value });
+  const mult = (stat, value) => ({ stat, op: 'mult', value });
+  const flag = name => ({ flag: name });
 
-  const ARCHETYPES = {
-    onslaught: { id: 'onslaught', name: 'Onslaught', color: '#ff5c6e', blurb: 'Aggression. Kill it before it reaches you.' },
-    dominion:  { id: 'dominion',  name: 'Dominion',  color: '#6ec6ff', blurb: 'Control. Nothing moves at its own pace.' },
-    kinesis:   { id: 'kinesis',   name: 'Kinesis',   color: '#9dff5c', blurb: 'Mobility. Never be where the bullet is.' }
-  };
+  /* tier constructors - key, name, desc, then any number of effects */
+  const mk = tier => (key, name, desc, ...effects) => ({ key, name, desc, tier, effects });
+  const w = mk('white'), y = mk('yellow'), r = mk('red');
+
+  /* Every lane has the same shape, so archetypes stay comparable:
+       row1            entry           white
+       row2  left + right              white white
+       row3            gate            yellow  (needs 2 of this archetype)
+       row4  left + right              white white
+       row5  left + right              red red - mutually exclusive pair
+       row6            join            white   (either red leads here)
+       row7            modifier        yellow  (needs 6)
+       row8            capstone        red     (needs 8, blocks the other capstones)  */
+  function lane(charId, archId, col, defs) {
+    if (defs.length !== 11) throw new Error(charId + '/' + archId + ' needs 11 nodes, got ' + defs.length);
+    const [entry, l2, r2, gate, l4, r4, redL, redR, join, mod, cap] = defs;
+    const id = n => charId + '_' + n.key;
+    const L = col - 1, C = col, R = col + 1;
+
+    const node = (n, c, row, parents, extra) => Object.assign({
+      id: id(n), name: n.name, desc: n.desc, tier: n.tier, archetype: archId,
+      col: c, row: row, parents: parents,
+      effects: n.effects.length > 1 ? n.effects : undefined,
+      effect: n.effects.length === 1 ? n.effects[0] : undefined
+    }, extra || {});
+
+    const arch2 = { archetypeMin: { name: archId, count: 2 } };
+    const arch4 = { archetypeMin: { name: archId, count: 4 } };
+    const arch6 = { archetypeMin: { name: archId, count: 6 } };
+    const arch8 = { archetypeMin: { name: archId, count: 8 }, pointsSpentMin: 12 };
+
+    return [
+      node(entry, C, 1, [charId + '_root']),
+      node(l2, L, 2, [id(entry)]),
+      node(r2, R, 2, [id(entry)]),
+      node(gate, C, 3, [id(l2), id(r2)], { reqs: arch2 }),
+      node(l4, L, 4, [id(gate)]),
+      node(r4, R, 4, [id(gate)]),
+      node(redL, L, 5, [id(l4), id(gate)], { reqs: arch4, blocks: [id(redR)] }),
+      node(redR, R, 5, [id(r4), id(gate)], { reqs: arch4, blocks: [id(redL)] }),
+      node(join, C, 6, [id(redL), id(redR)]),
+      node(mod, C, 7, [id(join)], { reqs: arch6 }),
+      node(cap, C, 8, [id(mod)], { reqs: arch8, capstone: true })
+    ];
+  }
+
+  /* assembles a character's tree and wires the capstones to block each other */
+  function tree(charId, rootName, rootDesc, rootEffect, archetypes, lanes) {
+    const nodes = [{
+      id: charId + '_root', name: rootName, desc: rootDesc, tier: 'white',
+      archetype: null, col: 4, row: 0, parents: [], effect: rootEffect
+    }];
+    for (const l of lanes) nodes.push.apply(nodes, l);
+    const caps = nodes.filter(n => n.capstone);
+    for (const c of caps) c.blocks = caps.filter(o => o !== c).map(o => o.id);
+    return { charId, archetypes, nodes };
+  }
+
+  const arch = (id, name, color, blurb) => ({ id, name, color, blurb });
 
   /* base values the compiler starts from.
      'add' effects are summed onto the base, then 'mult' effects multiply. */
   const STAT_BASE = {
-    damage: 1,          // multiplier
-    fireRate: 1,        // multiplier
-    moveSpeed: 1,       // multiplier
-    dashCooldown: 1,    // multiplier (lower is better)
-    maxHp: 0,           // flat
-    armor: 0,           // flat 0..1
-    pierce: 0,          // flat
-    projectiles: 0,     // flat, extra shots per trigger pull
-    critChance: 0,      // flat 0..1
-    critDamage: 0,      // flat, added to the crit multiplier
-    slowPower: 0,       // flat 0..1
-    statusDuration: 1,  // multiplier
-    auraRadius: 1,      // multiplier
-    chainCount: 0,      // flat
-    dashCharges: 0      // flat
+    // multipliers
+    damage: 1, fireRate: 1, moveSpeed: 1, dashCooldown: 1, statusDuration: 1,
+    auraRadius: 1, explosionSize: 1, explosionDamage: 1, droneRate: 1, chainDamage: 1,
+    // flat
+    maxHp: 0, armor: 0, pierce: 0, projectiles: 0, critChance: 0, critDamage: 0,
+    slowPower: 0, chainCount: 0, dashCharges: 0, shield: 0, thorns: 0, lifesteal: 0,
+    regen: 0, magnet: 0, burnDamage: 0, burnDuration: 0, orbitCount: 0, orbitDamage: 0,
+    droneCount: 0, dashDamage: 0, execute: 0, berserk: 0, scoreBonus: 0, dropBonus: 0,
+    bounces: 0, homingStrength: 0, clusterCount: 0, shieldRecharge: 0, frostbiteDamage: 0,
+    killChainCount: 0, onKillBlast: 0, droneRepair: 0, killHealAmount: 0, soulHeal: 0
   };
 
-  const NODES = [
-    /* ---------------- row 0: root ---------------- */
-    { id: 'core', name: 'Combat Uplink', desc: 'Boot the frame. Everything downstream hangs off this.',
-      tier: 'white', archetype: null, col: 4, row: 0, parents: [],
-      effect: { stat: 'damage', op: 'mult', value: 1.04 } },
-
-    /* ---------------- row 1: the three lanes split ---------------- */
-    { id: 'ons_1', name: 'Hair Trigger', desc: 'Lighter sear. The gun answers sooner.',
-      tier: 'white', archetype: 'onslaught', col: 1, row: 1, parents: ['core'],
-      effect: { stat: 'fireRate', op: 'mult', value: 1.06 } },
-    { id: 'dom_1', name: 'Cryo Coating', desc: 'Rounds carry a freezing film.',
-      tier: 'white', archetype: 'dominion', col: 4, row: 1, parents: ['core'],
-      effect: { stat: 'slowPower', op: 'add', value: 0.12 } },
-    { id: 'kin_1', name: 'Light Frame', desc: 'Strip the plating you were never going to use.',
-      tier: 'white', archetype: 'kinesis', col: 7, row: 1, parents: ['core'],
-      effect: { stat: 'moveSpeed', op: 'mult', value: 1.05 } },
-
-    /* ---------------- row 2 ---------------- */
-    { id: 'ons_2', name: 'Heavy Rounds', desc: 'More mass per round.',
-      tier: 'white', archetype: 'onslaught', col: 0, row: 2, parents: ['ons_1'],
-      effect: { stat: 'damage', op: 'mult', value: 1.08 } },
-    { id: 'ons_3', name: 'Match Grade', desc: 'Tighter tolerances find the weak points.',
-      tier: 'white', archetype: 'onslaught', col: 2, row: 2, parents: ['ons_1'],
-      effect: { stat: 'critChance', op: 'add', value: 0.04 } },
-    { id: 'dom_2', name: 'Lingering Frost', desc: 'The chill outstays the impact.',
-      tier: 'white', archetype: 'dominion', col: 3, row: 2, parents: ['dom_1'],
-      effect: { stat: 'statusDuration', op: 'mult', value: 1.20 } },
-    { id: 'dom_3', name: 'Broadcast Array', desc: 'Wider emitters, wider reach.',
-      tier: 'white', archetype: 'dominion', col: 5, row: 2, parents: ['dom_1'],
-      effect: { stat: 'auraRadius', op: 'mult', value: 1.15 } },
-    { id: 'kin_2', name: 'Kinetic Boots', desc: 'Recoil from the last dash charges the next.',
-      tier: 'white', archetype: 'kinesis', col: 6, row: 2, parents: ['kin_1'],
-      effect: { stat: 'dashCooldown', op: 'mult', value: 0.90 } },
-    { id: 'kin_3', name: 'Evasion Plating', desc: 'Angled panels, less drag.',
-      tier: 'white', archetype: 'kinesis', col: 8, row: 2, parents: ['kin_1'],
-      effect: { stat: 'moveSpeed', op: 'mult', value: 1.05 } },
-
-    /* ---------------- row 3: first yellows, first archetype gates ---------------- */
-    { id: 'ons_y1', name: 'Overpressure', desc: 'Overcharged loads. Hits far harder, cycles slower.',
-      tier: 'yellow', archetype: 'onslaught', col: 1, row: 3, parents: ['ons_2', 'ons_3'],
-      reqs: { archetypeMin: { name: 'onslaught', count: 2 } },
-      effects: [ { stat: 'damage', op: 'mult', value: 1.20 }, { stat: 'fireRate', op: 'mult', value: 0.92 } ] },
-    { id: 'dom_y1', name: 'Static Web', desc: 'Impacts arc to a second target.',
-      tier: 'yellow', archetype: 'dominion', col: 4, row: 3, parents: ['dom_2', 'dom_3'],
-      reqs: { archetypeMin: { name: 'dominion', count: 2 } },
-      effects: [ { stat: 'chainCount', op: 'add', value: 1 }, { flag: 'staticWeb' } ] },
-    { id: 'kin_y1', name: 'Phase Dash', desc: 'The dash phases you out: a second charge, and you cannot be touched mid-blink.',
-      tier: 'yellow', archetype: 'kinesis', col: 7, row: 3, parents: ['kin_2', 'kin_3'],
-      reqs: { archetypeMin: { name: 'kinesis', count: 2 } },
-      effects: [ { stat: 'dashCharges', op: 'add', value: 1 }, { flag: 'phaseDash' } ] },
-
-    /* ---------------- row 4 ---------------- */
-    { id: 'ons_4', name: 'Barrel Extension', desc: 'Longer barrel, more of the charge spent on the target.',
-      tier: 'white', archetype: 'onslaught', col: 0, row: 4, parents: ['ons_y1'],
-      effect: { stat: 'damage', op: 'mult', value: 1.07 } },
-    { id: 'ons_5', name: 'Rapid Cycle', desc: 'Shorter reset between shots.',
-      tier: 'white', archetype: 'onslaught', col: 2, row: 4, parents: ['ons_y1'],
-      effect: { stat: 'fireRate', op: 'mult', value: 1.07 } },
-    { id: 'dom_4', name: 'Deep Chill', desc: 'Colder rounds bite deeper.',
-      tier: 'white', archetype: 'dominion', col: 3, row: 4, parents: ['dom_y1'],
-      effect: { stat: 'slowPower', op: 'add', value: 0.14 } },
-    { id: 'dom_5', name: 'Capacitor Bank', desc: 'Hold more charge, project it further.',
-      tier: 'white', archetype: 'dominion', col: 5, row: 4, parents: ['dom_y1'],
-      effect: { stat: 'auraRadius', op: 'mult', value: 1.12 } },
-    { id: 'kin_4', name: 'Momentum Cells', desc: 'Speed feeds speed.',
-      tier: 'white', archetype: 'kinesis', col: 6, row: 4, parents: ['kin_y1'],
-      effect: { stat: 'moveSpeed', op: 'mult', value: 1.06 } },
-    { id: 'kin_5', name: 'Slipstream', desc: 'The frame recovers from a blink faster.',
-      tier: 'white', archetype: 'kinesis', col: 8, row: 4, parents: ['kin_y1'],
-      effect: { stat: 'dashCooldown', op: 'mult', value: 0.90 } },
-
-    /* ---------------- row 5: first reds ---------------- */
-    { id: 'ons_r1', name: 'Twin-Linked Barrels', desc: 'Your weapon fires an extra projectile on every trigger pull, and every round hits softer for it. A volume build.',
-      tier: 'red', archetype: 'onslaught', col: 0, row: 5, parents: ['ons_4', 'ons_5'],
-      blocks: ['ons_r2'],
-      reqs: { archetypeMin: { name: 'onslaught', count: 4 }, pointsSpentMin: 8 },
-      effects: [ { stat: 'projectiles', op: 'add', value: 1 }, { stat: 'damage', op: 'mult', value: 0.78 }, { flag: 'twinLinked' } ] },
-    { id: 'ons_r2', name: 'Charged Chamber', desc: 'The weapon winds up instead of spraying: far slower, brutal per shot, and rounds punch through. A precision build.',
-      tier: 'red', archetype: 'onslaught', col: 2, row: 5, parents: ['ons_4', 'ons_5'],
-      blocks: ['ons_r1'],
-      reqs: { archetypeMin: { name: 'onslaught', count: 4 }, pointsSpentMin: 8 },
-      effects: [ { stat: 'fireRate', op: 'mult', value: 0.55 }, { stat: 'damage', op: 'mult', value: 2.6 }, { stat: 'pierce', op: 'add', value: 2 }, { flag: 'chargedChamber' } ] },
-    { id: 'dom_r1', name: 'Gravity Well', desc: 'Every explosion collapses into a well that drags and slows whatever survives it.',
-      tier: 'red', archetype: 'dominion', col: 4, row: 5, parents: ['dom_4', 'dom_5'],
-      reqs: { archetypeMin: { name: 'dominion', count: 4 }, pointsSpentMin: 8 },
-      effects: [ { flag: 'gravityWell' }, { stat: 'slowPower', op: 'add', value: 0.10 } ] },
-    { id: 'kin_r1', name: 'Blink Protocol', desc: 'The dash stops being movement. You cross the gap instantly and everything on the line takes the trip badly.',
-      tier: 'red', archetype: 'kinesis', col: 7, row: 5, parents: ['kin_4', 'kin_5'],
-      reqs: { archetypeMin: { name: 'kinesis', count: 4 }, pointsSpentMin: 8 },
-      effects: [ { flag: 'blinkProtocol' }, { stat: 'dashCooldown', op: 'mult', value: 0.85 } ] },
-
-    /* ---------------- row 6: neutral hub, reachable from any lane ---------------- */
-    { id: 'hub', name: 'Power Core', desc: 'Whatever you became, it needs more power to run.',
-      tier: 'white', archetype: null, col: 4, row: 6, parents: ['ons_r1', 'ons_r2', 'dom_r1', 'kin_r1'],
-      effects: [ { stat: 'maxHp', op: 'add', value: 25 }, { stat: 'armor', op: 'add', value: 0.04 } ] },
-
-    /* ---------------- row 7: second yellows ---------------- */
-    { id: 'ons_y2', name: 'Executioner', desc: 'Anything under 12% health simply stops.',
-      tier: 'yellow', archetype: 'onslaught', col: 1, row: 7, parents: ['hub'],
-      reqs: { archetypeMin: { name: 'onslaught', count: 5 } },
-      effect: { flag: 'executioner' } },
-    { id: 'dom_y2', name: 'Cryo Nova', desc: 'Dashing detonates a freezing nova around you.',
-      tier: 'yellow', archetype: 'dominion', col: 4, row: 7, parents: ['hub'],
-      reqs: { archetypeMin: { name: 'dominion', count: 5 } },
-      effect: { flag: 'cryoNova' } },
-    { id: 'kin_y2', name: 'Bladestorm', desc: 'Two blades ride your orbit and cut what closes in.',
-      tier: 'yellow', archetype: 'kinesis', col: 7, row: 7, parents: ['hub'],
-      reqs: { archetypeMin: { name: 'kinesis', count: 5 } },
-      effect: { flag: 'bladestorm' } },
-
-    /* ---------------- row 8 ---------------- */
-    { id: 'ons_6', name: 'Hollow Points', desc: 'Critical hits open a wider wound.',
-      tier: 'white', archetype: 'onslaught', col: 1, row: 8, parents: ['ons_y2'],
-      effect: { stat: 'critDamage', op: 'add', value: 0.35 } },
-    { id: 'dom_6', name: 'Subzero', desc: 'The field runs colder still.',
-      tier: 'white', archetype: 'dominion', col: 4, row: 8, parents: ['dom_y2'],
-      effect: { stat: 'slowPower', op: 'add', value: 0.14 } },
-    { id: 'kin_6', name: 'Featherweight', desc: 'Nothing left to cut but weight.',
-      tier: 'white', archetype: 'kinesis', col: 7, row: 8, parents: ['kin_y2'],
-      effect: { stat: 'moveSpeed', op: 'mult', value: 1.06 } },
-
-    /* ---------------- row 9: late reds / late yellow ---------------- */
-    { id: 'ons_y3', name: 'Frenzy', desc: 'Every kill spins the weapon up for two seconds.',
-      tier: 'yellow', archetype: 'onslaught', col: 1, row: 9, parents: ['ons_6'],
-      reqs: { archetypeMin: { name: 'onslaught', count: 7 } },
-      effect: { flag: 'frenzy' } },
-    { id: 'dom_r2', name: 'Stasis Lock', desc: 'A slowed enemy under 20% health does not die. It shatters, and the shards chill its neighbours.',
-      tier: 'red', archetype: 'dominion', col: 4, row: 9, parents: ['dom_6'],
-      reqs: { archetypeMin: { name: 'dominion', count: 7 }, pointsSpentMin: 16 },
-      effect: { flag: 'stasisLock' } },
-    { id: 'kin_r2', name: 'Ricochet Rounds', desc: 'Shots stop dying on walls. They come off the geometry twice and keep hunting.',
-      tier: 'red', archetype: 'kinesis', col: 7, row: 9, parents: ['kin_6'],
-      reqs: { archetypeMin: { name: 'kinesis', count: 7 }, pointsSpentMin: 16 },
-      effect: { flag: 'ricochet' } },
-
-    /* ---------------- row 10: third yellows ---------------- */
-    { id: 'ons_y4', name: 'Hammer Blow', desc: 'Shots that land on a full-health target hit harder.',
-      tier: 'yellow', archetype: 'onslaught', col: 1, row: 10, parents: ['ons_y3'],
-      reqs: { archetypeMin: { name: 'onslaught', count: 8 } },
-      effect: { stat: 'damage', op: 'mult', value: 1.15 } },
-    { id: 'dom_y3', name: 'Conductor', desc: 'Every arc leaves its target chilled.',
-      tier: 'yellow', archetype: 'dominion', col: 4, row: 10, parents: ['dom_r2'],
-      reqs: { archetypeMin: { name: 'dominion', count: 8 } },
-      effects: [ { flag: 'conductor' }, { stat: 'chainCount', op: 'add', value: 1 } ] },
-    { id: 'kin_y3', name: 'Afterimage', desc: 'Your blink leaves something behind that still hurts.',
-      tier: 'yellow', archetype: 'kinesis', col: 7, row: 10, parents: ['kin_r2'],
-      reqs: { archetypeMin: { name: 'kinesis', count: 8 } },
-      effect: { flag: 'afterimage' } },
-
-    /* ---------------- row 11: capstones, mutually exclusive ---------------- */
-    { id: 'cap_ons', name: 'ANNIHILATION', desc: 'Nothing survives contact. Enormous damage, crits tear through every body in the line, and the armour you stripped is not coming back.',
-      tier: 'red', archetype: 'onslaught', col: 1, row: 11, parents: ['ons_y4'],
-      blocks: ['cap_dom', 'cap_kin'],
-      reqs: { archetypeMin: { name: 'onslaught', count: 8 }, pointsSpentMin: 20 },
-      effects: [ { stat: 'damage', op: 'mult', value: 1.6 }, { stat: 'maxHp', op: 'add', value: -25 }, { flag: 'annihilation' } ] },
-    { id: 'cap_dom', name: 'ABSOLUTE ZERO', desc: 'The arena freezes around you. A permanent chill field, slows deepened past anything else in the tree, and shatters that spread.',
-      tier: 'red', archetype: 'dominion', col: 4, row: 11, parents: ['dom_y3'],
-      blocks: ['cap_ons', 'cap_kin'],
-      reqs: { archetypeMin: { name: 'dominion', count: 8 }, pointsSpentMin: 20 },
-      effects: [ { stat: 'slowPower', op: 'add', value: 0.25 }, { stat: 'auraRadius', op: 'mult', value: 1.5 }, { flag: 'absoluteZero' } ] },
-    { id: 'cap_kin', name: 'PERPETUAL MOTION', desc: 'Three blink charges that refill as fast as you can spend them, and your damage rides your speed.',
-      tier: 'red', archetype: 'kinesis', col: 7, row: 11, parents: ['kin_y3'],
-      blocks: ['cap_ons', 'cap_dom'],
-      reqs: { archetypeMin: { name: 'kinesis', count: 8 }, pointsSpentMin: 20 },
-      effects: [ { stat: 'dashCharges', op: 'add', value: 2 }, { stat: 'dashCooldown', op: 'mult', value: 0.5 }, { flag: 'perpetualMotion' } ] }
+  /* every flag any tree may set. The game maps these onto its own mechanics;
+     the test asserts no tree uses a flag that is not listed here. */
+  const FLAGS = [
+    'shieldBurst', 'fortress', 'secondWind',
+    'ignite', 'wildfire', 'immolate', 'emberFeast', 'inferno',
+    'chill', 'chillAura', 'stasis', 'shatterChain', 'cryoNova', 'gravityWell',
+    'arcShot', 'chainStun', 'staticField', 'arcDash',
+    'bladestorm', 'droneBoom', 'droneShield',
+    'phaseDash', 'dashStrike', 'dashBlast', 'afterimage', 'blink', 'dashRefund',
+    'bounceSplit', 'amplify', 'noFalloff', 'critPierce',
+    'steadyAim', 'critBoom', 'volatile', 'carpet', 'megaShell',
+    'adrenaline', 'frenzy', 'deathMark',
+    'executioner', 'desperate'
   ];
 
-  const COLS = 9;
+  const TREES = {};
 
-  return { NODES, ARCHETYPES, STAT_BASE, TIER_COST, TIER_LABEL, COLS };
+  /* ============================================================
+     ROOK - Vanguard. Bulwark Rifle, recharging shield.
+     ============================================================ */
+  TREES.vanguard = tree('vanguard', 'Frame Uplink', 'Boot the armour. Everything hangs off this.', mult('damage', 1.04),
+    [arch('bulwark', 'Bulwark', '#6ec6ff', 'Outlast it. The shield is the build.'),
+     arch('retribution', 'Retribution', '#ff5c6e', 'Let them hit you. Make it the last thing they do.'),
+     arch('suppression', 'Suppression', '#ffc857', 'Never stop firing. Nothing gets close.')], [
+    lane('vanguard', 'bulwark', 1, [
+      w('plate', 'Plating', 'Heavier panels.', add('maxHp', 20)),
+      w('cell', 'Shield Cell', 'More capacity to burn.', add('shield', 25)),
+      w('coolant', 'Coolant Loop', 'The field cycles sooner.', add('shieldRecharge', 1)),
+      y('hardlight', 'Hardlight Weave', 'A far deeper field, and thicker armour under it.', add('shield', 40), add('armor', 0.05)),
+      w('deflect', 'Deflector', 'Angled panels shed damage.', add('armor', 0.06)),
+      w('capacitor', 'Capacitor', 'Bigger reservoir.', add('shield', 30)),
+      r('overshield', 'Overshield', 'When the shield breaks it goes off: a 140-damage shockwave clears the room around you.', flag('shieldBurst'), add('shield', 20)),
+      r('siege', 'Siege Mode', 'While the shield holds you take a quarter less damage, but the weight roots you.', flag('fortress'), mult('moveSpeed', 0.85)),
+      w('reinforce', 'Reinforce', 'More frame to protect.', add('maxHp', 30)),
+      y('secondskin', 'Second Skin', 'The field begins recharging almost immediately.', add('shieldRecharge', 1), add('shield', 25)),
+      r('immovable', 'IMMOVABLE', 'Nothing shifts you and nothing gets through: heavy armour, a field that never stays down.', add('armor', 0.20), flag('fortress'), add('shieldRecharge', 1))
+    ]),
+    lane('vanguard', 'retribution', 4, [
+      w('spikes', 'Spikes', 'Contact costs them.', add('thorns', 0.08)),
+      w('counter', 'Counterweight', 'Swing back harder.', mult('damage', 1.06)),
+      w('riposte', 'Riposte', 'Sharper edges.', add('thorns', 0.08)),
+      y('barbed', 'Barbed Plate', 'Anything that touches you loses a chunk of itself.', add('thorns', 0.15)),
+      w('hardened', 'Hardened', 'Take the hit better.', add('armor', 0.05)),
+      w('heavyframe', 'Heavy Frame', 'More to throw around.', add('maxHp', 25)),
+      r('painengine', 'Pain Engine', 'Damage climbs as your health falls. Wounded, you are the most dangerous thing here.', add('berserk', 0.04), flag('desperate')),
+      r('aegis', 'Aegis Protocol', 'Whatever strikes you is frozen where it stands and bleeds out in the cold.', add('slowPower', 0.35), flag('chillAura')),
+      w('vengeance', 'Vengeance', 'Answer everything.', mult('damage', 1.08)),
+      y('backlash', 'Backlash', 'Everything you kill detonates on the way out.', add('onKillBlast', 55)),
+      r('retaliation', 'RETALIATION ENGINE', 'Every wound you take is repaid as a blast, and your spikes gut anything that dares close.', add('thorns', 0.30), flag('shieldBurst'), add('onKillBlast', 55))
+    ]),
+    lane('vanguard', 'suppression', 7, [
+      w('trigger', 'Hair Trigger', 'Lighter sear.', mult('fireRate', 1.06)),
+      w('belt', 'Long Belt', 'Heavier rounds.', mult('damage', 1.06)),
+      w('stabilizer', 'Stabilizer', 'Steadier line.', add('critChance', 0.04)),
+      y('sustained', 'Sustained Fire', 'The rifle simply does not stop.', mult('fireRate', 1.14)),
+      w('apcore', 'AP Core', 'Punches past the first body.', add('pierce', 1)),
+      w('optics', 'Focus Optics', 'Find the seams.', add('critChance', 0.06)),
+      r('suppress', 'Suppression Field', 'Your fire pins them: everything you hit is dragged down to a crawl.', flag('chill'), add('slowPower', 0.30)),
+      r('breach', 'Breach Rounds', 'Rounds tear through the whole line without slowing, at the cost of bite per body.', add('pierce', 4), flag('noFalloff'), mult('damage', 0.80)),
+      w('feedramp', 'Feed Ramp', 'Faster cycling.', mult('fireRate', 1.08)),
+      y('grinder', 'Grinder', 'Anything already staggered takes far more from you.', mult('damage', 1.18)),
+      r('wallonlead', 'WALL OF LEAD', 'Two more rounds per pull and a savage rate of fire. Accuracy is somebody else\'s problem.', add('projectiles', 2), mult('fireRate', 1.25), mult('damage', 0.88))
+    ])
+  ]);
+
+  /* ============================================================
+     CINDER - Pyro. Flame Projector.
+     ============================================================ */
+  TREES.cinder = tree('cinder', 'Ignition Core', 'Light the pilot flame.', add('burnDamage', 2),
+    [arch('wildfire', 'Wildfire', '#ff8a3d', 'Fire that spreads on its own.'),
+     arch('immolation', 'Immolation', '#ffc857', 'Be the hazard. Stand in the middle of it.'),
+     arch('backdraft', 'Backdraft', '#ff5c6e', 'Move through them and leave the room burning.')], [
+    lane('cinder', 'wildfire', 1, [
+      w('accel', 'Accelerant', 'Hotter mix.', add('burnDamage', 3)),
+      w('fuel', 'Fuel Tanks', 'Longer burn.', add('burnDuration', 0.7)),
+      w('pressure', 'Pressure Valve', 'Faster throughput.', mult('fireRate', 1.08)),
+      y('catalyst', 'Catalyst', 'Everything you set alight burns hotter and longer.', add('burnDamage', 5), mult('statusDuration', 1.25)),
+      w('napalm', 'Napalm', 'It sticks.', add('burnDuration', 0.8)),
+      w('richmix', 'Rich Mix', 'More fuel per pull.', add('burnDamage', 4)),
+      r('spread', 'Wildfire', 'A burning body is a bomb: whatever dies alight passes the fire to everything nearby.', flag('wildfire')),
+      r('inferno', 'Inferno', 'Fire no longer just ticks. Anything burning takes brutally more from every source.', flag('inferno'), add('burnDamage', 4)),
+      w('bellows', 'Bellows', 'Feed the flame.', add('burnDamage', 5)),
+      y('feast', 'Ember Feast', 'Killing something that burns feeds you.', flag('emberFeast'), add('lifesteal', 0.02)),
+      r('firestorm', 'FIRESTORM', 'The arena becomes the weapon: fire spreads, feeds and doubles back on everything still standing.', flag('wildfire'), flag('inferno'), add('burnDamage', 10))
+    ]),
+    lane('cinder', 'immolation', 4, [
+      w('pilot', 'Pilot Light', 'A permanent halo of heat.', flag('immolate')),
+      w('radiant', 'Radiant Plating', 'Wider reach.', mult('auraRadius', 1.15)),
+      w('heatsink', 'Heat Sink', 'Stand the heat.', add('maxHp', 20)),
+      y('corona', 'Corona', 'The halo becomes a furnace you carry.', mult('auraRadius', 1.25), add('burnDamage', 4)),
+      w('emitters', 'Emitters', 'Push it further out.', mult('auraRadius', 1.15)),
+      w('ceramic', 'Ceramic Weave', 'Shrug off the backwash.', add('armor', 0.08)),
+      r('pyreheart', 'Pyre Heart', 'The fire around you feeds on the dying: every kill heals you and stokes the halo.', flag('emberFeast'), add('killHealAmount', 6)),
+      r('meltdown', 'Meltdown', 'Contact is fatal for them: the halo detonates whatever it finishes.', add('onKillBlast', 55), flag('immolate')),
+      w('convection', 'Convection', 'Hotter still.', add('burnDamage', 6)),
+      y('scorched', 'Scorched Earth', 'Your dash drags the fire with you.', flag('afterimage')),
+      r('sunwell', 'SUNWELL', 'You stop being a shooter. Standing near you is the kill condition.', mult('auraRadius', 1.6), add('burnDamage', 14), flag('immolate'))
+    ]),
+    lane('cinder', 'backdraft', 7, [
+      w('lightrig', 'Light Rig', 'Move faster.', mult('moveSpeed', 1.06)),
+      w('jets', 'Jets', 'Recharge the dash sooner.', mult('dashCooldown', 0.9)),
+      w('thermals', 'Thermals', 'Ride the heat.', mult('moveSpeed', 1.05)),
+      y('flashover', 'Flashover', 'Dashing tears a burning wake behind you.', flag('afterimage'), add('burnDamage', 3)),
+      w('vents', 'Vents', 'Another charge sooner.', mult('dashCooldown', 0.85)),
+      w('chassis', 'Light Chassis', 'Less to carry.', mult('moveSpeed', 1.06)),
+      r('detonator', 'Detonator', 'Every dash ends in a fireball.', flag('dashBlast'), mult('explosionSize', 1.2)),
+      r('phasefire', 'Phase Fire', 'You pass through the fight untouchable, igniting everything you cross.', flag('phaseDash'), flag('dashStrike'), add('dashDamage', 60)),
+      w('afterburn', 'Afterburn', 'The wake lingers.', mult('statusDuration', 1.2)),
+      y('chainrush', 'Chain Rush', 'Kills hand the dash straight back.', flag('dashRefund'), add('dashCharges', 1)),
+      r('cometrun', 'COMET RUN', 'Three charges, a blazing trail, and a detonation at the end of every one.', add('dashCharges', 2), flag('afterimage'), flag('dashBlast'))
+    ])
+  ]);
+
+  /* ============================================================
+     HALCYON - Cryomancer. Cryo Lance.
+     ============================================================ */
+  TREES.halcyon = tree('halcyon', 'Coolant Core', 'Bring the temperature down.', add('slowPower', 0.08),
+    [arch('permafrost', 'Permafrost', '#8ad8ff', 'Deeper, longer, colder.'),
+     arch('shatter', 'Shatter', '#bfeaff', 'Frozen things break. Break them.'),
+     arch('whiteout', 'Whiteout', '#6ec6ff', 'Own the ground they have to cross.')], [
+    lane('halcyon', 'permafrost', 1, [
+      w('coating', 'Cryo Coating', 'Colder rounds.', add('slowPower', 0.08)),
+      w('lingering', 'Lingering Frost', 'It outstays the hit.', mult('statusDuration', 1.2)),
+      w('supercool', 'Supercooled', 'Sharper bite.', add('slowPower', 0.08)),
+      y('deepfreeze', 'Deep Freeze', 'What you hit barely moves at all.', add('slowPower', 0.18)),
+      w('icecore', 'Ice Core', 'Colder still.', add('slowPower', 0.08)),
+      w('rime', 'Rime', 'The chill lasts.', mult('statusDuration', 1.25)),
+      r('flashfreeze', 'Flash Freeze', 'Chilled enemies bleed out in the cold, taking steady damage the whole time.', add('frostbiteDamage', 10)),
+      r('blacklice', 'Black Ice', 'The cold spreads: anything that dies frozen chills everything around it.', flag('shatterChain'), flag('chillAura')),
+      w('glacial', 'Glacial Rounds', 'Heavier cold.', add('slowPower', 0.08)),
+      y('hypothermia', 'Hypothermia', 'The longer they stay chilled, the worse it gets.', add('frostbiteDamage', 10), mult('statusDuration', 1.3)),
+      r('absolutezero', 'ABSOLUTE ZERO', 'Nothing in your presence moves at its own pace, and the cold never lifts.', add('slowPower', 0.30), mult('statusDuration', 1.5), flag('chillAura'))
+    ]),
+    lane('halcyon', 'shatter', 4, [
+      w('fracture', 'Fracture Lines', 'Find the cracks.', add('critChance', 0.05)),
+      w('heavylance', 'Heavy Lance', 'Drive it deeper.', mult('damage', 1.08)),
+      w('brittle', 'Brittle', 'Cold makes them fragile.', mult('damage', 1.06)),
+      y('shatterpoint', 'Shatterpoint', 'Anything chilled comes apart under your fire.', mult('damage', 1.25)),
+      w('splinter', 'Splinter', 'Through the first body.', add('pierce', 1)),
+      w('coldsteel', 'Cold Steel', 'Harder impacts.', add('critDamage', 0.3)),
+      r('stasislock', 'Stasis Lock', 'A chilled enemy under a fifth of its health does not die. It shatters.', flag('stasis')),
+      r('icepick', 'Ice Pick', 'Every critical hit detonates in a spray of frozen shards.', flag('critBoom'), add('critChance', 0.1)),
+      w('cleave', 'Cleave', 'More force behind it.', mult('damage', 1.08)),
+      y('avalanche', 'Avalanche', 'Shattered bodies take their neighbours with them.', flag('shatterChain'), add('onKillBlast', 55)),
+      r('killingfrost', 'KILLING FROST', 'Frozen is dead: the threshold rises and every shatter sets off the next.', add('execute', 0.15), flag('stasis'), flag('shatterChain'))
+    ]),
+    lane('halcyon', 'whiteout', 7, [
+      w('fog', 'Cold Fog', 'A chill hangs around you.', flag('chillAura')),
+      w('frontage', 'Frontage', 'Wider field.', mult('auraRadius', 1.2)),
+      w('insulate', 'Insulation', 'Hold your ground.', add('maxHp', 25)),
+      y('blizzard', 'Blizzard', 'The field around you drags on everything in it.', mult('auraRadius', 1.3), add('slowPower', 0.1)),
+      w('drift', 'Snowdrift', 'Further out.', mult('auraRadius', 1.2)),
+      w('coldarmor', 'Cold Armour', 'Frost on your own plating.', add('armor', 0.08)),
+      r('cryonova', 'Cryo Nova', 'Every dash detonates a freezing nova around you.', flag('cryoNova')),
+      r('gravitywell', 'Gravity Well', 'Explosions collapse into wells that hold whatever survives.', flag('gravityWell'), mult('explosionSize', 1.25)),
+      w('deepcold', 'Deep Cold', 'The field bites.', add('frostbiteDamage', 10)),
+      y('stormfront', 'Stormfront', 'The field moves with you and never thins.', mult('auraRadius', 1.25), mult('statusDuration', 1.2)),
+      r('whiteout', 'WHITEOUT', 'The arena is yours. Everything inside it is slowed, freezing and dying on your terms.', mult('auraRadius', 1.7), add('slowPower', 0.2), add('frostbiteDamage', 10))
+    ])
+  ]);
+
+  /* ============================================================
+     ARC - Tesla. Arc Coil.
+     ============================================================ */
+  TREES.arc = tree('arc', 'Coil Primer', 'Charge the coil.', add('chainCount', 1),
+    [arch('conduction', 'Conduction', '#c8b4ff', 'One shot, many bodies.'),
+     arch('overload', 'Overload', '#ff8aff', 'Every death is the next discharge.'),
+     arch('capacitor', 'Capacitor', '#8ad8ff', 'Hold the charge. Never stop dumping it.')], [
+    lane('arc', 'conduction', 1, [
+      w('conduct', 'Conduction', 'One more jump.', add('chainCount', 1)),
+      w('amp', 'Amplifier', 'Harder arcs.', mult('chainDamage', 1.2)),
+      w('coil', 'Tighter Coil', 'Cleaner discharge.', mult('damage', 1.06)),
+      y('lattice', 'Lattice', 'The arc keeps finding another body, and hits properly when it does.', add('chainCount', 1), mult('chainDamage', 1.25)),
+      w('copper', 'Copper Core', 'Better conductor.', mult('chainDamage', 1.2)),
+      w('reach', 'Extended Reach', 'Longer jumps.', add('chainCount', 1)),
+      r('stagger', 'Staggering Arc', 'Every chained hit locks the target in place as well as burning it.', flag('chainStun')),
+      r('fullcurrent', 'Full Current', 'Chains stop weakening. Each jump lands like the original shot.', mult('chainDamage', 2.2), flag('arcShot')),
+      w('bus', 'Bus Bar', 'More capacity.', add('chainCount', 1)),
+      y('cascade', 'Cascade', 'The current refuses to stop.', add('chainCount', 2)),
+      r('thunderstorm', 'THUNDERSTORM', 'One trigger pull is a storm: the current crosses the room and hits full strength the whole way.', add('chainCount', 3), mult('chainDamage', 1.8), flag('chainStun'))
+    ]),
+    lane('arc', 'overload', 4, [
+      w('discharge', 'Discharge', 'Death releases charge.', add('killChainCount', 2)),
+      w('grounding', 'Grounding', 'Steadier frame.', add('maxHp', 20)),
+      w('surge', 'Surge', 'More output.', mult('damage', 1.07)),
+      y('feedback', 'Feedback Loop', 'Kills dump a far bigger arc into whatever is left.', add('killChainCount', 2), mult('chainDamage', 1.3)),
+      w('voltage', 'Voltage', 'Harder hits.', mult('damage', 1.08)),
+      w('relay', 'Relay', 'Longer reach on the discharge.', add('chainCount', 1)),
+      r('overkill', 'Overload', 'Every kill detonates, not just arcs.', add('onKillBlast', 55), add('killChainCount', 2)),
+      r('runaway', 'Runaway Reaction', 'Each kill winds you up: fire rate spikes and stays there while you keep killing.', flag('frenzy'), mult('fireRate', 1.1)),
+      w('breaker', 'Breaker', 'Bigger dump.', mult('chainDamage', 1.25)),
+      y('chainkill', 'Chain Kill', 'One death lights the whole cluster.', add('killChainCount', 2), add('onKillBlast', 55)),
+      r('criticalmass', 'CRITICAL MASS', 'A single kill cascades through the room, each death feeding the next.', add('killChainCount', 2), add('onKillBlast', 55), flag('frenzy'))
+    ]),
+    lane('arc', 'capacitor', 7, [
+      w('static', 'Static Field', 'A live field around you.', flag('staticField')),
+      w('cycle', 'Fast Cycle', 'Quicker discharge.', mult('fireRate', 1.08)),
+      w('insulation', 'Insulation', 'Hold more.', add('maxHp', 20)),
+      y('chargebank', 'Charge Bank', 'The field hums louder and reaches further.', mult('auraRadius', 1.3), flag('staticField')),
+      w('throughput', 'Throughput', 'Faster still.', mult('fireRate', 1.08)),
+      w('emitter', 'Emitter Array', 'Wider field.', mult('auraRadius', 1.2)),
+      r('arcdash', 'Arc Dash', 'Dashing drags a live cable through everything you pass.', flag('arcDash'), flag('dashStrike'), add('dashDamage', 60)),
+      r('tesladrone', 'Tesla Drones', 'Two coils break off and hunt on their own.', add('droneCount', 2), add('orbitDamage', 0)),
+      w('supercap', 'Supercapacitor', 'Higher ceiling.', mult('fireRate', 1.08)),
+      y('resonance', 'Resonance', 'The field crackles across everything near you.', mult('auraRadius', 1.3), mult('chainDamage', 1.2)),
+      r('powerplant', 'POWER PLANT', 'You are the generator: a huge live field, constant discharge, nothing gets to stand near you.', mult('auraRadius', 1.6), flag('staticField'), mult('fireRate', 1.2))
+    ])
+  ]);
+
+  /* ============================================================
+     VEX - Marksman. Longshot.
+     ============================================================ */
+  TREES.vex = tree('vex', 'Optic Uplink', 'Range the target.', add('critChance', 0.04),
+    [arch('precision', 'Precision', '#ffd77a', 'Every shot a critical.'),
+     arch('penetration', 'Penetration', '#ff9a3d', 'One round, the whole line.'),
+     arch('execution', 'Execution', '#ff5c6e', 'Finish what is already hurt.')], [
+    lane('vex', 'precision', 1, [
+      w('focus', 'Focus', 'Steadier hold.', add('critChance', 0.06)),
+      w('caliber', 'Heavy Caliber', 'More mass.', mult('damage', 1.08)),
+      w('hollow', 'Hollow Points', 'Wider wound.', add('critDamage', 0.25)),
+      y('marksman', 'Marksmanship', 'Your critical hits come often and land like artillery.', add('critChance', 0.1), add('critDamage', 0.4)),
+      w('glass', 'Glass Optics', 'Find the seam.', add('critChance', 0.06)),
+      w('handload', 'Handloads', 'Better powder.', mult('damage', 1.08)),
+      r('steady', 'Steady Aim', 'Hold still half a second and the next round is guaranteed to crit.', flag('steadyAim'), add('critChance', 0.05)),
+      r('killshot', 'Killshot', 'Critical hits detonate on impact.', flag('critBoom'), mult('explosionSize', 1.2)),
+      w('trueline', 'True Line', 'Nothing wasted.', add('critDamage', 0.3)),
+      y('coldblood', 'Cold Blood', 'Crits hit harder the longer you hold your nerve.', add('critDamage', 0.5)),
+      r('oneshot', 'ONE SHOT, ONE KILL', 'Crits tear through every body in the line and hit for nearly triple.', add('critDamage', 1.2), flag('critPierce'), add('critChance', 0.15))
+    ]),
+    lane('vex', 'penetration', 4, [
+      w('ap', 'AP Core', 'Through the first.', add('pierce', 1)),
+      w('sabot', 'Sabot', 'Faster round.', mult('damage', 1.07)),
+      w('rifling', 'Deep Rifling', 'Straighter flight.', add('critChance', 0.04)),
+      y('throughandthrough', 'Through and Through', 'Rounds carry on through a crowd without losing their edge.', add('pierce', 2), flag('noFalloff')),
+      w('tungsten', 'Tungsten', 'Denser core.', mult('damage', 1.1)),
+      w('longbarrel', 'Long Barrel', 'More of the charge on target.', mult('damage', 1.08)),
+      r('railshot', 'Rail Shot', 'The weapon winds up: far slower, but each round is devastating and unstoppable.', mult('fireRate', 0.6), mult('damage', 2.2), add('pierce', 3)),
+      r('splitcore', 'Split Core', 'Rounds break into two on the way out. Twice the line, less per hit.', add('projectiles', 1), mult('damage', 0.82), add('pierce', 1)),
+      w('hardpoint', 'Hardpoint', 'Heavier still.', mult('damage', 1.08)),
+      y('overpenetrate', 'Overpenetration', 'Nothing is cover any more.', add('pierce', 3)),
+      r('lancer', 'LANCER', 'One round, one line, every body on it, full damage to the last.', add('pierce', 6), flag('noFalloff'), mult('damage', 1.3))
+    ]),
+    lane('vex', 'execution', 7, [
+      w('wound', 'Wound Channel', 'They bleed.', mult('damage', 1.06)),
+      w('scan', 'Threat Scan', 'Pick the hurt one.', add('critChance', 0.05)),
+      w('cull', 'Cull', 'Finish the weak.', add('execute', 0.05)),
+      y('executioner', 'Executioner', 'Anything badly wounded simply stops when you look at it.', add('execute', 0.10), flag('executioner')),
+      w('deadweight', 'Dead Weight', 'Heavier finisher.', mult('damage', 1.08)),
+      w('bounty', 'Bounty Tags', 'Paid per body.', add('scoreBonus', 0.15)),
+      r('deathmark', 'Death Mark', 'Every fifth hit brands a target. Marked, it takes half again from everything.', flag('deathMark')),
+      r('headhunter', 'Headhunter', 'Kills wind the rifle up and hand back the damage you spent getting there.', flag('frenzy'), add('killHealAmount', 6)),
+      w('finisher', 'Finisher', 'Higher threshold.', add('execute', 0.05)),
+      y('reaper', 'Reaper\'s Eye', 'The wounded are already dead.', add('execute', 0.08), flag('executioner')),
+      r('terminator', 'TERMINATOR', 'A quarter health is a death sentence, and every execution marks the next target.', add('execute', 0.12), flag('deathMark'), add('onKillBlast', 55))
+    ])
+  ]);
+
+  /* ============================================================
+     NYX - Blade Dancer. Twin Pistols.
+     ============================================================ */
+  TREES.nyx = tree('nyx', 'Servo Prime', 'Spin up the legs.', mult('moveSpeed', 1.04),
+    [arch('momentum', 'Momentum', '#9dff5c', 'Speed is the stat. Everything scales off it.'),
+     arch('bladestorm', 'Bladestorm', '#cfe6ff', 'Let the blades do the close work.'),
+     arch('phase', 'Phase', '#7cffe0', 'Be somewhere else. Arrive hurting.')], [
+    lane('nyx', 'momentum', 1, [
+      w('light', 'Light Frame', 'Less to carry.', mult('moveSpeed', 1.06)),
+      w('tread', 'Grip Tread', 'Better purchase.', mult('moveSpeed', 1.05)),
+      w('twitch', 'Twitch Reflex', 'Faster hands.', mult('fireRate', 1.07)),
+      y('sprint', 'Sprinter', 'You simply move faster than the fight does.', mult('moveSpeed', 1.14)),
+      w('cadence', 'Cadence', 'Faster trigger.', mult('fireRate', 1.08)),
+      w('featherweight', 'Featherweight', 'Nothing spare.', mult('moveSpeed', 1.06)),
+      r('bloodrush', 'Bloodrush', 'Every kill floods you: speed spikes and the guns run hot.', flag('adrenaline'), flag('frenzy')),
+      r('kinetic', 'Kinetic Conversion', 'Your speed becomes damage. The faster you run, the harder you hit.', mult('damage', 1.3), mult('moveSpeed', 1.1)),
+      w('overdrive', 'Overdrive', 'Push harder.', mult('moveSpeed', 1.06)),
+      y('runandgun', 'Run and Gun', 'Moving no longer costs you output.', mult('fireRate', 1.15)),
+      r('perpetual', 'PERPETUAL MOTION', 'Never stop: blistering speed, a permanent rush, and damage that rides all of it.', mult('moveSpeed', 1.25), mult('damage', 1.25), flag('adrenaline'))
+    ]),
+    lane('nyx', 'bladestorm', 4, [
+      w('blade', 'First Blade', 'One blade rides your orbit.', flag('bladestorm'), add('orbitDamage', 12)),
+      w('edge', 'Honed Edge', 'Sharper.', add('orbitDamage', 10)),
+      w('balance', 'Balance', 'Wider orbit.', add('orbitCount', 1)),
+      y('whirl', 'Whirlwind', 'More blades, and they bite properly.', add('orbitCount', 1), add('orbitDamage', 16)),
+      w('serrate', 'Serrated', 'Ragged cuts.', add('orbitDamage', 12)),
+      w('spin', 'Spin Up', 'Faster orbit.', add('orbitCount', 1)),
+      r('shredder', 'Shredder', 'The blades carve anything they finish into a detonation.', add('onKillBlast', 55), add('orbitDamage', 14)),
+      r('bloodedge', 'Blood Edge', 'The blades feed you with every cut they take.', add('lifesteal', 0.06), add('orbitDamage', 10)),
+      w('vortex', 'Vortex', 'One more blade.', add('orbitCount', 1)),
+      y('cyclone', 'Cyclone', 'A wall of steel at arm\'s length.', add('orbitCount', 1), add('orbitDamage', 18)),
+      r('bladestorm', 'BLADESTORM', 'Nothing survives contact: a full ring of blades, each one lethal.', add('orbitCount', 2), add('orbitDamage', 30), flag('bladestorm'))
+    ]),
+    lane('nyx', 'phase', 7, [
+      w('coil', 'Phase Coil', 'Recharge sooner.', mult('dashCooldown', 0.88)),
+      w('charge', 'Spare Charge', 'One more blink.', add('dashCharges', 1)),
+      w('edge2', 'Razor Entry', 'Arrive hurting.', add('dashDamage', 40), flag('dashStrike')),
+      y('phasestep', 'Phase Step', 'The blink lasts longer and nothing can touch you inside it.', flag('phaseDash'), mult('dashCooldown', 0.85)),
+      w('slipstream', 'Slipstream', 'Quicker recovery.', mult('dashCooldown', 0.85)),
+      w('cutting', 'Cutting Entry', 'Harder arrival.', add('dashDamage', 50)),
+      r('blink', 'Blink Protocol', 'The dash stops being movement: everything on the line takes the trip badly.', flag('blink'), add('dashDamage', 70)),
+      r('afterimage', 'Afterimage', 'You leave something behind that keeps killing.', flag('afterimage'), flag('dashBlast')),
+      w('recharge', 'Fast Recharge', 'Charges return sooner.', mult('dashCooldown', 0.85)),
+      y('resetter', 'Reset', 'Kills hand the blink straight back.', flag('dashRefund'), add('dashCharges', 1)),
+      r('unseen', 'UNSEEN', 'Three charges that refill on every kill, each one a killing blow.', add('dashCharges', 2), flag('dashRefund'), add('dashDamage', 90), flag('phaseDash'))
+    ])
+  ]);
+
+  /* ============================================================
+     COG - Engineer. Nail Driver.
+     ============================================================ */
+  TREES.cog = tree('cog', 'Workshop Uplink', 'Spin up the fabricator.', add('droneCount', 1),
+    [arch('fabrication', 'Fabrication', '#b8c6d8', 'More units in the air.'),
+     arch('support', 'Support', '#9dff5c', 'The drones keep you alive.'),
+     arch('ordnance', 'Ordnance', '#ff8a3d', 'Arm them properly.')], [
+    lane('cog', 'fabrication', 1, [
+      w('assembly', 'Assembly Line', 'Another unit.', add('droneCount', 1)),
+      w('servos', 'Servos', 'Faster fire.', mult('droneRate', 0.9)),
+      w('calibrate', 'Calibration', 'Better aim.', add('critChance', 0.04)),
+      y('massproduce', 'Mass Production', 'The bay runs hot: more drones, cycling faster.', add('droneCount', 1), mult('droneRate', 0.85)),
+      w('tuning', 'Tuning', 'Harder rounds.', mult('damage', 1.08)),
+      w('rapid', 'Rapid Servos', 'Faster still.', mult('droneRate', 0.85)),
+      r('swarm', 'Swarm Protocol', 'The bay never stops: a full escort, all of it firing.', add('droneCount', 3), mult('droneRate', 0.85)),
+      r('heavyunit', 'Heavy Units', 'Fewer, bigger, and each one hits like your own weapon.', add('droneCount', 1), mult('damage', 1.35), flag('droneBoom')),
+      w('overclock', 'Overclock', 'Push the servos.', mult('droneRate', 0.88)),
+      y('production', 'Production Line', 'One more off the rack.', add('droneCount', 1)),
+      r('hivemind', 'HIVE MIND', 'A full wing of drones, cycling twice as fast as anything should.', add('droneCount', 2), mult('droneRate', 0.6))
+    ]),
+    lane('cog', 'support', 4, [
+      w('repair', 'Repair Bots', 'They patch you up.', add('droneRepair', 1.2)),
+      w('plating', 'Spare Plating', 'More frame.', add('maxHp', 25)),
+      w('field', 'Field Kit', 'Steady recovery.', add('regen', 0.8)),
+      y('medbay', 'Mobile Med Bay', 'The escort keeps you standing through anything.', add('droneRepair', 1.2), add('regen', 1.2)),
+      w('barrier', 'Barrier Node', 'A little shielding.', add('shield', 30)),
+      w('scrap', 'Scrapper', 'More salvage from the dead.', add('dropBonus', 0.6)),
+      r('shieldgen', 'Shield Generator', 'Each drone projects a slice of shielding onto you.', flag('droneShield'), add('shield', 40)),
+      r('sacrifice', 'Sacrificial Protocol', 'A drone will take a killing blow for you, once per wave.', flag('secondWind'), add('droneRepair', 1.2)),
+      w('redundancy', 'Redundancy', 'Tougher frame.', add('maxHp', 30)),
+      y('logistics', 'Logistics', 'The salvage keeps coming.', add('dropBonus', 0.8), add('magnet', 60)),
+      r('failsafe', 'FAILSAFE', 'The escort will not let you die: heavy shielding, constant repair, a life held in reserve.', add('shield', 70), add('droneRepair', 1.2), flag('secondWind'))
+    ]),
+    lane('cog', 'ordnance', 7, [
+      w('payload', 'Payload', 'Heavier rounds.', mult('damage', 1.07)),
+      w('warhead', 'Warheads', 'Drones carry explosives.', flag('droneBoom')),
+      w('propellant', 'Propellant', 'Bigger blasts.', mult('explosionSize', 1.15)),
+      y('demolition', 'Demolition Package', 'Every drone round is a grenade.', flag('droneBoom'), mult('explosionDamage', 1.25)),
+      w('shrapnel', 'Shrapnel', 'Wider spray.', mult('explosionSize', 1.15)),
+      w('charges', 'Shaped Charges', 'Focused force.', mult('explosionDamage', 1.2)),
+      r('cluster', 'Cluster Munitions', 'Every blast scatters bomblets.', add('clusterCount', 3)),
+      r('minefield', 'Minefield', 'Whatever the drones kill goes up with them.', add('onKillBlast', 55), mult('explosionSize', 1.3)),
+      w('highyield', 'High Yield', 'More force.', mult('explosionDamage', 1.2)),
+      y('saturation', 'Saturation', 'The bomblets carry bomblets.', add('clusterCount', 3), flag('carpet')),
+      r('bombardment', 'BOMBARDMENT', 'The whole escort drops ordnance without pause. Nothing holds ground.', flag('droneBoom'), add('clusterCount', 3), mult('explosionSize', 1.4))
+    ])
+  ]);
+
+  /* ============================================================
+     BOOM - Demolitionist. Grenade Launcher.
+     ============================================================ */
+  TREES.boom = tree('boom', 'Ordnance Uplink', 'Check the fuses.', mult('explosionSize', 1.05),
+    [arch('payload', 'Payload', '#ff6b4a', 'Make each one bigger.'),
+     arch('submunitions', 'Submunitions', '#ffc857', 'One shell, many holes.'),
+     arch('shockwave', 'Shockwave', '#8ad8ff', 'The blast is the crowd control.')], [
+    lane('boom', 'payload', 1, [
+      w('charge', 'Bigger Charge', 'More filler.', mult('explosionDamage', 1.15)),
+      w('casing', 'Thin Casing', 'Wider spread.', mult('explosionSize', 1.12)),
+      w('fuse', 'Fast Fuse', 'Quicker cycling.', mult('fireRate', 1.08)),
+      y('highexplosive', 'High Explosive', 'Every shell lands harder and reaches further.', mult('explosionDamage', 1.3), mult('explosionSize', 1.15)),
+      w('tamper', 'Tamper Plate', 'Focus the force.', mult('explosionDamage', 1.18)),
+      w('propellant', 'Propellant', 'Longer reach.', mult('explosionSize', 1.15)),
+      r('fatman', 'Fat Man', 'Every sixth shell is enormous: triple damage, more than double the radius.', flag('megaShell'), mult('explosionSize', 1.15)),
+      r('volatile', 'Volatile Rounds', 'Everything you fire detonates, not just the shells.', flag('volatile'), mult('explosionDamage', 1.15)),
+      w('yield', 'High Yield', 'More force.', mult('explosionDamage', 1.2)),
+      y('overcharge', 'Overcharge', 'The shells barely fit the tube.', mult('explosionDamage', 1.3), mult('explosionSize', 1.1)),
+      r('daisycutter', 'DAISY CUTTER', 'One shell clears a quarter of the arena. Mind the splash.', mult('explosionSize', 1.8), mult('explosionDamage', 1.5), flag('megaShell'))
+    ]),
+    lane('boom', 'submunitions', 4, [
+      w('bomblet', 'Bomblets', 'The shell splits.', add('clusterCount', 3)),
+      w('scatter', 'Scatter Pack', 'Wider spread.', mult('explosionSize', 1.12)),
+      w('timer', 'Short Timers', 'They land sooner.', mult('fireRate', 1.07)),
+      y('clusterpack', 'Cluster Pack', 'Each shell throws a handful of smaller ones.', add('clusterCount', 3), mult('explosionDamage', 1.2)),
+      w('spread', 'Wide Pattern', 'Cover more ground.', mult('explosionSize', 1.15)),
+      w('filler', 'Dense Filler', 'Each bomblet bites.', mult('explosionDamage', 1.18)),
+      r('carpet', 'Carpet Bombing', 'The bomblets carry bomblets. The ground stops existing.', flag('carpet'), add('clusterCount', 3)),
+      r('sticky', 'Sticky Charges', 'Anything killed by a blast becomes one.', add('onKillBlast', 55), mult('explosionSize', 1.2)),
+      w('multi', 'Multi-Pack', 'More per shell.', mult('explosionDamage', 1.15)),
+      y('saturation', 'Saturation', 'Nothing walks out of the pattern.', add('clusterCount', 3), mult('explosionSize', 1.2)),
+      r('steelrain', 'STEEL RAIN', 'One trigger pull becomes a sustained bombardment that keeps splitting.', add('clusterCount', 3), flag('carpet'), mult('explosionDamage', 1.4))
+    ]),
+    lane('boom', 'shockwave', 7, [
+      w('concussion', 'Concussion', 'The blast staggers.', add('slowPower', 0.2)),
+      w('bracing', 'Bracing', 'Ride your own blasts.', add('armor', 0.06)),
+      w('overpressure', 'Overpressure', 'Longer stagger.', mult('statusDuration', 1.25)),
+      y('shockplate', 'Shock Plate', 'Survivors of a blast are dragged to a crawl.', flag('gravityWell'), add('slowPower', 0.15)),
+      w('blastshield', 'Blast Shield', 'Armour against the backwash.', add('armor', 0.08)),
+      w('kinetics', 'Kinetics', 'Heavier push.', mult('explosionSize', 1.15)),
+      r('demodash', 'Demo Dash', 'Every dash ends in a detonation.', flag('dashBlast'), add('dashDamage', 50)),
+      r('wellmaker', 'Well Maker', 'Blasts collapse into wells that hold everything caught in them.', flag('gravityWell'), flag('stasis')),
+      w('resonance', 'Resonance', 'Deeper shock.', add('slowPower', 0.15)),
+      y('groundzero', 'Ground Zero', 'Nothing near a blast moves properly again.', add('slowPower', 0.2), mult('statusDuration', 1.3)),
+      r('seismic', 'SEISMIC', 'Every explosion locks the arena down: crushed, held, and finished where they stand.', flag('gravityWell'), flag('stasis'), mult('explosionSize', 1.4))
+    ])
+  ]);
+
+  /* ============================================================
+     MOURN - Reaper. Soul Scythe.
+     ============================================================ */
+  TREES.mourn = tree('mourn', 'Reaper\'s Pact', 'Sign it.', add('lifesteal', 0.02),
+    [arch('hunger', 'Hunger', '#d08bff', 'Their lives are your health bar.'),
+     arch('wrath', 'Wrath', '#ff5c6e', 'The closer to death, the harder you hit.'),
+     arch('harvest', 'Harvest', '#8affb0', 'Every kill pays out.')], [
+    lane('mourn', 'hunger', 1, [
+      w('bite', 'First Bite', 'Take a little back.', add('lifesteal', 0.03)),
+      w('thirst', 'Thirst', 'Drink deeper.', add('lifesteal', 0.03)),
+      w('edge', 'Keen Edge', 'Harder cuts.', mult('damage', 1.07)),
+      y('feed', 'Feeding Frenzy', 'The scythe drinks properly now.', add('lifesteal', 0.05), mult('damage', 1.1)),
+      w('gorge', 'Gorge', 'More per wound.', add('lifesteal', 0.03)),
+      w('vitality', 'Vitality', 'A bigger vessel.', add('maxHp', 25)),
+      r('exsanguinate', 'Exsanguinate', 'Every kill tears a chunk of life straight back into you.', add('killHealAmount', 6), add('lifesteal', 0.03)),
+      r('leech', 'Leech Field', 'The dying feed you from across the room.', add('soulHeal', 6), add('magnet', 90)),
+      w('sate', 'Sated', 'Hold more.', add('maxHp', 25)),
+      y('glut', 'Glutton', 'The wounds never close.', add('lifesteal', 0.06)),
+      r('undying', 'UNDYING', 'You heal faster than they can hurt you, and death itself gets one refusal.', add('lifesteal', 0.08), add('killHealAmount', 6), flag('secondWind'))
+    ]),
+    lane('mourn', 'wrath', 4, [
+      w('spite', 'Spite', 'Pain sharpens.', add('berserk', 0.03)),
+      w('fury', 'Fury', 'Swing harder.', mult('damage', 1.07)),
+      w('scar', 'Scar Tissue', 'Stay standing.', add('armor', 0.06)),
+      y('bloodrage', 'Blood Rage', 'Every wound you carry makes you worse to face.', add('berserk', 0.05)),
+      w('reckless', 'Reckless', 'Hit harder.', mult('damage', 1.1)),
+      w('adrenal', 'Adrenal Spike', 'Move when hurt.', flag('desperate')),
+      r('deathwish', 'Death Wish', 'Strip the armour entirely. What you lose in safety you gain in ruin.', mult('damage', 1.45), add('maxHp', -25)),
+      r('lastrites', 'Last Rites', 'At the edge of death you cannot be finished, once per wave.', flag('secondWind'), flag('desperate')),
+      w('malice', 'Malice', 'Deeper cuts.', mult('damage', 1.1)),
+      y('deathmark', 'Death Mark', 'Every fifth strike brands a target for slaughter.', flag('deathMark')),
+      r('wrathincarnate', 'WRATH INCARNATE', 'Wounded, you are unstoppable: enormous damage scaling and speed to chase it down.', add('berserk', 0.08), flag('desperate'), mult('damage', 1.2))
+    ]),
+    lane('mourn', 'harvest', 7, [
+      w('gleaner', 'Gleaner', 'Souls drift free.', add('soulHeal', 6)),
+      w('pull', 'Soul Pull', 'They come to you.', add('magnet', 70)),
+      w('toll', 'Toll', 'Paid per body.', add('scoreBonus', 0.15)),
+      y('reaping', 'Reaping', 'Every death leaves something worth taking.', add('soulHeal', 6), add('dropBonus', 0.6)),
+      w('tithe', 'Tithe', 'A larger cut.', add('scoreBonus', 0.15)),
+      w('wake', 'Wake', 'Recover between cuts.', add('regen', 1.0)),
+      r('soulreaper', 'Soul Reaper', 'Each kill heals you and winds the scythe up for the next.', add('killHealAmount', 6), flag('frenzy')),
+      r('massgrave', 'Mass Grave', 'The dead take the living with them.', add('onKillBlast', 55), add('killChainCount', 2)),
+      w('harvester', 'Harvester', 'More from each.', add('dropBonus', 0.5)),
+      y('deathspiral', 'Death Spiral', 'One kill makes the next easier, and the next.', flag('frenzy'), flag('adrenaline')),
+      r('endless', 'ENDLESS HARVEST', 'Killing sustains you completely: every death heals, hastens and spreads to the next.', add('killHealAmount', 6), flag('frenzy'), add('onKillBlast', 55))
+    ])
+  ]);
+
+  /* ============================================================
+     IRIS - Prism. Prism Beam.
+     ============================================================ */
+  TREES.iris = tree('iris', 'Prism Array', 'Split the beam.', add('projectiles', 1),
+    [arch('refraction', 'Refraction', '#7cffe0', 'The walls are part of your weapon.'),
+     arch('seeker', 'Seeker', '#6ec6ff', 'Shots that do not miss.'),
+     arch('spectrum', 'Spectrum', '#e08bff', 'More beams, always more beams.')], [
+    lane('iris', 'refraction', 1, [
+      w('bounce', 'First Bounce', 'Shots come off the geometry.', add('bounces', 1)),
+      w('angle', 'Angle Optics', 'Cleaner reflections.', mult('damage', 1.06)),
+      w('elastic', 'Elastic Rounds', 'They keep their speed.', add('pierce', 1)),
+      y('refract', 'Refraction', 'Shots bounce again and hit harder each time.', add('bounces', 1), flag('amplify')),
+      w('polish', 'Polished Core', 'Less loss per bounce.', mult('damage', 1.08)),
+      w('carom', 'Carom', 'Another wall.', add('bounces', 1)),
+      r('splitbeam', 'Split Beam', 'Every bounce splits the shot in two.', flag('bounceSplit')),
+      r('amplifier', 'Amplifier', 'Each bounce winds the round up instead of wearing it down.', flag('amplify'), mult('damage', 1.15)),
+      w('mirror', 'Mirror Finish', 'More bounces.', add('bounces', 1)),
+      y('resonant', 'Resonant Cavity', 'The room fills with returning fire.', flag('bounceSplit'), flag('amplify')),
+      r('kaleidoscope', 'KALEIDOSCOPE', 'The arena becomes a crossfire of your own making.', add('bounces', 1), flag('bounceSplit'), flag('amplify'), add('projectiles', 1))
+    ]),
+    lane('iris', 'seeker', 4, [
+      w('tracker', 'Tracker', 'Shots lean toward targets.', add('homingStrength', 2.6)),
+      w('lens', 'Focus Lens', 'Harder light.', mult('damage', 1.08)),
+      w('gyro', 'Gyro Stabiliser', 'Tighter turns.', add('homingStrength', 2.6)),
+      y('seeking', 'Seeking Optics', 'Your fire curves hard onto whatever is closest.', add('homingStrength', 2.6), mult('damage', 1.12)),
+      w('guidance', 'Guidance', 'Better lock.', add('critChance', 0.05)),
+      w('sensor', 'Sensor Pod', 'Wider search.', mult('damage', 1.08)),
+      r('swarmfire', 'Swarm Fire', 'The beam breaks into a flock that hunts on its own.', add('projectiles', 2), mult('damage', 0.78), add('homingStrength', 2.6)),
+      r('lockon', 'Lock On', 'Nothing escapes a marked target, and marked targets fall apart.', flag('deathMark'), add('homingStrength', 2.6)),
+      w('tuned', 'Tuned Array', 'Harder light.', mult('damage', 1.1)),
+      y('relentless', 'Relentless', 'The shots simply do not give up.', add('homingStrength', 2.6), add('pierce', 2)),
+      r('inescapable', 'INESCAPABLE', 'Every round finds a body. There is no cover and no outrunning it.', add('homingStrength', 2.6), add('pierce', 3), mult('damage', 1.25))
+    ]),
+    lane('iris', 'spectrum', 7, [
+      w('split', 'Split', 'One more beam.', add('projectiles', 1)),
+      w('coherence', 'Coherence', 'Tighter grouping.', mult('damage', 1.07)),
+      w('cycle', 'Fast Cycle', 'Quicker pulses.', mult('fireRate', 1.08)),
+      y('spectrum', 'Full Spectrum', 'The array opens up: more beams, faster.', add('projectiles', 1), mult('fireRate', 1.1)),
+      w('prismatic', 'Prismatic', 'Cleaner split.', mult('damage', 1.08)),
+      w('rapid', 'Rapid Array', 'Faster still.', mult('fireRate', 1.1)),
+      r('scatter', 'Scatter Array', 'A wall of light every pull, each beam thinner.', add('projectiles', 3), mult('damage', 0.7)),
+      r('lance', 'Focused Lance', 'All the beams into one: slower, but it goes through everything.', add('projectiles', -1), mult('damage', 2.1), add('pierce', 4)),
+      w('output', 'Output', 'More power.', mult('damage', 1.1)),
+      y('overdrive', 'Overdrive', 'The array runs past its rating.', mult('fireRate', 1.18)),
+      r('whitelight', 'WHITE LIGHT', 'Everything at once: a saturating spread at full power.', add('projectiles', 2), mult('fireRate', 1.2), mult('damage', 1.15))
+    ])
+  ]);
+
+  /* display names, so the tree can title itself without the game telling it */
+  const NAMES = {
+    vanguard: 'ROOK', cinder: 'CINDER', halcyon: 'HALCYON', arc: 'ARC', vex: 'VEX',
+    nyx: 'NYX', cog: 'COG', boom: 'BOOM', mourn: 'MOURN', iris: 'IRIS'
+  };
+  for (const id in TREES) TREES[id].name = NAMES[id] || id.toUpperCase();
+
+  /* the tree shown when the game has no character context */
+  const DEFAULT_CHAR = 'vanguard';
+
+  return { TREES, DEFAULT_CHAR, STAT_BASE, FLAGS, TIER_COST, TIER_LABEL, COLS };
 });
 </script>
 <script>/* abilitytree/tree.logic.js */
 /* ============================================================
    ability tree - LOGIC
-   Pure rules + compilation + persistence. Never touches the DOM
-   and never touches game code: the game reads compiled stats only.
+   Pure rules + compilation + persistence for one tree per character.
+   Never touches the DOM and never touches game code: the game reads
+   compiled stats only.
    ============================================================ */
 (function (root, factory) {
   const data = (typeof module !== 'undefined' && module.exports)
@@ -457,29 +850,35 @@ h2{margin:0 0 14px; font-size:clamp(20px,4.5vw,30px); letter-spacing:.08em; colo
 })(typeof globalThis !== 'undefined' ? globalThis : this, function (DATA) {
   'use strict';
 
-  const { NODES, ARCHETYPES, STAT_BASE, TIER_COST } = DATA;
+  const { TREES, DEFAULT_CHAR, STAT_BASE, TIER_COST, FLAGS } = DATA;
 
-  const BY_ID = Object.create(null);
-  for (const n of NODES) BY_ID[n.id] = n;
+  /* ---- per-tree indexes, built once ---- */
+  const INDEX = {};
+  for (const charId in TREES) {
+    const t = TREES[charId];
+    const byId = Object.create(null);
+    for (const n of t.nodes) byId[n.id] = n;
 
-  /* children are derived from parents - connections are never hand-authored */
-  const CHILDREN = Object.create(null);
-  for (const n of NODES) {
-    for (const p of (n.parents || [])) (CHILDREN[p] || (CHILDREN[p] = [])).push(n.id);
+    const children = Object.create(null);
+    for (const n of t.nodes) for (const p of (n.parents || [])) (children[p] || (children[p] = [])).push(n.id);
+
+    /* blocks are mutual: if A lists B, taking either locks the other */
+    const blockedBy = Object.create(null);
+    const link = (a, b) => {
+      const list = blockedBy[a] || (blockedBy[a] = []);
+      if (list.indexOf(b) === -1) list.push(b);
+    };
+    for (const n of t.nodes) for (const b of (n.blocks || [])) { link(b, n.id); link(n.id, b); }
+
+    const archetypes = {};
+    for (const a of t.archetypes) archetypes[a.id] = a;
+
+    INDEX[charId] = { charId, nodes: t.nodes, byId, children, blockedBy, archetypes, archList: t.archetypes };
   }
 
-  /* blocks are treated as mutual: if A lists B, taking either locks the other */
-  const BLOCKED_BY = Object.create(null);
-  const addBlock = (a, b) => {
-    const list = BLOCKED_BY[a] || (BLOCKED_BY[a] = []);
-    if (list.indexOf(b) === -1) list.push(b);      // a pair that lists each other must not double up
-  };
-  for (const n of NODES) {
-    for (const b of (n.blocks || [])) { addBlock(b, n.id); addBlock(n.id, b); }
-  }
-
+  const CHAR_IDS = Object.keys(TREES);
   const SAVE_KEY = 'neon.abilityTree';
-  const SAVE_VERSION = 1;
+  const SAVE_VERSION = 2;
 
   /* ---------------- points ---------------- */
 
@@ -489,37 +888,66 @@ h2{margin:0 0 14px; font-size:clamp(20px,4.5vw,30px); letter-spacing:.08em; colo
     return l + Math.floor(l / 5);
   }
 
-  function costOf(nodeOrId) {
-    const n = typeof nodeOrId === 'string' ? BY_ID[nodeOrId] : nodeOrId;
+  function costOf(nodeOrId, charId) {
+    const n = typeof nodeOrId === 'string' ? nodeFor(nodeOrId, charId) : nodeOrId;
     return n ? (TIER_COST[n.tier] || 1) : 0;
   }
 
+  /* node ids carry their character prefix, so a lookup never needs the state */
+  function nodeFor(id, charId) {
+    if (charId && INDEX[charId] && INDEX[charId].byId[id]) return INDEX[charId].byId[id];
+    for (const c of CHAR_IDS) if (INDEX[c].byId[id]) return INDEX[c].byId[id];
+    return null;
+  }
+
   /* ---------------- state ---------------- */
-  function createState() {
-    const s = { version: SAVE_VERSION, level: 0, unlocked: [], compiled: null };
+  /* state = { version, active, chars: { charId: {level, unlocked[]} }, compiled } */
+  function createState(active) {
+    const s = { version: SAVE_VERSION, active: active && TREES[active] ? active : DEFAULT_CHAR, chars: {} };
+    for (const c of CHAR_IDS) s.chars[c] = { level: 0, unlocked: [] };
     s.compiled = recomputeStats(s);
     return s;
   }
 
-  const has = (state, id) => state.unlocked.indexOf(id) !== -1;
-  const pointsSpent = state => state.unlocked.reduce((sum, id) => sum + costOf(id), 0);
-  const pointsTotal = state => pointsForLevel(state.level);
-  const pointsLeft = state => pointsTotal(state) - pointsSpent(state);
+  const tree = state => INDEX[state.active] || INDEX[DEFAULT_CHAR];
+  const bucket = (state, charId) => {
+    const id = charId || state.active;
+    if (!state.chars[id]) state.chars[id] = { level: 0, unlocked: [] };
+    return state.chars[id];
+  };
 
-  /* grants points by raising the recorded level; replaying old levels grants nothing */
-  function grantPoints(state, level) {
-    const before = pointsTotal(state);
-    state.level = Math.max(state.level || 0, Math.floor(level || 0));
-    const gained = pointsTotal(state) - before;
+  function setCharacter(state, charId) {
+    if (!TREES[charId]) return state;
+    state.active = charId;
+    bucket(state, charId);
+    state.compiled = recomputeStats(state);
+    return state;
+  }
+
+  const has = (state, id, charId) => bucket(state, charId).unlocked.indexOf(id) !== -1;
+  const pointsSpent = (state, charId) => bucket(state, charId).unlocked
+    .reduce((sum, id) => sum + costOf(id, charId || state.active), 0);
+  const pointsTotal = (state, charId) => pointsForLevel(bucket(state, charId).level);
+  const pointsLeft = (state, charId) => pointsTotal(state, charId) - pointsSpent(state, charId);
+
+  /* Points are earned per character: playing ROOK does not pay for NYX's tree.
+     Replaying a level already reached grants nothing. */
+  function grantPoints(state, level, charId) {
+    const b = bucket(state, charId);
+    const before = pointsForLevel(b.level);
+    b.level = Math.max(b.level || 0, Math.floor(level || 0));
+    const gained = pointsForLevel(b.level) - before;
     if (gained > 0) state.compiled = recomputeStats(state);
     return gained;
   }
 
-  function archetypeCounts(state) {
+  function archetypeCounts(state, charId) {
+    const id = charId || state.active;
+    const idx = INDEX[id] || INDEX[DEFAULT_CHAR];
     const counts = {};
-    for (const key in ARCHETYPES) counts[key] = 0;
-    for (const id of state.unlocked) {
-      const n = BY_ID[id];
+    for (const key in idx.archetypes) counts[key] = 0;
+    for (const nid of bucket(state, id).unlocked) {
+      const n = idx.byId[nid];
       if (n && n.archetype && counts[n.archetype] !== undefined) counts[n.archetype]++;
     }
     return counts;
@@ -537,11 +965,11 @@ h2{margin:0 0 14px; font-size:clamp(20px,4.5vw,30px); letter-spacing:.08em; colo
   /* ---------------- the one rule function ---------------- */
   /* Used by the UI for painting and tooltips AND by the click handler. No second copy. */
   function canUnlock(nodeId, state) {
-    const node = BY_ID[nodeId];
-    if (!node) return { ok: false, reasons: ['Unknown node: ' + nodeId] };
+    const idx = tree(state);
+    const node = idx.byId[nodeId];
+    if (!node) return { ok: false, reasons: ['Unknown ability: ' + nodeId] };
 
     const reasons = [];
-
     if (has(state, nodeId)) return { ok: false, reasons: ['Already unlocked'] };
 
     const cost = costOf(node);
@@ -550,14 +978,12 @@ h2{margin:0 0 14px; font-size:clamp(20px,4.5vw,30px); letter-spacing:.08em; colo
 
     const parents = node.parents || [];
     if (parents.length && !parents.some(p => has(state, p))) {
-      const names = parents.map(p => (BY_ID[p] ? BY_ID[p].name : p));
+      const names = parents.map(p => (idx.byId[p] ? idx.byId[p].name : p));
       reasons.push('Requires ' + (names.length > 1 ? 'one of: ' : '') + names.join(' or '));
     }
 
-    for (const other of (BLOCKED_BY[nodeId] || [])) {
-      if (has(state, other)) {
-        reasons.push('Locked out by ' + (BY_ID[other] ? BY_ID[other].name : other));
-      }
+    for (const other of (idx.blockedBy[nodeId] || [])) {
+      if (has(state, other)) reasons.push('Locked out by ' + (idx.byId[other] ? idx.byId[other].name : other));
     }
 
     const reqs = node.reqs || {};
@@ -565,44 +991,44 @@ h2{margin:0 0 14px; font-size:clamp(20px,4.5vw,30px); letter-spacing:.08em; colo
       const { name, count } = reqs.archetypeMin;
       const have = archetypeCounts(state)[name] || 0;
       if (have < count) {
-        const label = ARCHETYPES[name] ? ARCHETYPES[name].name : name;
-        reasons.push('Requires ' + count + ' ' + label + ' nodes (you have ' + have + ')');
+        const label = idx.archetypes[name] ? idx.archetypes[name].name : name;
+        reasons.push('Requires ' + count + ' ' + label + ' abilities (you have ' + have + ')');
       }
     }
     if (reqs.pointsSpentMin) {
       const spent = pointsSpent(state);
       if (spent < reqs.pointsSpentMin) {
-        reasons.push('Requires ' + reqs.pointsSpentMin + ' points spent in the tree (you have ' + spent + ')');
+        reasons.push('Requires ' + reqs.pointsSpentMin + ' points spent in this tree (you have ' + spent + ')');
       }
     }
 
     return { ok: reasons.length === 0, reasons };
   }
 
-  /* purely for painting: what does this node look like right now */
+  /* purely for painting */
   function nodeStatus(nodeId, state) {
+    const idx = tree(state);
     if (has(state, nodeId)) return 'unlocked';
-    for (const other of (BLOCKED_BY[nodeId] || [])) if (has(state, other)) return 'blocked';
-    const check = canUnlock(nodeId, state);
-    if (check.ok) return 'reachable';
-    // a node whose only problem is points is still worth showing as "almost"
-    const node = BY_ID[nodeId];
+    for (const other of (idx.blockedBy[nodeId] || [])) if (has(state, other)) return 'blocked';
+    if (canUnlock(nodeId, state).ok) return 'reachable';
+    const node = idx.byId[nodeId];
+    if (!node) return 'locked';
     const parents = node.parents || [];
-    const parentOk = !parents.length || parents.some(p => has(state, p));
-    return parentOk ? 'available' : 'locked';
+    return (!parents.length || parents.some(p => has(state, p))) ? 'available' : 'locked';
   }
 
   function unlock(nodeId, state) {
     const check = canUnlock(nodeId, state);
     if (!check.ok) return { ok: false, reasons: check.reasons, state };
-    state.unlocked.push(nodeId);
+    bucket(state).unlocked.push(nodeId);
     state.compiled = recomputeStats(state);
     save(state);
     return { ok: true, reasons: [], state };
   }
 
-  function reset(state) {
-    state.unlocked = [];
+  /* refunds the active character's tree only - each one is banked separately */
+  function reset(state, charId) {
+    bucket(state, charId).unlocked = [];
     state.compiled = recomputeStats(state);
     save(state);
     return state;
@@ -610,14 +1036,16 @@ h2{margin:0 0 14px; font-size:clamp(20px,4.5vw,30px); letter-spacing:.08em; colo
 
   /* ---------------- compilation ---------------- */
   /* additive first, then multiplicative. flags into a Set. */
-  function recomputeStats(state) {
+  function recomputeStats(state, charId) {
+    const id = charId || state.active || DEFAULT_CHAR;
+    const idx = INDEX[id] || INDEX[DEFAULT_CHAR];
     const add = Object.create(null);
     const mult = Object.create(null);
     const flags = new Set();
 
-    for (const id of state.unlocked) {
-      const node = BY_ID[id];
-      if (!node) continue;                       // defensive: unknown ids are dropped on load
+    for (const nid of bucket(state, id).unlocked) {
+      const node = idx.byId[nid];
+      if (!node) continue;                        // defensive: unknown ids are dropped on load
       const list = node.effects || (node.effect ? [node.effect] : []);
       for (const e of list) {
         if (!e) continue;
@@ -635,33 +1063,38 @@ h2{margin:0 0 14px; font-size:clamp(20px,4.5vw,30px); letter-spacing:.08em; colo
       stats[k] = (base + (add[k] || 0)) * (mult[k] === undefined ? 1 : mult[k]);
     }
 
-    const counts = archetypeCounts(state);
+    const counts = archetypeCounts(state, id);
     return {
+      charId: id,
       stats,
       flags,
       archetypeCounts: counts,
       dominant: dominantArchetype(counts),
-      pointsTotal: pointsTotal(state),
-      pointsSpent: pointsSpent(state),
-      pointsLeft: pointsLeft(state),
-      level: state.level
+      pointsTotal: pointsTotal(state, id),
+      pointsSpent: pointsSpent(state, id),
+      pointsLeft: pointsLeft(state, id),
+      level: bucket(state, id).level
     };
   }
 
   /* ---------------- persistence ---------------- */
   const MIGRATIONS = {
-    /* 0: raw shape before versions existed. Add future steps as `n: payload => payload`. */
-    0: function (payload) {
-      return { v: 1, level: payload.level || 0, unlocked: payload.unlocked || [] };
+    /* pre-versions shape */
+    0: payload => ({ v: 1, level: payload.level || 0, unlocked: payload.unlocked || [] }),
+    /* v1 was a single shared tree. Its node ids do not exist in the per-character
+       trees, so the build is dropped and refunded, but the level is kept. */
+    1: payload => {
+      const chars = {};
+      for (const c of CHAR_IDS) chars[c] = { level: payload.level || 0, unlocked: [] };
+      return { v: 2, active: DEFAULT_CHAR, chars, migratedFrom: 1 };
     }
   };
 
   function migrate(payload) {
-    let p = payload;
-    let guard = 0;
+    let p = payload, guard = 0;
     while ((p.v || 0) < SAVE_VERSION && guard++ < 16) {
       const step = MIGRATIONS[p.v || 0];
-      if (!step) return null;                    // no path forward: caller starts fresh
+      if (!step) return null;
       p = step(p);
     }
     return p;
@@ -669,15 +1102,15 @@ h2{margin:0 0 14px; font-size:clamp(20px,4.5vw,30px); letter-spacing:.08em; colo
 
   function save(state) {
     try {
-      localStorage.setItem(SAVE_KEY, JSON.stringify({
-        v: SAVE_VERSION, level: state.level, unlocked: state.unlocked
-      }));
+      const chars = {};
+      for (const c in state.chars) chars[c] = { level: state.chars[c].level, unlocked: state.chars[c].unlocked };
+      localStorage.setItem(SAVE_KEY, JSON.stringify({ v: SAVE_VERSION, active: state.active, chars }));
     } catch (e) { /* private mode, quota, blocked storage: the tree still works in memory */ }
     return state;
   }
 
-  /* Never throws. Unknown ids in the save mean the tree changed under the player:
-     drop the build and hand every point back. */
+  /* Never throws. Unknown ids mean the tree changed under the player: drop that
+     character's build and hand every point back. */
   function load() {
     const state = createState();
     let raw = null;
@@ -691,33 +1124,43 @@ h2{margin:0 0 14px; font-size:clamp(20px,4.5vw,30px); letter-spacing:.08em; colo
     payload = migrate(payload);
     if (!payload) return state;
 
-    state.level = Math.max(0, Math.floor(payload.level || 0));
+    if (payload.active && TREES[payload.active]) state.active = payload.active;
+    const refunded = [];
 
-    const saved = Array.isArray(payload.unlocked) ? payload.unlocked : [];
-    const unknown = saved.filter(id => !BY_ID[id]);
-    if (unknown.length) {
-      state.refunded = unknown;                  // surfaced so the UI can say why
-      state.unlocked = [];
-      save(state);
-    } else {
+    const savedChars = (payload.chars && typeof payload.chars === 'object') ? payload.chars : {};
+    for (const charId of CHAR_IDS) {
+      const saved = savedChars[charId];
+      if (!saved) continue;
+      const b = bucket(state, charId);
+      b.level = Math.max(0, Math.floor(saved.level || 0));
+
+      const list = Array.isArray(saved.unlocked) ? saved.unlocked : [];
+      const idx = INDEX[charId];
+      if (list.some(id => !idx.byId[id])) {
+        refunded.push.apply(refunded, list.filter(id => !idx.byId[id]));
+        b.unlocked = [];
+        continue;
+      }
       // keep only what the rules still allow, in save order
       const rebuilt = [];
-      const probe = { version: SAVE_VERSION, level: state.level, unlocked: rebuilt, compiled: null };
-      for (const id of saved) {
-        if (canUnlock(id, probe).ok) rebuilt.push(id);
-      }
-      state.unlocked = rebuilt;
-      if (rebuilt.length !== saved.length) { state.refunded = saved.filter(id => rebuilt.indexOf(id) === -1); save(state); }
+      const probe = { version: SAVE_VERSION, active: charId, chars: { [charId]: { level: b.level, unlocked: rebuilt } } };
+      for (const id of list) if (canUnlock(id, probe).ok) rebuilt.push(id);
+      if (rebuilt.length !== list.length) refunded.push.apply(refunded, list.filter(id => rebuilt.indexOf(id) === -1));
+      b.unlocked = rebuilt;
     }
 
+    if (refunded.length) { state.refunded = refunded; save(state); }
+    if (payload.migratedFrom) state.migratedFrom = payload.migratedFrom;
     state.compiled = recomputeStats(state);
     return state;
   }
 
   return {
     // data passthrough
-    NODES, BY_ID, CHILDREN, ARCHETYPES, STAT_BASE, TIER_COST, COLS: DATA.COLS, TIER_LABEL: DATA.TIER_LABEL,
-    SAVE_KEY, SAVE_VERSION,
+    TREES, INDEX, CHAR_IDS, DEFAULT_CHAR, STAT_BASE, TIER_COST, FLAGS,
+    COLS: DATA.COLS, TIER_LABEL: DATA.TIER_LABEL, SAVE_KEY, SAVE_VERSION,
+    // active tree helpers
+    activeTree: tree, nodeFor,
     // rules
     canUnlock, nodeStatus, unlock, reset,
     // points
@@ -725,7 +1168,7 @@ h2{margin:0 0 14px; font-size:clamp(20px,4.5vw,30px); letter-spacing:.08em; colo
     // compilation
     recomputeStats, archetypeCounts, dominantArchetype,
     // state
-    createState, save, load, has
+    createState, setCharacter, save, load, has
   };
 });
 </script>
@@ -764,6 +1207,8 @@ h2{margin:0 0 14px; font-size:clamp(20px,4.5vw,30px); letter-spacing:.08em; colo
 .atree-hud{display:flex; flex-wrap:wrap; align-items:center; gap:10px;
   padding:10px 14px; background:rgba(12,20,36,.96); border-bottom:1px solid rgba(120,150,190,.22); flex:0 0 auto;}
 .atree-pts{font-weight:800; font-size:17px; color:#eaf6ff; letter-spacing:.04em;}
+.atree-who{font-weight:800; font-size:15px; letter-spacing:.06em; color:#eaf6ff;}
+.atree-who small{display:block; font-size:10px; font-weight:600; letter-spacing:.14em; color:#7e9bc4; text-transform:uppercase;}
 .atree-pts small{display:block; font-size:10px; font-weight:600; letter-spacing:.14em; color:#7e9bc4; text-transform:uppercase;}
 .atree-arch{display:flex; gap:8px; flex-wrap:wrap;}
 .atree-chip{display:flex; align-items:center; gap:6px; padding:4px 10px; border-radius:20px;
@@ -846,7 +1291,7 @@ h2{margin:0 0 14px; font-size:clamp(20px,4.5vw,30px); letter-spacing:.08em; colo
   };
   const cx = n => n.col * CELL_W + CELL_W / 2;
   const cy = n => n.row * CELL_H + CELL_H / 2;
-  const archColor = a => (a && T.ARCHETYPES[a] ? T.ARCHETYPES[a].color : '#8fb2d8');
+  const archColor = (idx, a) => (a && idx.archetypes[a] ? idx.archetypes[a].color : '#8fb2d8');
 
   /* human readable effect lines, also used by the tooltip */
   const norm = s => String(s).toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -883,158 +1328,171 @@ h2{margin:0 0 14px; font-size:clamp(20px,4.5vw,30px); letter-spacing:.08em; colo
     let state = opts.state || T.load();
     const onChange = opts.onChange || function () {};
 
-    const rows = Math.max.apply(null, T.NODES.map(n => n.row)) + 1;
-    const cols = T.COLS || (Math.max.apply(null, T.NODES.map(n => n.col)) + 1);
-
     const rootEl = el('div', 'atree');
     const hud = el('div', 'atree-hud');
+    const who = el('div', 'atree-who');
     const pts = el('div', 'atree-pts');
     const chips = el('div', 'atree-arch');
     const spacer = el('div', 'atree-spacer');
     const resetBtn = el('button', 'atree-btn', 'Reset tree');
     const note = el('div', 'atree-note');
-    hud.append(pts, chips, spacer, resetBtn, note);
+    hud.append(who, pts, chips, spacer, resetBtn, note);
 
     const scroll = el('div', 'atree-scroll');
-    const grid = el('div', 'atree-grid');
-    grid.style.width = cols * CELL_W + 'px';
-    grid.style.height = rows * CELL_H + 'px';
-    const svg = document.createElementNS(SVG_NS, 'svg');
-    svg.setAttribute('class', 'atree-pipes');
-    svg.setAttribute('width', cols * CELL_W);
-    svg.setAttribute('height', rows * CELL_H);
-    grid.appendChild(svg);
-    scroll.appendChild(grid);
-
     const tip = el('div', 'atree-tip');
     const confirm = el('div', 'atree-confirm',
-      '<div class="box"><h3>Reset the ability tree?</h3>' +
+      '<div class="box"><h3>Reset this ability tree?</h3>' +
       '<p id="atree-confirm-text"></p>' +
       '<div class="row"><button class="yes">Reset</button><button class="no">Cancel</button></div></div>');
     rootEl.append(hud, scroll, tip, confirm);
     container.innerHTML = '';
     container.appendChild(rootEl);
 
-    /* --- nodes --- */
-    const tiles = {};
-    for (const n of T.NODES) {
-      const b = el('button', 'atree-node t-' + n.tier);
-      b.type = 'button';
-      b.style.left = (cx(n) - TILE_W / 2) + 'px';
-      b.style.top = (cy(n) - TILE_H / 2) + 'px';
-      b.style.width = TILE_W + 'px';
-      b.style.height = TILE_H + 'px';
-      b.innerHTML = '<span class="g">' + (TIER_GLYPH[n.tier] || '◆') + '</span>' +
-                    '<span class="n">' + n.name + '</span>' +
-                    '<span class="c">' + T.costOf(n) + ' pt' + (T.costOf(n) === 1 ? '' : 's') + '</span>';
-      if (n.archetype) {
-        const bar = el('span', 'arch');
-        bar.style.color = archColor(n.archetype);
-        b.appendChild(bar);
-      }
-      b.addEventListener('click', () => clickNode(n.id));
-      b.addEventListener('mouseenter', ev => showTip(n, ev.currentTarget));
-      b.addEventListener('focus', ev => showTip(n, ev.currentTarget));
-      b.addEventListener('mouseleave', hideTip);
-      b.addEventListener('blur', hideTip);
-      grid.appendChild(b);
-      tiles[n.id] = b;
-    }
+    /* rebuilt whenever the active character changes */
+    let idx = null, tiles = {}, segs = null, junctionDots = [], svg = null, builtFor = null;
 
-    /* --- pipes: build once, recolour on paint --- */
-    const segs = new Map();            // key -> {x1,y1,x2,y2, edges:[{parent,child}], path}
-    const joins = new Map();           // "x,y" -> count of segment endpoints
-    function addSeg(x1, y1, x2, y2, parent, child) {
-      if (x1 === x2 && y1 === y2) return;
-      const key = [x1, y1, x2, y2].map(v => Math.round(v)).join(':');
-      let s = segs.get(key);
-      if (!s) { s = { x1, y1, x2, y2, edges: [] }; segs.set(key, s); }
-      s.edges.push({ parent, child });
-      for (const p of [[x1, y1], [x2, y2]]) {
-        const k = Math.round(p[0]) + ',' + Math.round(p[1]);
-        joins.set(k, (joins.get(k) || 0) + 1);
+    function build() {
+      idx = T.activeTree(state);
+      builtFor = idx.charId;
+      tiles = {};
+      segs = new Map();
+      junctionDots = [];
+      scroll.innerHTML = '';
+
+      const rows = Math.max.apply(null, idx.nodes.map(n => n.row)) + 1;
+      const cols = T.COLS || (Math.max.apply(null, idx.nodes.map(n => n.col)) + 1);
+
+      const grid = el('div', 'atree-grid');
+      grid.style.width = cols * CELL_W + 'px';
+      grid.style.height = rows * CELL_H + 'px';
+      svg = document.createElementNS(SVG_NS, 'svg');
+      svg.setAttribute('class', 'atree-pipes');
+      svg.setAttribute('width', cols * CELL_W);
+      svg.setAttribute('height', rows * CELL_H);
+      grid.appendChild(svg);
+      scroll.appendChild(grid);
+
+      for (const n of idx.nodes) {
+        const b = el('button', 'atree-node t-' + n.tier);
+        b.type = 'button';
+        b.style.left = (cx(n) - TILE_W / 2) + 'px';
+        b.style.top = (cy(n) - TILE_H / 2) + 'px';
+        b.style.width = TILE_W + 'px';
+        b.style.height = TILE_H + 'px';
+        b.innerHTML = '<span class="g">' + (TIER_GLYPH[n.tier] || '\u25c6') + '</span>' +
+                      '<span class="n">' + n.name + '</span>' +
+                      '<span class="c">' + T.costOf(n) + ' pt' + (T.costOf(n) === 1 ? '' : 's') + '</span>';
+        if (n.archetype) {
+          const bar = el('span', 'arch');
+          bar.style.color = archColor(idx, n.archetype);
+          b.appendChild(bar);
+        }
+        b.addEventListener('click', () => clickNode(n.id));
+        b.addEventListener('mouseenter', ev => showTip(n, ev.currentTarget));
+        b.addEventListener('focus', ev => showTip(n, ev.currentTarget));
+        b.addEventListener('mouseleave', hideTip);
+        b.addEventListener('blur', hideTip);
+        grid.appendChild(b);
+        tiles[n.id] = b;
       }
-    }
-    for (const n of T.NODES) {
-      for (const pid of (n.parents || [])) {
-        const p = T.BY_ID[pid];
-        if (!p) continue;
-        const px = cx(p), py = cy(p), nx = cx(n), ny = cy(n);
-        const midY = (py + ny) / 2;
-        addSeg(px, py, px, midY, pid, n.id);     // down out of the parent
-        addSeg(px, midY, nx, midY, pid, n.id);   // across the gutter
-        addSeg(nx, midY, nx, ny, pid, n.id);     // down into the child
+
+      /* pipes: parent -> child elbows, deduplicated into shared trunks */
+      const joins = new Map();
+      function addSeg(x1, y1, x2, y2, parent, child) {
+        if (x1 === x2 && y1 === y2) return;
+        const key = [x1, y1, x2, y2].map(v => Math.round(v)).join(':');
+        let s2 = segs.get(key);
+        if (!s2) { s2 = { x1, y1, x2, y2, edges: [] }; segs.set(key, s2); }
+        s2.edges.push({ parent, child });
+        for (const p of [[x1, y1], [x2, y2]]) {
+          const k = Math.round(p[0]) + ',' + Math.round(p[1]);
+          joins.set(k, (joins.get(k) || 0) + 1);
+        }
       }
-    }
-    for (const [, s] of segs) {
-      const path = document.createElementNS(SVG_NS, 'line');
-      path.setAttribute('x1', s.x1); path.setAttribute('y1', s.y1);
-      path.setAttribute('x2', s.x2); path.setAttribute('y2', s.y2);
-      path.setAttribute('stroke-width', 4);
-      path.setAttribute('stroke-linecap', 'round');
-      svg.appendChild(path);
-      s.path = path;
-    }
-    // a dot wherever three or more pipe ends meet, so joins read as joins
-    const junctionDots = [];
-    for (const [k, count] of joins) {
-      if (count < 3) continue;
-      const [jx, jy] = k.split(',').map(Number);
-      if (T.NODES.some(n => Math.round(cx(n)) === jx && Math.round(cy(n)) === jy)) continue;
-      const dot = document.createElementNS(SVG_NS, 'circle');
-      dot.setAttribute('cx', jx); dot.setAttribute('cy', jy); dot.setAttribute('r', 4.5);
-      svg.appendChild(dot);
-      junctionDots.push({ el: dot, x: jx, y: jy });
+      for (const n of idx.nodes) {
+        for (const pid of (n.parents || [])) {
+          const p = idx.byId[pid];
+          if (!p) continue;
+          const px = cx(p), py = cy(p), nx = cx(n), ny = cy(n);
+          const midY = (py + ny) / 2;
+          addSeg(px, py, px, midY, pid, n.id);     // down out of the parent
+          addSeg(px, midY, nx, midY, pid, n.id);   // across the gutter
+          addSeg(nx, midY, nx, ny, pid, n.id);     // down into the child
+        }
+      }
+      for (const [, s2] of segs) {
+        const line = document.createElementNS(SVG_NS, 'line');
+        line.setAttribute('x1', s2.x1); line.setAttribute('y1', s2.y1);
+        line.setAttribute('x2', s2.x2); line.setAttribute('y2', s2.y2);
+        line.setAttribute('stroke-width', 4);
+        line.setAttribute('stroke-linecap', 'round');
+        svg.appendChild(line);
+        s2.path = line;
+      }
+      for (const [k, count] of joins) {
+        if (count < 3) continue;
+        const parts = k.split(',').map(Number);
+        const jx = parts[0], jy = parts[1];
+        if (idx.nodes.some(n => Math.round(cx(n)) === jx && Math.round(cy(n)) === jy)) continue;
+        const dot = document.createElementNS(SVG_NS, 'circle');
+        dot.setAttribute('cx', jx); dot.setAttribute('cy', jy); dot.setAttribute('r', 4.5);
+        svg.appendChild(dot);
+        junctionDots.push({ el: dot, x: jx, y: jy });
+      }
     }
 
     /* --- painting --- */
     const PIPE = { off: 'rgba(120,150,190,.20)', live: 'rgba(64,224,255,.55)', on: '#9dff5c' };
     function paint() {
       const c = state.compiled;
+      const t = T.TREES[idx.charId];
+
+      who.innerHTML = (t.name || idx.charId.toUpperCase()) + '<small>ability tree</small>';
       pts.innerHTML = c.pointsLeft + ' <small>points left &middot; ' + c.pointsSpent + ' spent</small>';
 
       chips.innerHTML = '';
-      for (const key in T.ARCHETYPES) {
-        const a = T.ARCHETYPES[key];
-        const chip = el('div', 'atree-chip' + (c.dominant === key ? ' dom' : ''));
+      for (const a of idx.archList) {
+        const chip = el('div', 'atree-chip' + (c.dominant === a.id ? ' dom' : ''));
         chip.style.color = a.color;
-        chip.innerHTML = '<span class="atree-dot"></span><span style="color:#a8c6e8">' + a.name + '</span> <b>' + c.archetypeCounts[key] + '</b>';
+        chip.title = a.blurb;
+        chip.innerHTML = '<span class="atree-dot"></span><span style="color:#a8c6e8">' + a.name + '</span> <b>' +
+                         (c.archetypeCounts[a.id] || 0) + '</b>';
         chips.appendChild(chip);
       }
 
-      for (const n of T.NODES) {
+      for (const n of idx.nodes) {
         const st = T.nodeStatus(n.id, state);
         const b = tiles[n.id];
         b.className = 'atree-node t-' + n.tier + ' s-' + st;
         b.setAttribute('aria-pressed', st === 'unlocked' ? 'true' : 'false');
-        b.disabled = false;   // still focusable so the tooltip can explain why not
       }
 
-      for (const [, s] of segs) {
+      for (const [, s2] of segs) {
         let best = 'off';
-        for (const e of s.edges) {
+        for (const e of s2.edges) {
           const pOn = T.has(state, e.parent), cOn = T.has(state, e.child);
           if (pOn && cOn) { best = 'on'; break; }
           if (pOn) best = 'live';
         }
-        s.path.setAttribute('stroke', PIPE[best]);
-        s.state = best;
+        s2.path.setAttribute('stroke', PIPE[best]);
+        s2.state = best;
       }
       for (const d of junctionDots) {
         let best = 'off';
-        for (const [, s] of segs) {
-          if (Math.round(s.x1) === d.x && Math.round(s.y1) === d.y || Math.round(s.x2) === d.x && Math.round(s.y2) === d.y) {
-            if (s.state === 'on') { best = 'on'; break; }
-            if (s.state === 'live') best = 'live';
-          }
+        for (const [, s2] of segs) {
+          const touches = (Math.round(s2.x1) === d.x && Math.round(s2.y1) === d.y) ||
+                          (Math.round(s2.x2) === d.x && Math.round(s2.y2) === d.y);
+          if (!touches) continue;
+          if (s2.state === 'on') { best = 'on'; break; }
+          if (s2.state === 'live') best = 'live';
         }
         d.el.setAttribute('fill', PIPE[best]);
       }
 
       note.textContent = state.refunded && state.refunded.length
-        ? 'Your saved build referenced ' + state.refunded.length + ' ability that no longer exists — every point was refunded.'
+        ? 'A saved build referenced ' + state.refunded.length + ' ability that no longer exists \u2014 those points were refunded.'
         : '';
-      if (tipNode) showTip(tipNode, tiles[tipNode.id]);   // keep an open tooltip truthful
+      if (tipNode && tiles[tipNode.id]) showTip(tipNode, tiles[tipNode.id]);
     }
 
     /* --- tooltip --- */
@@ -1043,7 +1501,7 @@ h2{margin:0 0 14px; font-size:clamp(20px,4.5vw,30px); letter-spacing:.08em; colo
       tipNode = n;
       const unlocked = T.has(state, n.id);
       const check = T.canUnlock(n.id, state);
-      const a = n.archetype ? T.ARCHETYPES[n.archetype] : null;
+      const a = n.archetype ? idx.archetypes[n.archetype] : null;
       const tierLabel = T.TIER_LABEL[n.tier] || n.tier;
 
       let html = '<h4>' + n.name + '</h4>';
@@ -1053,7 +1511,7 @@ h2{margin:0 0 14px; font-size:clamp(20px,4.5vw,30px); letter-spacing:.08em; colo
       html += '<div class="desc">' + n.desc + '</div>';
       for (const e of effectLines(n)) html += '<div class="eff' + (e.neg ? ' neg' : '') + '">' + e.text + '</div>';
       if (n.blocks && n.blocks.length) {
-        html += '<div class="eff neg">Locks out: ' + n.blocks.map(b => (T.BY_ID[b] ? T.BY_ID[b].name : b)).join(', ') + '</div>';
+        html += '<div class="eff neg">Locks out: ' + n.blocks.map(b => (idx.byId[b] ? idx.byId[b].name : b)).join(', ') + '</div>';
       }
       if (unlocked) html += '<div class="got">Unlocked</div>';
       else if (!check.ok) html += '<div class="why"><b>Requires</b>' + check.reasons.map(r => '<div>' + r + '</div>').join('') + '</div>';
@@ -1075,13 +1533,13 @@ h2{margin:0 0 14px; font-size:clamp(20px,4.5vw,30px); letter-spacing:.08em; colo
 
     /* --- interaction --- */
     function clickNode(id) {
-      const res = T.unlock(id, state);          // re-checks the same canUnlock the UI painted with
+      const res = T.unlock(id, state);      // re-checks the same canUnlock the UI painted with
       if (res.ok) {
         paint();
         onChange(state);
       } else {
         const b = tiles[id];
-        showTip(T.BY_ID[id], b);
+        showTip(idx.byId[id], b);
         b.animate(
           [{ transform: 'translateX(0)' }, { transform: 'translateX(-4px)' }, { transform: 'translateX(4px)' }, { transform: 'translateX(0)' }],
           { duration: 180 }
@@ -1091,7 +1549,8 @@ h2{margin:0 0 14px; font-size:clamp(20px,4.5vw,30px); letter-spacing:.08em; colo
 
     resetBtn.addEventListener('click', () => {
       confirm.querySelector('#atree-confirm-text').textContent =
-        'Every unlocked ability is cleared and all ' + state.compiled.pointsSpent + ' spent points come back. This cannot be undone.';
+        'Every ability in this character\u2019s tree is cleared and all ' + state.compiled.pointsSpent +
+        ' spent points come back. Other characters are untouched.';
       confirm.classList.add('show');
     });
     confirm.querySelector('.no').addEventListener('click', () => confirm.classList.remove('show'));
@@ -1103,11 +1562,16 @@ h2{margin:0 0 14px; font-size:clamp(20px,4.5vw,30px); letter-spacing:.08em; colo
       onChange(state);
     });
 
+    build();
     paint();
 
     return {
       el: rootEl,
-      refresh(next) { if (next) state = next; paint(); },
+      refresh(next) {
+        if (next) state = next;
+        if (state.active !== builtFor) build();     // the player switched character
+        paint();
+      },
       getState() { return state; },
       destroy() { hideTip(); container.innerHTML = ''; }
     };
@@ -1353,7 +1817,6 @@ const WEAPONS = {
   rail:    { name: 'Railgun',      ico: '🔷', dmg: 78, rof: 0.85, speed: 2100, spread: 0.005, count: 1, ammo: 26, kick: 11,  size: 6,   color: '#e08bff', pierce: 4 },
   flak:    { name: 'Flak Cannon',  ico: '🧨', dmg: 26, rof: 0.5, speed: 720,  spread: 0.06, count: 1, ammo: 48,  kick: 6,   size: 7,   color: '#ff8a3d', explode: 78 }
 };
-const DROP_WEAPONS = ['smg', 'shotgun', 'rail', 'flak'];
 
 /* ---------------- player ---------------- */
 function makePlayer(charId) {
@@ -1399,7 +1862,7 @@ function shoot() {
   if (player.ammo <= 0) { swapWeapon(player.sigWeapon || 'pistol'); return; }
   player.fireCd = playerFireInterval();
 
-  const total = w.count + player.extra;
+  const total = Math.max(1, w.count + player.extra);
   const muzzle = player.r + 12;
   player.shotCount++;
   const mega = player.megaEvery > 0 && player.shotCount % player.megaEvery === 0;
@@ -1508,7 +1971,7 @@ function gainXp(v) {
     player.pending++;             // a burst of xp can stack several picks
     player.xpNext = Math.round(player.xpNext * 1.35 + 6);
   }
-  AbilityTree.grantPoints(treeState, player.level);   // the one points hook
+  AbilityTree.grantPoints(treeState, player.level, player.charId);   // the one points hook
   AbilityTree.save(treeState);
   updateSpButton();
   if (player.pending > 0 && game.state === 'play') openLevelUp();
@@ -1644,14 +2107,10 @@ function killEnemy(e) {
   if (e.boss) {
     explode(e.x, e.y, 190, 0, true);
     dropPickup(e.x, e.y, 'health');
-    dropPickup(e.x + 46, e.y, 'weapon');
+    dropPickup(e.x + 46, e.y, 'health');
     game.banner = { text: 'TARGET ELIMINATED', t: 2.2, color: '#9dff5c' };
-  } else if (Math.random() < 0.09 * player.dropMul) {
+  } else if (Math.random() < 0.12 * player.dropMul) {
     dropPickup(e.x, e.y, 'health');
-  } else if (Math.random() < 0.055 * player.dropMul) {
-    dropPickup(e.x, e.y, 'weapon');
-  } else if (Math.random() < 0.09 * player.dropMul && player.ammo !== Infinity) {
-    dropPickup(e.x, e.y, 'ammo');
   }
 }
 
@@ -1676,9 +2135,7 @@ function onEnemyKilled(e) {
 }
 
 function dropPickup(x, y, type) {
-  const p = { type, x, y, vx: rand(-40, 40), vy: rand(-40, 40), r: 13, life: 26, bob: rand(0, TAU) };
-  if (type === 'weapon') p.weapon = pick(DROP_WEAPONS);
-  pickups.push(p);
+  pickups.push({ type, x, y, vx: rand(-40, 40), vy: rand(-40, 40), r: 13, life: 26, bob: rand(0, TAU) });
 }
 
 function updateEnemy(e, dt) {
@@ -1932,7 +2389,7 @@ const UPGRADES = [
   { id: 'adrenal', ico: '🏃', name: 'Adrenaline',     desc: 'Kills grant +20% speed for 2s',  max: 2, apply: p => p.adrenaline += 0.20 },
   { id: 'blastup', ico: '💥', name: 'Bigger Blasts',  desc: '+30% explosion damage and size', max: 4,
     apply: p => { p.explodeMul *= 1.3; p.explodeDmgMul *= 1.3; } },
-  { id: 'scav',   ico: '📦', name: 'Scavenger',       desc: '+50% pickup drops',              max: 3, apply: p => p.dropMul += 0.5 },
+  { id: 'scav',   ico: '📦', name: 'Scavenger',       desc: '+50% health drops',              max: 3, apply: p => p.dropMul += 0.5 },
   { id: 'overkill', ico: '🧨', name: 'Overkill',      desc: 'Kills detonate for 55',          max: 3, rare: true, apply: p => p.onKillBoom += 55 },
   { id: 'bounty', ico: '◆', name: 'Bounty Chip',     desc: '+15% score, so more cores banked', max: 4, apply: p => p.scoreMul += 0.15 }
 ];
@@ -2020,18 +2477,6 @@ function collectPickup(p) {
   } else if (p.type === 'health') {
     healPlayer(32);
     burst(p.x, p.y, 10, '#9dff5c', 160);
-  } else if (p.type === 'ammo') {
-    const w = WEAPONS[player.weapon];
-    if (player.ammo !== Infinity) {
-      player.ammo = Math.min(w.ammo, player.ammo + Math.ceil(w.ammo * 0.4));
-      floatText(player.x, player.y - 30, 'AMMO', '#ffc46b', 14);
-    }
-    burst(p.x, p.y, 8, '#ffc46b', 150);
-  } else if (p.type === 'weapon') {
-    swapWeapon(p.weapon);
-    floatText(player.x, player.y - 34, WEAPONS[p.weapon].name, WEAPONS[p.weapon].color, 16);
-    burst(p.x, p.y, 14, WEAPONS[p.weapon].color, 200);
-    game.banner = { text: WEAPONS[p.weapon].name.toUpperCase(), t: 1.2, color: WEAPONS[p.weapon].color };
   }
 }
 
@@ -2510,15 +2955,6 @@ function drawWorld() {
       ctx.shadowColor = '#d08bff'; ctx.fillStyle = '#d08bff';
       ctx.beginPath(); ctx.arc(x, y, 6, 0, TAU); ctx.fill();
       ctx.globalAlpha = 0.4; ctx.beginPath(); ctx.arc(x, y - 3, 3, 0, TAU); ctx.fill();
-    } else if (p.type === 'ammo') {
-      ctx.shadowColor = '#ffc46b'; ctx.fillStyle = '#ffc46b';
-      ctx.fillRect(x - 7, y - 9, 14, 18);
-      ctx.fillStyle = '#3a2a10'; ctx.fillRect(x - 4, y - 5, 8, 3);
-    } else {
-      const col = WEAPONS[p.weapon].color;
-      ctx.shadowColor = col; ctx.strokeStyle = col; ctx.lineWidth = 2.5;
-      drawPoly(x, y, 13, 6, game.time * 1.2); ctx.stroke();
-      ctx.fillStyle = col; ctx.fillRect(x - 7, y - 2.5, 14, 5);
     }
     ctx.restore();
   }
@@ -2642,9 +3078,9 @@ function drawHUD() {
   ctx.font = '700 14px "Segoe UI",Roboto,sans-serif';
   ctx.fillStyle = w.color;
   ctx.fillText(w.ico + '  ' + w.name, pad, pad + 62 + yOff);
-  ctx.font = '700 12px "Segoe UI",Roboto,sans-serif';
-  ctx.fillStyle = player.ammo !== Infinity && player.ammo < 15 ? '#ff6b9d' : '#a8c6e8';
-  ctx.fillText(player.ammo === Infinity ? '∞ AMMO' : player.ammo + ' AMMO', pad, pad + 79 + yOff);
+  ctx.font = '600 11px "Segoe UI",Roboto,sans-serif';
+  ctx.fillStyle = '#7e9bc4';
+  ctx.fillText('SIGNATURE WEAPON', pad, pad + 79 + yOff);
 
   // score / wave (top right)
   ctx.textAlign = 'right';
@@ -2728,7 +3164,7 @@ function drawMinimap() {
 
   for (const p of pickups) {
     if (p.type === 'xp') continue;
-    ctx.fillStyle = p.type === 'health' ? '#9dff5c' : (p.type === 'ammo' ? '#ffc46b' : '#e08bff');
+    ctx.fillStyle = p.type === 'soul' ? '#d08bff' : '#9dff5c';
     ctx.fillRect(mx + p.x * sx - 1.5, my + p.y * sy - 1.5, 3, 3);
   }
   for (const e of enemies) {
@@ -3278,8 +3714,9 @@ function showCharInfo() {
   const c = CHAR_BY_ID[selectedChar];
   const w = WEAPONS[c.weapon];
   const unlocked = isUnlocked(c.id);
-  const tc = treeState.compiled;
-  const dom = tc.dominant ? AbilityTree.ARCHETYPES[tc.dominant] : null;
+  const tc = AbilityTree.recomputeStats(treeState, c.id);
+  const arch = AbilityTree.INDEX[c.id] ? AbilityTree.INDEX[c.id].archetypes : {};
+  const dom = tc.dominant ? arch[tc.dominant] : null;
   document.getElementById('csInfo').innerHTML =
     '<h3 style="color:' + c.color + '">' + c.ico + ' ' + c.name + '</h3>' +
     '<div class="role">' + c.title + '</div>' +
@@ -3287,7 +3724,7 @@ function showCharInfo() {
     '<div class="row"><b>Weapon:</b> ' + w.ico + ' ' + w.name + ' — ' + w.dmg + ' dmg, ' + (1 / w.rof).toFixed(1) + '/s' +
       (w.count > 1 ? ', ' + w.count + ' shots' : '') + '</div>' +
     '<div class="row pass"><b>Passive:</b> ' + c.passive + '</div>' +
-    '<div class="row"><b>Ability tree:</b> ' + tc.pointsSpent + ' points spent' +
+    '<div class="row"><b>Own ability tree:</b> ' + tc.pointsSpent + ' points spent' +
       (dom ? ' · <span style="color:' + dom.color + '">' + dom.name + '</span>' : ' · no archetype yet') +
       (tc.pointsLeft > 0 ? ' · <span style="color:#9dff5c">' + tc.pointsLeft + ' unspent</span>' : '') + '</div>';
 
@@ -3321,20 +3758,32 @@ function deploySelected() {
 }
 
 /* ---------------- ability tree (drop-in module) ---------------- */
-/* The game owns none of the tree's rules. It grants points, reads the
-   compiled stats, and maps them onto the engine in applyTreeToPlayer(). */
+/* Every operative has its own tree, its own three archetypes and its own
+   point pool. The game owns none of the tree's rules: it grants points, reads
+   compiled stats, and maps them onto the engine below. */
 const treeState = AbilityTree.load();
 let treeUI = null;
+
+function treeCharId() {
+  // in a run the operative decides; on the menu the one you have selected does
+  if (game.state === 'play' || game.state === 'skills') return (player && player.charId) || selectedChar;
+  return selectedChar || (player && player.charId) || AbilityTree.DEFAULT_CHAR;
+}
 
 function openSkillTree() {
   if (game.state === 'play') game.state = 'skills';
   else if (game.state !== 'skills' && game.state !== 'menu' && game.state !== 'select') return;
   mouse.down = false;
+  AbilityTree.setCharacter(treeState, treeCharId());
   showOverlay('skilltree');
   if (!treeUI) {
     treeUI = AbilityTreeUI.mount(document.getElementById('stMount'), {
       state: treeState,
-      onChange: () => { if (player && game.state === 'skills') applyTreeToPlayer(player, true); updateSpButton(); }
+      onChange: () => {
+        if (player && game.state === 'skills') applyTreeToPlayer(player, true);
+        updateSpButton();
+        if (game.state === 'select') buildCharGrid();
+      }
     });
   } else {
     treeUI.refresh(treeState);
@@ -3345,14 +3794,74 @@ function openSkillTree() {
 function closeSkillTree() {
   closeOverlay('skilltree');
   if (game.state === 'skills') game.state = 'play';
+  if (game.state === 'select') buildCharGrid();
   updateSpButton();
 }
 
-/* The one place tree output meets the engine: compiled stats and flags in,
-   existing player fields out. */
+/* Flags are behaviour switches; each maps onto a mechanic the engine already
+   has. Kept as a table so an unmapped flag is caught at boot, not in play. */
+const TREE_FLAGS = {
+  // defence
+  shieldBurst: p => { p.shieldBoom = Math.max(p.shieldBoom, 140); },
+  fortress:    p => { p.shieldDR += 0.25; },
+  secondWind:  p => { p.secondWind = 1; },
+  // fire
+  ignite:      p => { p.burnDps = Math.max(p.burnDps, 6); p.burnDur = Math.max(p.burnDur, 2); },
+  wildfire:    p => { p.burnSpread = Math.max(p.burnSpread, 110); },
+  immolate:    p => { p.burnAura += 12; p.burnAuraR = Math.max(p.burnAuraR || 0, 70); },
+  emberFeast:  p => { p.emberHeal += 5; },
+  inferno:     p => { p.burnBonus += 0.45; },
+  // ice
+  chill:       p => { p.slowPow = Math.min(0.9, Math.max(p.slowPow, 0.25)); p.slowDur = Math.max(p.slowDur, 1.2); },
+  chillAura:   p => { p.chillAura = Math.max(p.chillAura, 150); p.slowDur = Math.max(p.slowDur, 1.2); },
+  stasis:      p => { p.slowExecute += 0.20; },
+  shatterChain:p => { p.shatterChain = 1; },
+  cryoNova:    p => { p.dashNova = Math.max(p.dashNova, 190); },
+  gravityWell: p => { p.blastSlow = Math.max(p.blastSlow, 0.5); },
+  // lightning
+  arcShot:     p => { p.chains = Math.max(p.chains, 1); p.chainDmg = Math.max(p.chainDmg, 1); },
+  chainStun:   p => { p.chainStun = 1; },
+  staticField: p => { p.staticAura += 16; p.staticR = Math.max(p.staticR || 0, 140); },
+  arcDash:     p => { p.dashZap += 60; },
+  // blades and drones
+  bladestorm:  p => { p.orbit += 2; p.orbitDmg = Math.max(p.orbitDmg, 22); },
+  droneBoom:   p => { p.droneBoom = Math.max(p.droneBoom, 46); },
+  droneShield: p => { p.droneShield += 20; },
+  // dash
+  phaseDash:   p => { p.dashInvuln += 0.35; },
+  dashStrike:  p => { p.dashDmg += 50; },
+  dashBlast:   p => { p.dashBlast += 90; },
+  afterimage:  p => { p.dashTrail = 1; },
+  blink:       p => { p.dashDmg += 80; p.dashInvuln += 0.1; },
+  dashRefund:  p => { p.dashRefund = 1; },
+  // projectiles
+  bounceSplit: p => { p.bounceSplit = 1; },
+  amplify:     p => { p.bounceGain += 0.3; },
+  noFalloff:   p => { p.noFalloff = 1; },
+  critPierce:  p => { p.critPierce = 1; },
+  steadyAim:   p => { p.steady = 1; },
+  critBoom:    p => { p.critBoom += 70; },
+  // explosions
+  volatile:    p => { p.explodeAll = 1; },
+  carpet:      p => { p.clusterDepth = 1; p.cluster += 2; },
+  megaShell:   p => { p.megaEvery = 6; },
+  // on kill and scaling
+  adrenaline:  p => { p.adrenaline += 0.30; },
+  frenzy:      p => { p.killFrenzy = Math.max(p.killFrenzy, 0.25); },
+  deathMark:   p => { p.markEvery = 5; p.markBonus += 0.5; },
+  executioner: p => { p.execute += 0.12; },
+  desperate:   p => { p.desperateSpeed += 0.20; }
+};
+
+(function checkFlagCoverage() {
+  const missing = AbilityTree.FLAGS.filter(f => !TREE_FLAGS[f]);
+  if (missing.length) console.warn('ability tree: unmapped flags ->', missing.join(', '));
+})();
+
+/* The one place tree output meets the engine. */
 function applyTreeToPlayer(p, live) {
   if (live) {
-    // mid-run change: rebuild the player from its character base, keep run progress
+    // mid-run change: rebuild from the character base, keep run progress
     const keep = { x: p.x, y: p.y, hp: p.hp, xp: p.xp, level: p.level, xpNext: p.xpNext,
                    weapon: p.weapon, ammo: p.ammo, upgrades: p.upgrades, pending: p.pending };
     const rebuilt = makePlayer(p.charId);
@@ -3368,13 +3877,20 @@ function applyTreeToPlayer(p, live) {
     return;
   }
 
-  const c = treeState.compiled;
+  const c = AbilityTree.recomputeStats(treeState, p.charId);
   const S = c.stats, F = c.flags;
 
+  // multipliers
   p.dmgMul *= S.damage;
   p.rofMul *= S.fireRate;
   p.speedMul *= S.moveSpeed;
   p.dashCdMul *= S.dashCooldown;
+  p.explodeMul *= S.explosionSize;
+  p.explodeDmgMul *= S.explosionDamage;
+  p.droneRof *= S.droneRate;
+  p.chainDmg *= S.chainDamage;
+
+  // flat stats
   p.maxHp = Math.max(20, p.maxHp + S.maxHp);
   p.hp = Math.min(p.hp + Math.max(0, S.maxHp), p.maxHp);
   p.armor = Math.min(0.7, p.armor + S.armor);
@@ -3385,29 +3901,45 @@ function applyTreeToPlayer(p, live) {
   p.chains += S.chainCount;
   p.dashMax += S.dashCharges;
   p.dashCharge += S.dashCharges;
+  p.thorns += S.thorns;
+  p.lifesteal += S.lifesteal;
+  p.regen += S.regen;
+  p.magnet += S.magnet;
+  p.orbit += S.orbitCount;
+  p.orbitDmg += S.orbitDamage;
+  p.drones += S.droneCount;
+  p.dashDmg += S.dashDamage;
+  p.execute += S.execute;
+  p.berserk += S.berserk;
+  p.scoreMul += S.scoreBonus;
+  p.dropMul += S.dropBonus;
+  p.bounce += S.bounces;
+  p.homing += S.homingStrength;
+  p.cluster += S.clusterCount;
+  p.frostbite += S.frostbiteDamage;
+  p.killChain += S.killChainCount;
+  p.onKillBoom += S.onKillBlast;
+  p.droneHeal += S.droneRepair;
+  p.killHeal += S.killHealAmount;
+  p.soulHeal += S.soulHeal;
+  if (S.shield > 0) { p.shieldMax += S.shield; p.shield += S.shield; }
+  if (S.shieldRecharge > 0) {
+    p.shieldDelay = Math.max(0.8, p.shieldDelay - 0.6 * S.shieldRecharge);
+    p.shieldRegen += 5 * S.shieldRecharge;
+  }
+  if (S.burnDamage > 0) { p.burnDps += S.burnDamage; p.burnDur = Math.max(p.burnDur, 2); }
+  if (S.burnDuration > 0) p.burnDur += S.burnDuration;
   if (S.slowPower > 0) {
     p.slowPow = Math.min(0.9, p.slowPow + S.slowPower);
     p.slowDur = Math.max(p.slowDur, 1.2);
   }
+
+  // behaviour switches
+  for (const f of F) { const fn = TREE_FLAGS[f]; if (fn) fn(p); }
+
+  // durations and aura radii scale last, so flag-granted ones are included
   p.slowDur *= S.statusDuration;
   if (p.burnDur) p.burnDur *= S.statusDuration;
-
-  if (F.has('phaseDash')) p.dashInvuln += 0.35;
-  if (F.has('gravityWell')) p.blastSlow = Math.max(p.blastSlow, 0.5);
-  if (F.has('blinkProtocol')) { p.dashDmg += 80; p.dashInvuln += 0.1; }
-  if (F.has('executioner')) p.execute += 0.12;
-  if (F.has('cryoNova')) p.dashNova = Math.max(p.dashNova, 190);
-  if (F.has('bladestorm')) { p.orbit += 2; p.orbitDmg = Math.max(p.orbitDmg, 22) + 8; }
-  if (F.has('frenzy')) p.killFrenzy = Math.max(p.killFrenzy, 0.25);
-  if (F.has('stasisLock')) { p.slowExecute += 0.20; p.shatterChain = 1; }
-  if (F.has('ricochet')) p.bounce += 2;
-  if (F.has('conductor')) p.chainStun = 1;
-  if (F.has('afterimage')) p.dashTrail = 1;
-  if (F.has('annihilation')) p.critPierce = 1;
-  if (F.has('absoluteZero')) { p.chillAura = Math.max(p.chillAura, 150); p.frostbite += 8; }
-  if (F.has('perpetualMotion')) p.dmgMul *= 1 + (p.speedMul - 1);   // damage rides your speed
-
-  // aura radii scale last so flag-granted auras are included
   if (S.auraRadius !== 1) {
     if (p.burnAuraR) p.burnAuraR *= S.auraRadius;
     if (p.staticR) p.staticR *= S.auraRadius;
@@ -3418,7 +3950,7 @@ function applyTreeToPlayer(p, live) {
 function updateSpButton() {
   const b = document.getElementById('spBtn');
   if (!b) return;
-  const left = treeState.compiled.pointsLeft;
+  const left = AbilityTree.pointsLeft(treeState, treeCharId());
   const show = left > 0 && game.state === 'play';
   b.style.display = show ? 'block' : 'none';
   if (show) b.textContent = '\u2605 ' + left + ' ABILITY POINT' + (left === 1 ? '' : 'S') + (isTouch ? '' : ' \u2014 TAB');
@@ -3450,6 +3982,7 @@ function startRun(charId) {
   game.betweenWaves = 0; game.spawnQueue = []; game.banner = null;
   camera.shake = 0; camera.flash = 0;
   camera.x = player.x - VW / 2; camera.y = player.y - VH / 2;
+  AbilityTree.setCharacter(treeState, player.charId);
   closeAllOverlays();
   game.state = 'play';
   startWave(1);
