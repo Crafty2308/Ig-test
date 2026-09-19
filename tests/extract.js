@@ -1,0 +1,11 @@
+const path=require('path');
+const PAGE=path.join(__dirname,'..','theorycraft.html');
+const PAGE_URL='file://'+PAGE;
+const fs=require('fs');
+const src=fs.readFileSync(process.argv[2]||PAGE,'utf8');
+const a=src.indexOf('   ================================================================ */', src.indexOf('==ENGINE-START=='));
+const b=src.lastIndexOf('/* ==ENGINE-END== */');
+if(a<0||b<0) throw new Error('markers missing');
+const code=src.slice(src.indexOf('\n',a)+1, b);
+const EXPORTS='ELEMS,EL,ALLBUCKETS,CLASSES,ITEMS,TREES,MAJORS,SLOTS,RARITY,buildContext,computeAttack,simulate,dummyRun,headline,attributeDamage,attributeBySource,newState,rollItem,rolledValues,itemQuality,rollDrops,elemBudget,treeBudget,treeSpent,treeLeft,canAllocate,canDeallocate,reachable,exclBlocked,permaLocked,tiered,T_DMG,applyResist,playerIncoming,effectiveHp,attackTable,strikeDef,spellCost,fmt,burstWindow,statQuality,DUMMY,mulberry32,elemSpent,autoEquipStarters,isAlloc,REF_PROFILE,rarityWeight,pickPolicy,POLICY_NAME';
+module.exports=function(){ const m={exports:{}}; const fn=new Function('module','exports',code+'\n;module.exports={'+EXPORTS+'};'); fn(m,m.exports); return m.exports; };

@@ -286,6 +286,30 @@ button.slot,button.trial,button.spellrow,button.srow{display:grid;align-items:ce
 .tcbtn:active{background:#1c2432}
 .tcbtn.sm{font-size:10px;letter-spacing:.08em}
 
+/* ============================================================ WORLD */
+#scrWorld{overflow:hidden;position:relative;background:#07090d}
+#cv{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none}
+#poiPrompt{position:absolute;left:50%;transform:translateX(-50%);bottom:172px;z-index:5;
+  background:rgba(12,16,22,.94);border:1px solid var(--gold);padding:8px 14px;min-height:44px;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;max-width:76%}
+#poiPrompt b{font-size:12.5px;color:var(--gold);letter-spacing:.02em}
+#poiPrompt span{font-size:11px;color:var(--tx2)}
+#poiPrompt.dead{border-color:var(--line2)}
+#poiPrompt.dead b{color:var(--tx2)}
+#padBtns{position:absolute;right:8px;bottom:10px;display:grid;gap:7px;
+  grid-template-columns:repeat(2,minmax(0,1fr));width:186px;pointer-events:none}
+.pb{position:relative;overflow:hidden;pointer-events:auto;min-height:52px;
+  background:rgba(14,18,26,.82);border:1px solid var(--line2);color:var(--tx);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;padding:4px 3px}
+.pb b{font-size:10.5px;font-weight:700;letter-spacing:.02em;text-align:center;line-height:1.15}
+.pb i{font-style:normal;font-size:9px;color:var(--tx3)}
+.pb.basic{grid-column:1 / -1;border-color:#4a5163;background:rgba(22,27,37,.86)}
+.pb.held{background:rgba(58,47,18,.92);border-color:var(--gold)}
+.pb.poor{opacity:.45}
+.pb .cdmask{position:absolute;left:0;bottom:0;width:100%;height:0%;
+  background:rgba(4,6,10,.72);pointer-events:none;transition:height .05s linear}
+@keyframes nope{0%,100%{transform:translateX(0)}25%{transform:translateX(-3px)}75%{transform:translateX(3px)}}
+.nope{animation:nope .2s}
 /* ============================================================ TRIALS */
 .trial{display:grid;grid-template-columns:40px 1fr auto;align-items:center;
   border-bottom:1px solid var(--line);background:var(--panel);min-height:62px}
@@ -377,12 +401,16 @@ hr.sep{border:none;border-top:1px solid var(--line);margin:0}
       </div>
     </div>
   </div>
-  <div class="screen" id="scrTrial"></div>
+  <div class="screen" id="scrWorld">
+    <canvas id="cv"></canvas>
+    <div id="padBtns"></div>
+    <div id="poiPrompt" style="display:none"></div>
+  </div>
 </div>
 <nav id="tabs">
   <button class="tab on" data-scr="Gear"><span class="ic">▤</span>Gear</button>
   <button class="tab" data-scr="Tree"><span class="ic">✳</span>Tree</button>
-  <button class="tab" data-scr="Trial"><span class="ic">▶</span>Trial</button>
+  <button class="tab" data-scr="World"><span class="ic">▶</span>World</button>
 </nav>
 <div id="scrim"></div>
 <div id="sheet">
@@ -523,6 +551,13 @@ function buildContext(state){
     if(fx.key==="crit")   add(agg, "crit",   tiered(p,T_CRIT),   label, "elem", e);
   }
 
+  /* shrines: permanent, one-time, and traceable like anything else */
+  if(state.shrines) for(const pid in state.shrines){
+    const p = WORLD.pois.find(x=>x.id===pid);
+    if(!p) continue;
+    const c = p.choice.find(x=>x.id === state.shrines[pid]);
+    if(c) addAll(agg, c.stats, c.name+" (shrine)", "shrine", pid);
+  }
   /* tree */
   const tree = TREES[state.cls];
   const nodes = [];
@@ -1249,65 +1284,6 @@ function attributeBySource(state, baseDps){
 /* ================================================================
    DIAGNOSIS — one plain sentence, then the numbers underneath
    ================================================================ */
-function diagnose(r){
-  const e = r.enemy, ctx = r.ctx;
-  const need = (e.hp + (e.regen||0)*e.timeLimit) / e.timeLimit;
-  const ratio = r.effDps / Math.max(1, need);
-  const taken = r.taken || 1;
-  const parts = Object.entries(r.takenBy).sort((a,b)=>b[1]-a[1]);
-  const top = parts[0] || ["neutral",0];
-  const topPct = Math.round(top[1]/taken*100);
-  const topName = EL[top[0]] ? EL[top[0]].name : top[0];
-  const myRes = Math.round(g(ctx.agg,"res."+top[0]) + g(ctx.agg,"res.all"));
-  const starvePct = Math.round(r.starvedTime / Math.max(0.1, r.totalTime) * 100);
-  const facts = [];
-
-  facts.push(["Sustained DPS", fmt(r.effDps) + " / " + fmt(need) + " needed", ratio>=1?"pos":"neg"]);
-  if(r.wardAbsorbed > 1) facts.push(["Swallowed by wards", fmt(r.wardAbsorbed) + " of your " + fmt(r.dealt) + " damage never reached it"]);
-  facts.push(["Damage dealt", fmt(r.dealt) + " of " + fmt(e.hp) + " enemy HP" + (r.healedBack>1?" (+"+fmt(r.healedBack)+" healed back)":"")]);
-  facts.push(["Damage taken", fmt(r.taken) + " against " + fmt(ctx.maxHp) + " max HP"]);
-  if(taken>1) facts.push(["Biggest threat", topName + " — " + topPct + "% of incoming, your " + topName + " defence " + (myRes>=0?"+":"") + myRes + "%", myRes<0?"neg":""]);
-  facts.push(["Time on basic attacks", Math.round(r.strikeTime/Math.max(.1,r.totalTime)*100) + "%" + (starvePct>3?" · "+starvePct+"% out of mana":"")]);
-  if(e.ward) facts.push(["Ward windows", r.wardBreaks + " broken of " + (r.wardBreaks+r.wardFails) +
-    (r.wardFails? " — best failed push " + fmt(r.failPush) + " of " + fmt(e.ward.hp) : " — all broken"), r.wardFails?"neg":"pos"]);
-  if(e.drain) facts.push(["Mana drained", fmt(r.drained) + " over the fight, pool " + fmt(ctx.maxMana)]);
-
-  let line;
-  if(r.win){
-    line = "Cleared at " + r.killAt.toFixed(1) + "s with " + Math.round(r.hpPct*100) + "% health left — "
-         + (ratio>1.6 ? "you beat the damage check by " + ratio.toFixed(1) + "×, so there is headroom to trade damage for defence."
-                      : "you cleared it by " + Math.round((ratio-1)*100) + "% on damage, which is thin.");
-  } else if(r.deathAt >= 0){
-    const dmgClause = ratio >= 1.15
-      ? "You out-damaged the check by " + ratio.toFixed(1) + "×"
-      : (ratio >= 0.9 ? "Your damage was almost exactly on the check" : "You were " + Math.round((1-ratio)*100) + "% short on damage");
-    const causeClause = e.spike && top[1] > 0 && e.spike.dmg
-      ? " but died at " + r.deathAt.toFixed(1) + "s to its " + e.spike.every + "s burst — one hit lands for "
-        + fmt(playerIncoming(ctx, e.spike.dmg).total) + " against your " + fmt(ctx.maxHp) + " HP"
-      : " but died at " + r.deathAt.toFixed(1) + "s to sustained " + topName + " damage — " + topPct
-        + "% of everything that hit you was " + topName + " and your " + topName + " defence is " + (myRes>=0?"+":"") + myRes + "%";
-    line = dmgClause + causeClause + ".";
-  } else if(e.ward && r.wardFails > 0){
-    /* report the window that actually failed, and never print a near miss
-       as two identical rounded numbers */
-    const pushTxt = fmt(r.failPush) === fmt(e.ward.hp)
-      ? (r.failPush/e.ward.hp*100).toFixed(1) + "% of the"
-      : fmt(r.failPush) + " of the";
-    line = "Your " + e.ward.window.toFixed(1) + "s burst window delivered " + pushTxt + " "
-         + fmt(e.ward.hp) + " needed to break the ward — it resealed " + r.wardFails + " time" + (r.wardFails>1?"s":"")
-         + " and healed back " + fmt(r.healedBack) + ".";
-  } else if(starvePct > 25){
-    line = "You ran dry and spent " + starvePct + "% of the fight on basic attacks — sustained DPS of "
-         + fmt(r.effDps) + " against a " + fmt(need) + " check.";
-  } else if(e.regen && r.healedBack > r.dealt*0.25){
-    line = "Its regeneration ate " + fmt(r.healedBack) + " of your " + fmt(r.dealt)
-         + " damage — you need " + fmt(need) + " sustained DPS and you do " + fmt(r.effDps) + ".";
-  } else {
-    line = "You survived the full " + e.timeLimit + "s but left it on " + Math.round((1-r.enemyPct)*100)
-         + "% health — your " + fmt(r.effDps) + " DPS is " + Math.round(ratio*100) + "% of the " + fmt(need) + " this check wants.";
-  }
-  return {line, facts, ratio, need};
-}
 function fmt(n){
   if(n==null||isNaN(n)) return "—";
   const a = Math.abs(n);
@@ -1332,12 +1308,15 @@ const CLASSES = {
     base:{"armor":5,"res.stone":5},
     spells:[
       {id:"cleave", slot:1, name:"Cleave",      cost:20, time:0.80, mult:1.70, flatScale:0.90,
+       form:"melee", reach:104, arc:120, windup:0.13, active:0.10, recover:0.16, knock:150, heavy:true,
        fx:{pierce:1}, text:"A wide arc that carries through the target into whatever is behind it."},
       {id:"charge", slot:2, name:"Charge",      cost:24, time:0.60, mult:1.40, flatScale:0.70,
+       form:"dash", dashDist:260, iframes:0.22, reach:76, knock:210,
        fx:{weaken:{pct:12,dur:4}}, text:"Close the gap shoulder-first. Whatever you hit swings weaker for a while."},
       {id:"slam",   slot:3, name:"Ground Slam", cost:36, time:1.30, mult:2.80, flatScale:1.35,
+       form:"nova", radius:190, knock:190, heavy:true,
        fx:{aoe:true}, text:"Drive the head into the floor. Everything standing on it feels it."},
-      {id:"guard",  slot:4, name:"Guard",       cost:22, time:0.50, mult:0.00, flatScale:0,
+      {id:"guard",  slot:4, name:"Guard",       cost:22, time:0.50, mult:0.00, flatScale:0, form:"buff",
        util:{dur:4, cd:5}, fx:{guard:{block:40, dur:4, counter:0}},
        text:"Brace behind the haft. Blocks 40% of everything for four seconds."}
     ]
@@ -1350,12 +1329,16 @@ const CLASSES = {
     base:{"dodge":5,"res.gale":5},
     spells:[
       {id:"storm", slot:1, name:"Arrow Storm", cost:28, time:1.00, mult:3.15, flatScale:1.05,
+       form:"projectile", shots:5, spread:38, speed:660, range:560, projR:7,
        fx:{aoe:true}, text:"A volley across a whole front. Wide, and thin where it lands."},
       {id:"dash",  slot:2, name:"Dash",        cost:0,  time:0.30, mult:0.00, flatScale:0,
+       form:"dash", dashDist:230, iframes:0.38,
        util:{dur:4, cd:7, dodge:30}, fx:{}, text:"Free, short, and the reason you are still alive."},
       {id:"pin",   slot:3, name:"Pin Shot",    cost:20, time:0.70, mult:2.60, flatScale:0.85,
+       form:"projectile", speed:900, range:720, projR:6, heavy:true, knock:40,
        fx:{root:{pct:25,dur:3}}, text:"One arrow through something load-bearing. It stops moving and hits softer."},
       {id:"mark",  slot:4, name:"Mark",        cost:16, time:0.40, mult:0.30, flatScale:0.20,
+       form:"projectile", speed:1100, range:760, projR:6,
        fx:{mark:{pct:28,dur:8}}, text:"Almost no damage. Everything you do to a marked target hits harder."}
     ]
   },
@@ -1367,12 +1350,16 @@ const CLASSES = {
     base:{"res.cinder":5},
     spells:[
       {id:"bolt",   slot:1, name:"Firebolt", cost:14, time:0.50, mult:1.25, flatScale:0.60,
+       form:"projectile", speed:620, range:520, projR:10,
        fx:{}, text:"Cheap and quick. Everything else in this tree is built on top of it."},
       {id:"blink",  slot:2, name:"Blink",    cost:0,  time:0.25, mult:0.00, flatScale:0,
+       form:"dash", dashDist:250, iframes:0.34,
        util:{dur:3, cd:6, dodge:28}, fx:{}, text:"Three seconds of being somewhere else."},
       {id:"nova",   slot:3, name:"Nova",     cost:34, time:1.10, mult:2.45, flatScale:1.10,
+       form:"nova", radius:210, knock:120,
        fx:{aoe:true}, text:"A ring of fire leaving you in every direction."},
       {id:"siphon", slot:4, name:"Siphon",   cost:0,  time:0.90, mult:0.70, flatScale:0.38,
+       form:"projectile", speed:480, range:300, projR:12,
        fx:{drain:{mana:22}}, text:"Pulls mana out of whatever you point it at. Costs nothing, returns 22."}
     ]
   },
@@ -1383,13 +1370,16 @@ const CLASSES = {
     hp:640, mana:135, manaRegen:6.4, crit:5, critMult:2.0,
     base:{"hpRegen":4,"res.stone":4},
     spells:[
-      {id:"summon", slot:1, name:"Summon", cost:30, time:1.20, mult:0.00, flatScale:0,
+      {id:"summon", slot:1, name:"Summon", cost:30, time:1.20, mult:0.00, flatScale:0, form:"summon",
        fx:{summon:{count:1, pct:44, dur:14, cap:4}}, text:"One thorn-thing, for fourteen seconds. It fights while you do not."},
       {id:"root",   slot:2, name:"Root",   cost:18, time:0.60, mult:0.90, flatScale:0.45,
+       form:"ground", radius:120, castRange:300, delay:0.30,
        fx:{root:{pct:30,dur:4}}, text:"Holds it in place and cuts what it can put out by a third."},
       {id:"drain",  slot:3, name:"Drain",  cost:22, time:0.90, mult:1.55, flatScale:0.80,
+       form:"projectile", speed:520, range:330, projR:11,
        fx:{drain:{heal:4}}, text:"Takes from it and gives to you."},
       {id:"totem",  slot:4, name:"Totem",  cost:34, time:1.00, mult:0.00, flatScale:0,
+       form:"ground", radius:130, castRange:240, delay:0.25,
        fx:{zone:{name:"Totem", pct:30, dur:10, elem:"stone"}, weaken:{pct:15, dur:10}},
        text:"Plant it and leave it. It grinds at whatever stands near it and blunts what that thing swings."}
     ]
@@ -1654,77 +1644,6 @@ function itemQuality(inst){
   return n ? s/n : 1;
 }
 
-/* ================================================================
-   ENEMIES & TRIALS
-   Five archetypes, each checking a different defence. The check is
-   printed on the trial card before you fight it — this game has no
-   interest in surprising you.
-   ================================================================ */
-const ARCH = {
-  bulwark:    {name:"Bulwark",     check:"raw sustained damage through resistance"},
-  pyre:       {name:"Pyre",        check:"elemental defence and health sustain"},
-  executioner:{name:"Executioner", check:"the size of your health pool at one instant"},
-  ward:       {name:"Ward",        check:"burst damage inside a fixed window"},
-  leech:      {name:"Leech",       check:"your mana economy against a damage floor"}
-};
-function T(o){ return o; }
-const TRIALS = [
-T({n:1,  id:"t1", name:"Pit Dummy, Reinforced", arch:"bulwark", lvl:1,
-   flavor:"A sack of gravel in a steel frame. It does not fight back. It only has to outlast you.",
-   hp:390, timeLimit:30, res:{"neutral":10}, dps:null}),
-T({n:2,  id:"t2", name:"Ashmoth Swarm", arch:"pyre", lvl:2, adds:3,
-   flavor:"Individually harmless. There are not, at any point, individually.",
-   hp:810, timeLimit:30, res:{"cinder":35,"frost":-20}, dps:{"cinder":26.7,"neutral":6.1}}),
-T({n:3,  id:"t3", name:"The Slab", arch:"bulwark", lvl:3,
-   flavor:"Nine tonnes of quarried basalt with an opinion.",
-   hp:3260, timeLimit:32, res:{"neutral":25,"stone":30,"volt":-15}, dps:{"stone":24.7,"neutral":10.4}}),
-T({n:4,  id:"t4", name:"Kiln-Warden Orlo", arch:"pyre", lvl:4,
-   flavor:"He has stood in the doorway of the same kiln for eleven years and is no longer entirely outside it.",
-   hp:8240, timeLimit:34, res:{"cinder":50,"frost":-25,"neutral":10}, dps:{"cinder":27.2,"neutral":5.2}}),
-T({n:5,  id:"t5", name:"Tallow Executioner", arch:"executioner", lvl:5,
-   flavor:"Slow. Announces itself. Kills you anyway.",
-   hp:7770, timeLimit:34, res:{"neutral":20,"stone":15}, dps:{"neutral":21.6},
-   spike:{"every":6,"dmg":{"neutral":419,"stone":235}}}),
-T({n:6,  id:"t6", name:"Sealed Reliquary", arch:"ward", lvl:6,
-   flavor:"It reseals every eight seconds whether or not you were finished.",
-   hp:23960, timeLimit:36, res:{"neutral":15,"frost":20}, dps:{"frost":31.7,"neutral":10.4},
-   ward:{"hp":280,"window":4,"every":8,"first":5,"healOnFail":2875,"failDmg":{"frost":149}}}),
-T({n:7,  id:"t7", name:"Marrow Leech", arch:"leech", lvl:7,
-   flavor:"It is not trying to kill you. It is trying to make you boring.",
-   hp:38390, timeLimit:38, res:{"neutral":20,"gale":25}, dps:{"gale":5.6,"neutral":2.3},
-   regen:245, drain:3.7}),
-T({n:8,  id:"t8", name:"Glacier Gate", arch:"bulwark", lvl:8,
-   flavor:"Two hundred metres of ice with a door in it. The door is the boss.",
-   hp:29940, timeLimit:40, res:{"frost":60,"neutral":30,"cinder":-25}, dps:{"frost":33.3,"neutral":12}}),
-T({n:9,  id:"t9", name:"The Nine Bells", arch:"ward", lvl:9,
-   flavor:"Each bell is a ward. You are not expected to get all nine.",
-   hp:156800, timeLimit:40, res:{"neutral":25,"volt":20}, dps:{"volt":30.9,"neutral":13.3},
-   ward:{"hp":1970,"window":3.5,"every":7,"first":4,"healOnFail":18816,"failDmg":{"volt":92}}}),
-T({n:10,  id:"t10", name:"Cinder Choir", arch:"pyre", lvl:10, adds:4,
-   flavor:"Seven voices, one lung, and it is on fire.",
-   hp:259280, timeLimit:40, res:{"cinder":65,"neutral":25,"frost":-30}, dps:{"cinder":32.3,"neutral":7.9},
-   spike:{"every":9,"dmg":{"cinder":72}}}),
-T({n:11,  id:"t11", name:"Ossuary Warden", arch:"executioner", lvl:11,
-   flavor:"It hits once every five seconds and it has never needed a second.",
-   hp:262210, timeLimit:42, res:{"neutral":35,"stone":35,"gale":-20}, dps:{"neutral":6.5,"stone":4.6},
-   spike:{"every":5,"dmg":{"neutral":140,"stone":57}}}),
-T({n:12,  id:"t12", name:"The Debt Collector", arch:"leech", lvl:12,
-   flavor:"Every second you are not spending, it is.",
-   hp:204520, timeLimit:44, res:{"neutral":30,"frost":30,"volt":30}, dps:{"neutral":0,"frost":0}, thorns:3,
-   regen:1782, drain:8.6}),
-T({n:13,  id:"t13", name:"Anvil of Noon", arch:"bulwark", lvl:13,
-   flavor:"Resists everything a little and one thing completely. Find out which.",
-   hp:258910, timeLimit:46, res:{"neutral":45,"cinder":70,"stone":45,"frost":35,"gale":35,"volt":35}, dps:{"cinder":29.8,"neutral":13.4}, thorns:4}),
-T({n:14,  id:"t14", name:"The Hollow Verdict", arch:"ward", lvl:14,
-   flavor:"A ward every six seconds, and it takes your health when it closes.",
-   hp:426610, timeLimit:48, res:{"neutral":40,"gale":40,"volt":40,"frost":25}, dps:{"gale":14.6,"neutral":10},
-   ward:{"hp":3060,"window":3,"every":6,"first":4,"healOnFail":51193,"failDmg":{"gale":116}}}),
-T({n:15,  id:"t15", name:"Null, Who Counts", arch:"executioner", lvl:15, adds:2,
-   flavor:"It checks every defence you have, in order, and then adds them up.",
-   hp:519100, timeLimit:50, res:{"neutral":45,"cinder":45,"frost":45,"gale":45,"stone":45,"volt":45}, dps:{"cinder":0,"frost":0,"gale":0,"stone":0,"volt":0,"neutral":0}, executeGate:true,
-   spike:{"every":7,"dmg":{"neutral":0,"cinder":0,"volt":0}}, ward:{"hp":1870,"window":3.5,"every":11,"first":9,"healOnFail":62292,"failDmg":{"neutral":0}}, regen:2122, drain:5.6})
-];
-const TRIAL_BY_ID = {}; for(const t of TRIALS) TRIAL_BY_ID[t.id]=t;
 
 /* ================================================================
    SKILL TREES
@@ -2476,7 +2395,8 @@ function permaLocked(state, node){
    RUN STATE
    ================================================================ */
 function newState(cls){
-  const s = {cls, level:1, alloc:{}, tree:[], equipped:{}, inv:[], cleared:{}, salvaged:{}, seen:{}, best:{}};
+  const s = {cls, level:1, alloc:{}, tree:[], equipped:{}, inv:[], cleared:{}, salvaged:{}, seen:{}, best:{},
+             gold:0, bosses:{}, poi:{}, shrines:{}, bought:{}};
   for(const e of ELEMS) s.alloc[e]=0;
   const start = {warden:"w_wd1", skyward:"w_ac1", ember:"w_tc1", thornbound:"w_sh1"}[cls];
   for(const id of [start,"h_hodmask","c_padded","l_roughspun","b_hobnail","r_tin","a_cord"]){
@@ -2547,6 +2467,2030 @@ function rollDrops(state, lvl, count){
   return out;
 }
 /* ==ENGINE-END== */
+/* ================================================================
+   ==COMBAT-START==
+   Real-time combat. Nothing in here applies damage without a
+   collision: projectiles are swept segments, melee is an arc with
+   an active window, areas are shapes on the ground, and an enemy
+   attack resolves against wherever the player actually is when it
+   lands.
+   ================================================================ */
+const TAU = Math.PI*2;
+function clampN(v,a,b){ return v<a?a:(v>b?b:v); }
+function len(x,y){ return Math.hypot(x,y); }
+function norm(x,y){ const l=Math.hypot(x,y)||1; return [x/l, y/l]; }
+function angDiff(a,b){ let d=(a-b)%TAU; if(d>Math.PI)d-=TAU; if(d<-Math.PI)d+=TAU; return d; }
+
+/* ---------------- geometry: the whole basis of hit detection ----------------
+   Every one of these is pure and unit-tested. If a number appears on
+   screen, one of these returned true first. */
+
+/* moving point (p0 -> p1) against a circle. Swept, so a fast projectile
+   cannot tunnel through a body between two frames. */
+function segCircle(x0,y0,x1,y1,cx,cy,r){
+  const dx=x1-x0, dy=y1-y0;
+  const fx=x0-cx, fy=y0-cy;
+  const a=dx*dx+dy*dy;
+  if(a < 1e-12) return (fx*fx+fy*fy) <= r*r ? 0 : -1;
+  const b=2*(fx*dx+fy*dy);
+  const c=(fx*fx+fy*fy)-r*r;
+  let disc=b*b-4*a*c;
+  if(disc < 0) return -1;
+  disc=Math.sqrt(disc);
+  const t1=(-b-disc)/(2*a), t2=(-b+disc)/(2*a);
+  if(t1<0 && t2>0) return 0;            // started inside: connects now, not on the way out
+  if(t1>=0 && t1<=1) return t1;
+  if(t2>=0 && t2<=1) return t2;
+  return -1;
+}
+/* circle overlap */
+function circHit(ax,ay,ar,bx,by,br){
+  const dx=bx-ax, dy=by-ay, rr=ar+br;
+  return dx*dx+dy*dy <= rr*rr;
+}
+/* a wedge in front of something: origin, facing, reach, half-angle.
+   A body counts as hit if any part of its circle is inside the wedge. */
+function arcHit(ox,oy,facing,reach,halfAng,tx,ty,tr){
+  const dx=tx-ox, dy=ty-oy;
+  const d=Math.hypot(dx,dy);
+  if(d > reach+tr) return false;
+  if(d <= tr) return true;                       // standing on top of you
+  const a=Math.atan2(dy,dx);
+  const off=Math.abs(angDiff(a,facing));
+  const slack=Math.asin(clampN(tr/Math.max(d,0.001),0,1));   // body width helps
+  return off <= halfAng + slack;
+}
+/* an oriented rectangle on the ground: origin at one short edge, pointing
+   along `facing`, `long` deep and `wide` across. Used for cleaves and
+   boss sweeps. */
+function boxHit(ox,oy,facing,long,wide,tx,ty,tr){
+  const dx=tx-ox, dy=ty-oy;
+  const c=Math.cos(-facing), s=Math.sin(-facing);
+  const lx=dx*c-dy*s, ly=dx*s+dy*c;
+  const qx=Math.max(0, Math.max(-lx, lx-long));
+  const qy=Math.max(0, Math.abs(ly)-wide/2);
+  return qx*qx+qy*qy <= tr*tr;
+}
+/* a ring: damage only between two radii (a nova that has already passed
+   you does not hit you again) */
+function ringHit(cx,cy,rIn,rOut,tx,ty,tr){
+  const d=Math.hypot(tx-cx,ty-cy);
+  return d+tr >= rIn && d-tr <= rOut;
+}
+
+/* ---------------- world-space collision with the map ---------------- */
+function blocked(x,y,r){
+  if(x-r < 0 || y-r < 0 || x+r > WORLD.w || y+r > WORLD.h) return true;
+  /* the map is a list of floor rectangles; everything else is solid.
+     Corridors overlap the regions they join, so a body crossing a seam
+     is always fully inside at least one rectangle. */
+  let onFloor = false;
+  for(const f of WORLD.floor){
+    if(x > f.x+r && x < f.x+f.w-r && y > f.y+r && y < f.y+f.h-r){ onFloor = true; break; }
+  }
+  if(!onFloor) return true;
+  for(const w of WORLD.walls)
+    if(x+r > w.x && x-r < w.x+w.w && y+r > w.y && y-r < w.y+w.h) return true;
+  for(const gt of WORLD.gates)
+    if(!gt.open && x+r > gt.x && x-r < gt.x+gt.w && y+r > gt.y && y-r < gt.y+gt.h) return true;
+  return false;
+}
+/* slide along walls instead of sticking to them */
+function moveBody(e, dx, dy){
+  if(dx){ if(!blocked(e.x+dx, e.y, e.r)) e.x += dx; }
+  if(dy){ if(!blocked(e.x, e.y+dy, e.r)) e.y += dy; }
+  e.x = clampN(e.x, e.r, WORLD.w-e.r);
+  e.y = clampN(e.y, e.r, WORLD.h-e.r);
+}
+/* line of sight, for projectiles stopping at walls */
+function wallBlocks(x0,y0,x1,y1){
+  const steps = Math.max(1, Math.ceil(Math.hypot(x1-x0,y1-y0)/14));
+  for(let i=1;i<=steps;i++){
+    const t=i/steps;
+    if(blocked(x0+(x1-x0)*t, y0+(y1-y0)*t, 3)) return true;
+  }
+  return false;
+}
+
+/* ================================================================
+   GAME STATE
+   ================================================================ */
+const G = {
+  running:false, t:0, acc:0, last:0,
+  player:null, enemies:[], projs:[], zones:[], minions:[], floaters:[], marks:[], pickups:[],
+  hitstop:0, shake:0, camx:0, camy:0, zoom:1,
+  paused:false, dead:false, lastHitBy:null,
+  telemetry:null, region:null, bossFight:null, nearPoi:null, msg:null, msgT:0
+};
+function resetTelemetry(){
+  G.telemetry = {dealt:0, byKind:{}, taken:0, takenBy:{}, takenFrom:{}, hits:0, misses:0, kills:0, start:G.t};
+}
+
+/* ================================================================
+   DAMAGE — always the tail end of a collision, never a dice roll
+   about whether you connected
+   ================================================================ */
+function critRoll(res){
+  const cc = res.crit.chance;
+  return Math.random()*100 < cc;
+}
+/* buckets -> a real hit on a real body at a real point */
+function dealDamage(target, res, opt){
+  opt = opt || {};
+  const crit = opt.noCrit ? false : critRoll(res);
+  let buckets = {};
+  for(const k in res.rawBuckets) buckets[k] = res.rawBuckets[k] * (opt.mul||1) * (crit ? res.crit.mult : 1);
+  if(target.marked > 0) for(const k in buckets) buckets[k] *= 1 + target.markPct/100;
+  if(target.stagger > 0) for(const k in buckets) buckets[k] *= 1.5;   // the punish window
+  const after = applyResist(buckets, target.res || {});
+  let dmg = after.total;
+  if(CTX.flags.focusfire) dmg *= (target.marked>0 ? 1.6 : 0.6);
+  if(dmg <= 0) return 0;
+  if(target.ward > 0){
+    const w = Math.min(target.ward, dmg);
+    target.ward -= w; dmg -= w;
+    G.telemetry.dealt += w;
+    floater(opt.px != null ? opt.px : target.x, (opt.py != null ? opt.py : target.y-target.r)-14,
+            Math.round(w), "#8fd8ff", crit, "ward");
+    if(dmg <= 0){ target.flash = 0.10; return w; }
+  }
+  target.hp -= dmg;
+  G.telemetry.dealt += dmg;
+  const kind = opt.kind || "direct";
+  G.telemetry.byKind[kind] = (G.telemetry.byKind[kind]||0) + dmg;
+  G.telemetry.hits++;
+  /* the number pops where the hit physically happened */
+  const px = opt.px != null ? opt.px : target.x;
+  const py = opt.py != null ? opt.py : target.y - target.r;
+  floater(px, py, Math.round(dmg), crit ? "#ffd24a" : (KIND_COLOUR[kind]||"#fff"), crit, kind);
+  if(opt.knock){
+    const [nx,ny] = norm(target.x-opt.fromX, target.y-opt.fromY);
+    target.kx = (target.kx||0) + nx*opt.knock;
+    target.ky = (target.ky||0) + ny*opt.knock;
+  }
+  if(opt.heavy){ G.hitstop = Math.max(G.hitstop, 0.075); G.shake = Math.max(G.shake, 5); }
+  target.flash = 0.10;
+  if(target.hp <= 0) killEnemy(target);
+  return dmg;
+}
+function floater(x,y,txt,col,big,kind){
+  if(G.floaters.length > 60) G.floaters.shift();
+  G.floaters.push({x, y, vx:(Math.random()-0.5)*22, vy:-46-Math.random()*16,
+                   txt:typeof txt==="number"? fmt(txt) : txt, col, big:!!big, life:0.85, kind});
+}
+/* damage to the player: only ever called from a shape test */
+function hurtPlayer(buckets, fromName, opt){
+  const P = G.player;
+  if(P.iframe > 0) { floater(P.x, P.y-26, "dodged", "#9be7d8", false); return 0; }
+  const inc = playerIncoming(CTX, buckets);
+  let d = inc.total;
+  if(P.block > 0) d *= (1 - P.blockPct/100);
+  if(P.shield > 0){ const s=Math.min(P.shield,d); P.shield-=s; d-=s; }
+  if(d <= 0) return 0;
+  P.hp -= d;
+  G.telemetry.taken += d;
+  for(const k in inc.buckets) G.telemetry.takenBy[k] = (G.telemetry.takenBy[k]||0) + inc.buckets[k];
+  G.telemetry.takenFrom[fromName] = (G.telemetry.takenFrom[fromName]||0) + d;
+  G.lastHitBy = fromName;
+  floater(P.x, P.y-30, Math.round(d), "#ff5f56", (opt&&opt.heavy), "taken");
+  G.shake = Math.max(G.shake, (opt&&opt.heavy)?9:4);
+  P.flash = 0.12;
+  P.lastHurt = G.t;
+  if(P.hp <= 0) playerDied();
+  return d;
+}
+
+/* ================================================================
+   ATTACK FORMS — how a spell becomes a thing in the world
+   ================================================================ */
+function spellRes(sp){
+  const key = sp.id;
+  if(!G.resCache) G.resCache = {};
+  if(G.resCache[key]) return G.resCache[key];
+  const a = Object.assign({}, sp, {kind: sp.id==="__strike" ? "strike" : "spell"});
+  G.resCache[key] = computeAttack(CTX, a);
+  return G.resCache[key];
+}
+function clearResCache(){ G.resCache = null; }
+
+function castSpell(sp, aimX, aimY){
+  const P = G.player;
+  const form = sp.form || "projectile";
+  const res = spellRes(sp);
+  const [ax,ay] = norm(aimX - P.x, aimY - P.y);
+  const facing = Math.atan2(ay, ax);
+  P.facing = facing;
+  const fx = sp.fx || {};
+
+  if(form === "melee"){
+    P.swing = {sp, res, fx, t:0, windup:sp.windup||0.14, active:sp.active||0.10,
+               recover:sp.recover||0.16, reach:sp.reach||96, half:(sp.arc||100)*Math.PI/360,
+               facing, hits:new Set(), fired:false};
+  } else if(form === "projectile"){
+    const n = sp.shots || 1, spread = (sp.spread||0)*Math.PI/180;
+    for(let i=0;i<n;i++){
+      const a = facing + (n>1 ? (-spread/2 + spread*i/(n-1)) : 0);
+      G.projs.push({x:P.x+Math.cos(a)*18, y:P.y+Math.sin(a)*18,
+        vx:Math.cos(a)*(sp.speed||520), vy:Math.sin(a)*(sp.speed||520),
+        r:sp.projR||9, life:sp.range ? sp.range/(sp.speed||520) : 1.5,
+        pierce:1+(fx.pierce||0)+(fx.chain||0), hit:new Set(), sp, res, fx,
+        col:projColour(res), trail:[]});
+    }
+  } else if(form === "nova"){
+    G.zones.push({kind:"ring", x:P.x, y:P.y, r0:0, r:sp.radius||170, grow:(sp.radius||170)/0.28,
+                  life:0.30, sp, res, fx, hit:new Set(), col:projColour(res), friendly:true});
+  } else if(form === "ground"){
+    const d = Math.min(sp.castRange||220, len(aimX-P.x, aimY-P.y));
+    const gx = P.x + ax*d, gy = P.y + ay*d;
+    G.zones.push({kind:"telegraph", x:gx, y:gy, r:sp.radius||110, life:sp.delay||0.35,
+                  sp, res, fx, friendly:true, col:projColour(res)});
+  } else if(form === "dash"){
+    const dist = sp.dashDist||190;
+    P.dashVX = ax*dist/0.16; P.dashVY = ay*dist/0.16; P.dashT = 0.16;
+    P.iframe = Math.max(P.iframe, sp.iframes || 0.32);
+    if(sp.mult > 0){
+      P.swing = {sp, res, fx, t:0, windup:0.02, active:0.14, recover:0.04,
+                 reach:sp.reach||110, half:Math.PI, facing, hits:new Set(), fired:false};
+    }
+  } else if(form === "buff"){
+    /* handled entirely by applyFxSelf below */
+  } else if(form === "summon"){
+    /* handled by applyFxSelf */
+  }
+  applyFxSelf(sp, fx, res);
+  return true;
+}
+/* effects that land on you rather than on something you hit */
+function applyFxSelf(sp, fx, res){
+  const P = G.player;
+  if(fx.guard){ P.block = fx.guard.dur||3; P.blockPct = fx.guard.block||30;
+                P.counter = fx.guard.counter||0; P.counterAll = !!fx.guard.counterAll;
+                P.counterDot = fx.guard.counterDot||null; }
+  if(sp.util && sp.util.shield) P.shield += P.maxHp*sp.util.shield/100;
+  if(sp.util && sp.util.heal && !CTX.flags.noHeal) P.hp = Math.min(P.maxHp, P.hp + P.maxHp*sp.util.heal/100);
+  if(sp.util && sp.util.dodge){ P.dodgeBuff = sp.util.dur||3; P.dodgeBuffPct = sp.util.dodge; }
+  if(fx.drain && fx.drain.mana) P.mana = Math.min(P.maxMana, P.mana + fx.drain.mana);
+  if(fx.drain && fx.drain.heal && !CTX.flags.noHeal) P.hp = Math.min(P.maxHp, P.hp + P.maxHp*fx.drain.heal/100);
+  if(fx.summon){
+    const n = fx.summon.count||1, cap = fx.summon.cap||4;
+    for(let i=0;i<n && G.minions.length<cap;i++){
+      const a = Math.random()*TAU;
+      if(CTX.flags.symbiosis) P.hp -= P.maxHp*0.11;
+      G.minions.push({x:P.x+Math.cos(a)*40, y:P.y+Math.sin(a)*40, r:11,
+        life: fx.summon.perm ? 1e9 : (fx.summon.dur||12),
+        pct: fx.summon.pct||40, explode: fx.summon.explode||0, cd:0, target:null});
+    }
+  }
+}
+function projColour(res){
+  let best="neutral", bv=-1;
+  for(const k in res.rawBuckets) if(res.rawBuckets[k] > bv){ bv=res.rawBuckets[k]; best=k; }
+  return EL[best] ? EL[best].col : "#d9dfea";
+}
+/* everything a landed hit does beyond the number */
+function onHitFx(target, fx, res, px, py){
+  if(fx.dot){
+    const d = fx.dot;
+    target.dots = target.dots || {};
+    const e = target.dots[d.name] || (target.dots[d.name] = {name:d.name, elem:d.elem, stacks:0, t:0, per:0});
+    e.stacks = Math.min(d.stacks||1, e.stacks+1);
+    e.t = d.dur||4;
+    e.per = sumB(res.rawBuckets) * (d.pct/100);
+    e.max = d.stacks||1;
+    if(fx.spread){
+      for(const o of G.enemies){
+        if(o===target || o.dead) continue;
+        if(Math.hypot(o.x-target.x, o.y-target.y) > 190) continue;
+        o.dots = o.dots || {};
+        const oe = o.dots[d.name] || (o.dots[d.name] = {name:d.name, elem:d.elem, stacks:0, t:0, per:0});
+        oe.stacks = Math.min(d.stacks||1, oe.stacks+1); oe.t = d.dur||4;
+        oe.per = e.per; oe.max = d.stacks||1;
+      }
+    }
+  }
+  if(fx.detonate){
+    let boom = 0;
+    for(const e of G.enemies){
+      if(e.dead || !e.dots) continue;
+      if(Math.hypot(e.x-target.x, e.y-target.y) > 220) continue;
+      let v = 0;
+      for(const k in e.dots){ const d=e.dots[k]; v += d.per*d.stacks*d.t*(fx.detonate.pct/100); d.stacks=0; d.t=0; }
+      if(v>0){ e.hp -= v; G.telemetry.dealt += v; G.telemetry.byKind.blast=(G.telemetry.byKind.blast||0)+v;
+               floater(e.x, e.y-e.r, Math.round(v), KIND_COLOUR.blast, true, "blast");
+               if(e.hp<=0) killEnemy(e); boom += v; }
+    }
+    if(boom>0){ G.hitstop=Math.max(G.hitstop,0.07); G.shake=Math.max(G.shake,6); }
+  }
+  if(fx.zone){
+    const z = fx.zone;
+    G.zones.push({kind:"field", x:px, y:py, r:z.r||100, life:z.dur||4,
+      dps: sumB(res.rawBuckets)*(z.pct/100), elem:z.elem, name:z.name,
+      tick:0, friendly:true, col:EL[z.elem]?EL[z.elem].col:"#aaa"});
+  }
+  if(fx.freeze){ target.frozen = Math.max(target.frozen||0, fx.freeze.dur||1.5); }
+  if(fx.mark){ target.marked = fx.mark.dur||6; target.markPct = fx.mark.pct||20; }
+  if(fx.weaken){ target.weak = fx.weaken.dur||5; target.weakPct = fx.weaken.pct||15; }
+  if(fx.root){ target.rooted = fx.root.dur||3; target.rootPct = fx.root.pct||30; }
+}
+/* shatter is resolved before the hit so the freeze it consumes is visible */
+function shatterBonus(target, fx, res){
+  if(!fx.shatter || !(target.frozen>0)) return 0;
+  target.frozen = 0;
+  return fx.shatter.pct/100;
+}
+/* ================================================================
+   SIMULATION STEP — fixed 60Hz
+   ================================================================ */
+const DT = 1/60;
+function stepWorld(dt){
+  G.t += dt;
+  stepPlayer(dt);
+  stepSwing(dt);
+  stepProjectiles(dt);
+  stepZones(dt);
+  stepEnemies(dt);
+  stepMinions(dt);
+  stepDots(dt);
+  stepFloaters(dt);
+  stepPickups(dt);
+  if(G.shake > 0) G.shake = Math.max(0, G.shake - dt*26);
+}
+
+function stepPlayer(dt){
+  const P = G.player;
+  P.iframe = Math.max(0, P.iframe - dt);
+  P.flash = Math.max(0, P.flash - dt);
+  P.block = Math.max(0, P.block - dt);
+  P.dodgeBuff = Math.max(0, P.dodgeBuff - dt);
+  for(const k in P.cd) P.cd[k] = Math.max(0, P.cd[k] - dt);
+  P.castLock = Math.max(0, P.castLock - dt);
+
+  if(P.dashT > 0){
+    P.dashT -= dt;
+    moveBody(P, P.dashVX*dt, P.dashVY*dt);
+  } else {
+    const [ix,iy] = inputMove();
+    const spd = P.speed * (P.rooted>0 ? 0.35 : 1) * (P.castLock>0 ? 0.55 : 1);
+    if(ix||iy){
+      moveBody(P, ix*spd*dt, iy*spd*dt);
+      if(!P.swing) P.facing = Math.atan2(iy, ix);
+      P.moving = true;
+    } else P.moving = false;
+  }
+  P.rooted = Math.max(0, (P.rooted||0) - dt);
+  /* resource */
+  if(!CTX.flags.thirst) P.mana = Math.min(P.maxMana, P.mana + CTX.manaRegen*dt);
+  else P.mana = P.maxMana;
+  if(CTX.hpRegen && !CTX.flags.noHeal) P.hp = Math.min(P.maxHp, P.hp + CTX.hpRegen*dt);
+  if(CTX.flags.lucid && G.t - P.lastHurt > 3 && !CTX.flags.thirst)
+    P.mana = Math.min(P.maxMana, P.mana + CTX.manaRegen*dt);
+  if(CTX.flags.symbiosis && G.minions.length && !CTX.flags.noHeal)
+    P.hp = Math.min(P.maxHp, P.hp + G.minions.length*P.maxHp*0.02*dt);
+}
+
+/* melee: windup -> active window -> recovery. Only the active window
+   can connect, and each body is hit at most once per swing. */
+function stepSwing(dt){
+  const P = G.player, sw = P.swing;
+  if(!sw) return;
+  sw.t += dt;
+  const aStart = sw.windup, aEnd = sw.windup + sw.active;
+  if(sw.t >= aStart && sw.t <= aEnd){
+    for(const e of G.enemies){
+      if(e.dead || sw.hits.has(e.id)) continue;
+      if(!arcHit(P.x, P.y, sw.facing, sw.reach, sw.half, e.x, e.y, e.r)) continue;
+      sw.hits.add(e.id);
+      const bonus = shatterBonus(e, sw.fx, sw.res);
+      const [nx,ny] = norm(e.x-P.x, e.y-P.y);
+      const px = P.x + nx*(sw.reach*0.55), py = P.y + ny*(sw.reach*0.55);
+      const hits = sw.fx.hits || 1;
+      for(let i=0;i<hits;i++)
+        dealDamage(e, sw.res, {px, py, knock:sw.sp.knock||120, fromX:P.x, fromY:P.y,
+                               heavy:(sw.sp.heavy||hits>1), mul:1});
+      if(bonus) dealDamage(e, sw.res, {px, py, kind:"shatter", mul:bonus, noCrit:true});
+      onHitFx(e, sw.fx, sw.res, px, py);
+      G.telemetry.swingHits = (G.telemetry.swingHits||0)+1;
+    }
+  }
+  if(sw.t >= aEnd && !sw.counted){ sw.counted = true;
+    if(sw.hits.size === 0) G.telemetry.misses++; }
+  if(sw.t >= aEnd + sw.recover) P.swing = null;
+}
+
+/* projectiles: swept against every body, stopped by walls, finite life */
+function stepProjectiles(dt){
+  for(let i=G.projs.length-1;i>=0;i--){
+    const p = G.projs[i];
+    const nx = p.x + p.vx*dt, ny = p.y + p.vy*dt;
+    let best = null, bestT = 2;
+    for(const e of G.enemies){
+      if(e.dead || p.hit.has(e.id)) continue;
+      const t = segCircle(p.x, p.y, nx, ny, e.x, e.y, e.r + p.r);
+      if(t >= 0 && t < bestT){ bestT = t; best = e; }
+    }
+    p.trail.push({x:p.x, y:p.y});
+    if(p.trail.length > 6) p.trail.shift();
+    if(best){
+      const hx = p.x + (nx-p.x)*bestT, hy = p.y + (ny-p.y)*bestT;
+      p.hit.add(best.id);
+      const bonus = shatterBonus(best, p.fx, p.res);
+      dealDamage(best, p.res, {px:hx, py:hy, knock:p.sp.knock||60, fromX:p.x, fromY:p.y,
+                               heavy:!!p.sp.heavy});
+      if(bonus) dealDamage(best, p.res, {px:hx, py:hy, kind:"shatter", mul:bonus, noCrit:true});
+      onHitFx(best, p.fx, p.res, hx, hy);
+      p.pierce--;
+      if(p.pierce <= 0){ G.projs.splice(i,1); continue; }
+    }
+    if(wallBlocks(p.x, p.y, nx, ny)){
+      burst(p.x, p.y, p.col); G.projs.splice(i,1); G.telemetry.misses++; continue;
+    }
+    p.x = nx; p.y = ny;
+    p.life -= dt;
+    if(p.life <= 0){ G.projs.splice(i,1); G.telemetry.misses++; }
+  }
+}
+
+/* areas: an expanding ring, a delayed circle, or a lingering field.
+   All of them are shapes; being outside one means nothing happens. */
+function stepZones(dt){
+  for(let i=G.zones.length-1;i>=0;i--){
+    const z = G.zones[i];
+    z.life -= dt;
+    if(z.kind === "ring"){
+      const prev = z.r0;
+      z.r0 = Math.min(z.r, z.r0 + z.grow*dt);
+      for(const e of G.enemies){
+        if(e.dead || z.hit.has(e.id)) continue;
+        if(!ringHit(z.x, z.y, prev, z.r0, e.x, e.y, e.r)) continue;
+        z.hit.add(e.id);
+        const bonus = shatterBonus(e, z.fx, z.res);
+        const [nx,ny] = norm(e.x-z.x, e.y-z.y);
+        dealDamage(e, z.res, {px:e.x-nx*e.r, py:e.y-ny*e.r, knock:90, fromX:z.x, fromY:z.y});
+        if(bonus) dealDamage(e, z.res, {kind:"shatter", mul:bonus, noCrit:true, px:e.x, py:e.y-e.r});
+        onHitFx(e, z.fx, z.res, e.x, e.y);
+      }
+      if(z.life <= 0) G.zones.splice(i,1);
+    } else if(z.kind === "telegraph"){
+      if(z.life <= 0){
+        for(const e of G.enemies){
+          if(e.dead) continue;
+          if(!circHit(z.x, z.y, z.r, e.x, e.y, e.r)) continue;
+          const bonus = shatterBonus(e, z.fx, z.res);
+          dealDamage(e, z.res, {px:e.x, py:e.y-e.r, knock:70, fromX:z.x, fromY:z.y, heavy:true});
+          if(bonus) dealDamage(e, z.res, {kind:"shatter", mul:bonus, noCrit:true, px:e.x, py:e.y-e.r});
+          onHitFx(e, z.fx, z.res, e.x, e.y);
+        }
+        burst(z.x, z.y, z.col, z.r);
+        G.zones.splice(i,1);
+      }
+    } else if(z.kind === "field"){
+      z.tick -= dt;
+      if(z.tick <= 0){
+        z.tick = 0.25;
+        for(const e of G.enemies){
+          if(e.dead) continue;
+          if(!circHit(z.x, z.y, z.r, e.x, e.y, e.r)) continue;
+          const raw = {}; raw[z.elem||"neutral"] = z.dps*0.25;
+          const after = applyResist(raw, e.res||{});
+          e.hp -= after.total;
+          G.telemetry.dealt += after.total;
+          G.telemetry.byKind.zone = (G.telemetry.byKind.zone||0) + after.total;
+          floater(e.x+(Math.random()-0.5)*14, e.y-e.r, Math.round(after.total), z.col, false, "zone");
+          if(e.hp <= 0) killEnemy(e);
+        }
+      }
+      if(z.life <= 0) G.zones.splice(i,1);
+    } else if(z.kind === "enemyTel"){
+      /* an enemy's telegraph: the shape is locked when it starts, and
+         resolves against wherever the player is when it lands */
+      if(z.life <= 0){
+        resolveEnemyAttack(z);
+        G.zones.splice(i,1);
+      }
+    }
+  }
+}
+
+/* ---- enemy attacks: telegraph, then a shape test against the player ---- */
+function resolveEnemyAttack(z){
+  const P = G.player;
+  let hit = false;
+  if(z.shape === "circle")  hit = circHit(z.x, z.y, z.r, P.x, P.y, P.r);
+  else if(z.shape === "box")   hit = boxHit(z.x, z.y, z.facing, z.long, z.wide, P.x, P.y, P.r);
+  else if(z.shape === "arc")   hit = arcHit(z.x, z.y, z.facing, z.reach, z.half, P.x, P.y, P.r);
+  else if(z.shape === "ring")  hit = ringHit(z.x, z.y, z.rIn, z.r, P.x, P.y, P.r);
+  burst(z.x, z.y, "#ff6a5a", z.r || z.reach || z.long);
+  if(!hit){ floater(P.x, P.y-34, "clear", "#8fd8b0", false); return; }
+  hurtPlayer(z.dmg, z.from, {heavy:z.heavy});
+  if(z.knock){
+    const [nx,ny] = norm(P.x-z.x, P.y-z.y);
+    moveBody(P, nx*z.knock, ny*z.knock);
+  }
+  /* your counter only exists if their attack actually connected with you */
+  if(P.block > 0 && P.counter > 0){
+    const st = spellRes(strikeSpell());
+    const targets = P.counterAll ? G.enemies : [nearestEnemy(P.x,P.y,220)];
+    for(const e of targets){
+      if(!e || e.dead) continue;
+      if(!P.counterAll && Math.hypot(e.x-P.x,e.y-P.y) > 220) continue;
+      dealDamage(e, st, {kind:"counter", mul:P.counter/100, px:e.x, py:e.y-e.r});
+      if(P.counterDot) onHitFx(e, {dot:P.counterDot}, st, e.x, e.y);
+    }
+  }
+}
+
+function stepEnemies(dt){
+  const P = G.player;
+  for(let i=G.enemies.length-1;i>=0;i--){
+    const e = G.enemies[i];
+    if(e.dead){ e.deadT -= dt; if(e.deadT <= 0) G.enemies.splice(i,1); continue; }
+    e.flash = Math.max(0, e.flash - dt);
+    e.frozen = Math.max(0, (e.frozen||0) - dt);
+    e.marked = Math.max(0, (e.marked||0) - dt);
+    e.weak   = Math.max(0, (e.weak||0) - dt);
+    e.rooted = Math.max(0, (e.rooted||0) - dt);
+    if(e.stagger > 0){ e.staggerFor = e.staggerFor || e.stagger; e.stagger -= dt;
+      if(e.stagger <= 0){ e.stagger = 0; e.staggerFor = 0; } }
+    /* knockback decays */
+    if(e.kx || e.ky){
+      moveBody(e, e.kx*dt, e.ky*dt);
+      e.kx *= 0.86; e.ky *= 0.86;
+      if(Math.abs(e.kx) < 2) e.kx = 0;
+      if(Math.abs(e.ky) < 2) e.ky = 0;
+    }
+    const def = ENEMY[e.type];
+    const d = Math.hypot(P.x-e.x, P.y-e.y);
+    if(e.frozen > 0 || e.rooted > 0){ e.stateT += dt; continue; }
+    e.stateT += dt;
+    if(e.state === "idle"){
+      if(!e.inert && d < def.aggro) e.state = "chase";
+      else { /* drift around home */ }
+    } else if(e.state === "chase"){
+      if(d > def.leash){ e.state = "idle"; continue; }
+      const spd = def.speed * (e.weak>0 ? 0.8 : 1);
+      if(d > def.range*0.8){
+        const [nx,ny] = norm(P.x-e.x, P.y-e.y);
+        moveBody(e, nx*spd*dt, ny*spd*dt);
+        e.facing = Math.atan2(P.y-e.y, P.x-e.x);
+      }
+      if(d <= def.range && e.atkCd <= 0){
+        startEnemyAttack(e, def);
+      }
+    } else if(e.state === "windup"){
+      if(!e.wind){ e.state = "chase"; e.stateT = 0; }
+      else if(e.stateT >= e.wind.windup){ e.state = "recover"; e.stateT = 0; }
+      /* the marker was already spawned and is locked; it resolves itself */
+    } else if(e.state === "recover"){
+      if(!e.wind){ e.state = "chase"; e.stateT = 0; e.atkCd = 1.0; }
+      else if(e.stateT >= e.wind.recover){
+        if(e.wind.opening){ e.stagger = e.wind.opening; e.state = "stagger"; e.stateT = 0; }
+        else { e.state = "chase"; e.stateT = 0; e.atkCd = e.wind.cd; }
+      }
+    } else if(e.state === "stagger"){
+      if(e.stateT >= (e.staggerFor || e.stagger)){ e.state = "chase"; e.stateT = 0;
+        e.atkCd = e.wind ? e.wind.cd : 1.5; }
+    }
+    e.atkCd = Math.max(0, e.atkCd - dt);
+    /* separation so bodies do not stack into one pixel */
+    for(const o of G.enemies){
+      if(o === e || o.dead) continue;
+      const dx = o.x-e.x, dy = o.y-e.y, dd = Math.hypot(dx,dy);
+      if(dd > 0.01 && dd < e.r+o.r){
+        const push = (e.r+o.r-dd)*0.5;
+        const [ux,uy] = norm(dx,dy);
+        moveBody(e, -ux*push, -uy*push);
+      }
+    }
+  }
+}
+function startEnemyAttack(e, def){
+  const P = G.player;
+  const atk = def.attacks[(e.atkIx++) % def.attacks.length];
+  e.state = "windup"; e.stateT = 0; e.wind = atk;
+  e.facing = Math.atan2(P.y-e.y, P.x-e.x);
+  const z = {kind:"enemyTel", life:atk.windup, total:atk.windup, shape:atk.shape,
+             x:e.x, y:e.y, facing:e.facing, from:def.name,
+             dmg:scaleDmg(atk.dmg, e.mult||1), knock:atk.knock||0, heavy:!!atk.heavy};
+  if(atk.shape === "circle"){ const reach = Math.min(atk.reach||120, Math.hypot(P.x-e.x,P.y-e.y));
+    z.x = e.x + Math.cos(e.facing)*reach; z.y = e.y + Math.sin(e.facing)*reach; z.r = atk.r||70; }
+  if(atk.shape === "box"){ z.long = atk.long||190; z.wide = atk.wide||70; }
+  if(atk.shape === "arc"){ z.reach = atk.reach||120; z.half = (atk.arc||110)*Math.PI/360; }
+  if(atk.shape === "ring"){ z.r = atk.r||200; z.rIn = atk.rIn||90; }
+  G.zones.push(z);
+}
+function scaleDmg(d, m){ const o={}; for(const k in d) o[k]=d[k]*m; return o; }
+
+function stepMinions(dt){
+  for(let i=G.minions.length-1;i>=0;i--){
+    const m = G.minions[i];
+    m.life -= dt; m.cd -= dt;
+    const tgt = (m.target && !m.target.dead) ? m.target : nearestEnemy(m.x, m.y, 520);
+    m.target = tgt;
+    if(tgt){
+      const d = Math.hypot(tgt.x-m.x, tgt.y-m.y);
+      if(d > 34){ const [nx,ny]=norm(tgt.x-m.x, tgt.y-m.y); moveBody(m, nx*170*dt, ny*170*dt); }
+      else if(m.cd <= 0){
+        m.cd = 0.8;
+        const st = spellRes(strikeSpell());
+        dealDamage(tgt, st, {kind:"minion", mul:m.pct/100, px:tgt.x, py:tgt.y-tgt.r, noCrit:true});
+      }
+    } else {
+      const P=G.player, d=Math.hypot(P.x-m.x,P.y-m.y);
+      if(d > 70){ const [nx,ny]=norm(P.x-m.x,P.y-m.y); moveBody(m, nx*180*dt, ny*180*dt); }
+    }
+    if(m.life <= 0){
+      if(m.explode){
+        const st = spellRes(strikeSpell());
+        for(const e of G.enemies){
+          if(e.dead || Math.hypot(e.x-m.x,e.y-m.y) > 90+e.r) continue;
+          dealDamage(e, st, {kind:"blast", mul:m.explode/100, px:e.x, py:e.y-e.r, noCrit:true});
+        }
+        burst(m.x, m.y, "#6fd3a6", 90);
+      }
+      G.minions.splice(i,1);
+    }
+  }
+}
+function stepDots(dt){
+  for(const e of G.enemies){
+    if(e.dead || !e.dots) continue;
+    for(const k in e.dots){
+      const d = e.dots[k];
+      if(d.stacks <= 0 || d.t <= 0) continue;
+      d.t -= dt;
+      d.acc = (d.acc||0) + d.per*d.stacks*dt;
+      if(d.acc >= 1){
+        const raw = {}; raw[d.elem||"neutral"] = d.acc;
+        const after = applyResist(raw, e.res||{});
+        e.hp -= after.total;
+        G.telemetry.dealt += after.total;
+        G.telemetry.byKind.bleed = (G.telemetry.byKind.bleed||0) + after.total;
+        if(Math.random() < 0.34) floater(e.x+(Math.random()-0.5)*16, e.y-e.r-6,
+            Math.round(after.total), EL[d.elem] ? EL[d.elem].col : "#ff7a5c", false, "bleed");
+        d.acc = 0;
+        if(e.hp <= 0){ killEnemy(e); break; }
+      }
+      if(d.t <= 0) d.stacks = 0;
+    }
+  }
+}
+
+/* dropped loot is a body in the world you walk over */
+function stepPickups(dt){
+  const P = G.player;
+  for(let i=G.pickups.length-1;i>=0;i--){
+    const k = G.pickups[i];
+    k.life -= dt;
+    const d = Math.hypot(P.x-k.x, P.y-k.y);
+    if(d < 120){                       // drifts toward you once you are close
+      const [nx,ny] = norm(P.x-k.x, P.y-k.y);
+      const pull = 90 + (120-d)*3.4;
+      k.x += nx*pull*dt; k.y += ny*pull*dt;
+    }
+    if(d < P.r + 14){ collectPickup(k); G.pickups.splice(i,1); continue; }
+    if(k.life <= 0) G.pickups.splice(i,1);
+  }
+}
+function collectPickup(k){
+  if(k.kind === "gold"){ S.gold = (S.gold||0) + k.n; floater(k.x, k.y-10, "+"+k.n+"g", "#e8bd63", false); }
+  else if(k.kind === "item"){
+    S.inv.push(k.inst);
+    const def = ITEMS[k.inst.def];
+    floater(k.x, k.y-10, def.name, RARITY_COL[def.rarity], true);
+    toast(def.name + "  ·  " + RARITY[def.rarity].name);
+    save();
+  } else if(k.kind === "orb"){
+    const P=G.player;
+    if(k.stat === "hp" && !CTX.flags.noHeal){ P.hp = Math.min(P.maxHp, P.hp + P.maxHp*0.25); floater(k.x,k.y-10,"+health","#54d391",false); }
+    if(k.stat === "mana"){ P.mana = Math.min(P.maxMana, P.mana + P.maxMana*0.3); floater(k.x,k.y-10,"+mana","#4fb9ff",false); }
+  }
+}
+const RARITY_COL = {common:"#9aa4b4", uncommon:"#6fd3a6", rare:"#57b2ff",
+                    legendary:"#c88bff", fabled:"#ff7a5c", mythic:"#ffd24a"};
+function dropPickup(x, y, kind, data){
+  const jitter = () => (Math.random()-0.5)*34;
+  const k = Object.assign({x:x+jitter(), y:y+jitter(), kind, life:90,
+    col: kind==="gold" ? "#e8bd63" : (kind==="orb" ? (data.stat==="hp"?"#54d391":"#4fb9ff") : "#ffd24a")}, data);
+  if(kind === "item") k.col = RARITY_COL[ITEMS[k.inst.def].rarity];
+  G.pickups.push(k);
+}
+function toast(txt){ G.msg = txt; G.msgT = 2.4; }
+
+function stepFloaters(dt){
+  for(let i=G.floaters.length-1;i>=0;i--){
+    const f = G.floaters[i];
+    f.life -= dt; f.x += f.vx*dt; f.y += f.vy*dt; f.vy += 90*dt;
+    if(f.life <= 0) G.floaters.splice(i,1);
+  }
+  for(let i=G.marks.length-1;i>=0;i--){
+    const m=G.marks[i]; m.life -= dt; if(m.life<=0) G.marks.splice(i,1);
+  }
+}
+function burst(x,y,col,r){ G.marks.push({x,y,col,r:r||26,life:0.22,max:0.22}); }
+function nearestEnemy(x,y,maxD){
+  let best=null, bd=maxD*maxD;
+  for(const e of G.enemies){
+    if(e.dead) continue;
+    const d=(e.x-x)*(e.x-x)+(e.y-y)*(e.y-y);
+    if(d<bd){ bd=d; best=e; }
+  }
+  return best;
+}
+
+
+
+/* ================================================================
+   INPUT — thumbstick on the left, buttons on the right, drag a
+   button to aim it. Keyboard and mouse on desktop.
+   ================================================================ */
+const IN = {stick:{id:null, ox:0, oy:0, x:0, y:0, on:false},
+            aim:{id:null, slot:-1, x:0, y:0, on:false},
+            keys:{}, mouse:{x:0,y:0}, usedKeys:false};
+function inputMove(){
+  if(IN.stick.on){
+    const dx=IN.stick.x-IN.stick.ox, dy=IN.stick.y-IN.stick.oy;
+    const l=Math.hypot(dx,dy);
+    if(l < 8) return [0,0];
+    const f=Math.min(1,l/58);
+    return [dx/l*f, dy/l*f];
+  }
+  let x=0,y=0;
+  if(IN.keys.a||IN.keys.ArrowLeft) x-=1;
+  if(IN.keys.d||IN.keys.ArrowRight) x+=1;
+  if(IN.keys.w||IN.keys.ArrowUp) y-=1;
+  if(IN.keys.s||IN.keys.ArrowDown) y+=1;
+  if(x||y){ const l=Math.hypot(x,y); return [x/l, y/l]; }
+  return [0,0];
+}
+function screenToWorld(sx, sy){
+  const c=$("#cv");
+  return {x:(sx - c.clientWidth/2)/G.zoom + G.camx, y:(sy - c.clientHeight/2)/G.zoom + G.camy};
+}
+function aimPoint(slot){
+  const P=G.player;
+  if(IN.aim.on && IN.aim.slot===slot){
+    const dx=IN.aim.x-IN.aim.ox, dy=IN.aim.y-IN.aim.oy;
+    if(Math.hypot(dx,dy) > 12) return {x:P.x+dx*6, y:P.y+dy*6};
+  }
+  if(IN.usedKeys){ const w=screenToWorld(IN.mouse.x, IN.mouse.y); return w; }
+  const e = nearestEnemy(P.x, P.y, 620);
+  if(e) return {x:e.x, y:e.y};
+  return {x:P.x+Math.cos(P.facing)*200, y:P.y+Math.sin(P.facing)*200};
+}
+function strikeSpell(){
+  const w = CTX.weapon;
+  const melee = !w || w.speed >= 1.0;
+  return {id:"__strike", name:w?w.strikeName:"Strike", cost:0,
+          time:(w?w.speed:1)/Math.max(0.3,1+g(CTX.agg,"speed")/100),
+          mult:1, flatScale:(w?w.speed:1)/0.8, fx:{},
+          form: melee ? "melee" : "projectile",
+          reach:92, arc:100, windup:0.08, active:0.09, recover:0.12, knock:90,
+          speed:700, range:520, projR:7};
+}
+function tryCast(slot){
+  const P=G.player;
+  if(G.paused || G.dead || P.castLock > 0) return false;
+  const sp = slot === 0 ? strikeSpell() : CTX.spells.find(x=>x.slot === slot);
+  if(!sp) return false;
+  if((P.cd[sp.id]||0) > 0) return false;
+  const cost = slot === 0 ? 0 : spellCost(CTX, sp);
+  if(CTX.flags.thirst && cost > 0){
+    if(P.hp <= cost*1.5 + 1) return false;
+    P.hp -= cost*1.5;
+  } else if(P.mana < cost) { flashMana(); return false; }
+  else P.mana -= cost;
+  const a = aimPoint(slot);
+  castSpell(sp, a.x, a.y);
+  const ct = slot === 0 ? sp.time : castTime(CTX, sp);
+  P.castLock = Math.max(0.10, ct*0.55);
+  P.cd[sp.id] = sp.util && sp.util.cd ? sp.util.cd : ct;
+  return true;
+}
+function flashMana(){ const el=$("#manaBar"); if(el){ el.classList.remove("nope"); void el.offsetWidth; el.classList.add("nope"); } }
+
+/* ================================================================
+   RENDER
+   ================================================================ */
+function render(){
+  const c=$("#cv"), ctx=c.getContext("2d");
+  const dpr=Math.min(2, window.devicePixelRatio||1);
+  const W=c.clientWidth, H=c.clientHeight;
+  if(c.width !== W*dpr || c.height !== H*dpr){ c.width=W*dpr; c.height=H*dpr; }
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  ctx.clearRect(0,0,W,H);
+  const P=G.player;
+  /* camera */
+  G.camx += (P.x - G.camx)*0.14; G.camy += (P.y - G.camy)*0.14;
+  const sh = G.shake>0 ? G.shake : 0;
+  const ox = W/2 - G.camx*G.zoom + (Math.random()-0.5)*sh;
+  const oy = H/2 - G.camy*G.zoom + (Math.random()-0.5)*sh;
+  ctx.save(); ctx.translate(ox, oy); ctx.scale(G.zoom, G.zoom);
+  const vx0=(0-ox)/G.zoom, vy0=(0-oy)/G.zoom, vx1=(W-ox)/G.zoom, vy1=(H-oy)/G.zoom;
+  const vis=(x,y,pad)=> x> vx0-pad && x< vx1+pad && y> vy0-pad && y< vy1+pad;
+
+  /* ground: every authored floor rectangle, regions tinted, corridors plain */
+  for(const f of WORLD.floor){
+    ctx.fillStyle = f.region ? REGION_BY_ID[f.region].floor : "#191f2b";
+    ctx.fillRect(f.x, f.y, f.w, f.h);
+    ctx.strokeStyle = "rgba(0,0,0,.55)"; ctx.lineWidth = 6;
+    ctx.strokeRect(f.x+3, f.y+3, f.w-6, f.h-6);
+  }
+  ctx.strokeStyle="rgba(255,255,255,.035)"; ctx.lineWidth=1;
+  const gs=120;
+  ctx.beginPath();
+  for(let x=Math.floor(vx0/gs)*gs; x<vx1; x+=gs){ ctx.moveTo(x,vy0); ctx.lineTo(x,vy1); }
+  for(let y=Math.floor(vy0/gs)*gs; y<vy1; y+=gs){ ctx.moveTo(vx0,y); ctx.lineTo(vx1,y); }
+  ctx.stroke();
+
+  /* region borders */
+  for(const r of WORLD.regions){
+    ctx.strokeStyle=r.tint; ctx.globalAlpha=.30; ctx.lineWidth=3;
+    ctx.strokeRect(r.x+1.5, r.y+1.5, r.w-3, r.h-3); ctx.globalAlpha=1;
+  }
+  /* gates */
+  for(const gt of WORLD.gates){
+    if(gt.open) continue;
+    ctx.fillStyle="#241a12"; ctx.fillRect(gt.x, gt.y, gt.w, gt.h);
+    ctx.strokeStyle="#e8bd63"; ctx.lineWidth=3; ctx.setLineDash([9,7]);
+    ctx.strokeRect(gt.x+1.5, gt.y+1.5, gt.w-3, gt.h-3); ctx.setLineDash([]);
+  }
+  /* POIs under everything */
+  for(const p of WORLD.pois){
+    if(!vis(p.x,p.y,160)) continue;
+    drawPoi(ctx, p);
+  }
+  /* ground shapes */
+  for(const z of G.zones){
+    if(z.kind==="telegraph"){
+      const k=1-z.life/(z.sp&&z.sp.delay?z.sp.delay:0.35);
+      ctx.strokeStyle=z.col; ctx.globalAlpha=.85; ctx.lineWidth=3;
+      ctx.beginPath(); ctx.arc(z.x,z.y,z.r,0,TAU); ctx.stroke();
+      ctx.fillStyle=z.col; ctx.globalAlpha=.16*k+.06;
+      ctx.beginPath(); ctx.arc(z.x,z.y,z.r*Math.max(.05,k),0,TAU); ctx.fill();
+      ctx.globalAlpha=1;
+    } else if(z.kind==="field"){
+      ctx.fillStyle=z.col; ctx.globalAlpha=.13;
+      ctx.beginPath(); ctx.arc(z.x,z.y,z.r,0,TAU); ctx.fill();
+      ctx.globalAlpha=.5; ctx.strokeStyle=z.col; ctx.lineWidth=2;
+      ctx.beginPath(); ctx.arc(z.x,z.y,z.r,0,TAU); ctx.stroke(); ctx.globalAlpha=1;
+    } else if(z.kind==="ring"){
+      ctx.strokeStyle=z.col; ctx.lineWidth=9; ctx.globalAlpha=Math.max(0,z.life/0.30);
+      ctx.beginPath(); ctx.arc(z.x,z.y,Math.max(1,z.r0),0,TAU); ctx.stroke(); ctx.globalAlpha=1;
+    } else if(z.kind==="enemyTel"){
+      drawTelegraph(ctx, z);
+    }
+  }
+  /* walls */
+  for(const w of WORLD.walls){
+    if(!vis(w.x+w.w/2, w.y+w.h/2, Math.max(w.w,w.h))) continue;
+    ctx.fillStyle="#141922"; ctx.fillRect(w.x,w.y,w.w,w.h);
+    ctx.strokeStyle="#252d3c"; ctx.lineWidth=2; ctx.strokeRect(w.x+1,w.y+1,w.w-2,w.h-2);
+  }
+  /* pickups */
+  for(const p of G.pickups){
+    if(!vis(p.x,p.y,40)) continue;
+    const bob=Math.sin(G.t*4+p.x)*3;
+    ctx.fillStyle=p.col; ctx.globalAlpha=.25;
+    ctx.beginPath(); ctx.arc(p.x,p.y+bob,15,0,TAU); ctx.fill(); ctx.globalAlpha=1;
+    ctx.fillStyle=p.col; ctx.beginPath(); ctx.arc(p.x,p.y+bob,6,0,TAU); ctx.fill();
+  }
+  /* minions */
+  for(const m of G.minions){
+    ctx.fillStyle="#3f7d5f"; ctx.strokeStyle="#6fd3a6"; ctx.lineWidth=2;
+    ctx.beginPath(); ctx.arc(m.x,m.y,m.r,0,TAU); ctx.fill(); ctx.stroke();
+  }
+  /* enemies */
+  for(const e of G.enemies){
+    if(!vis(e.x,e.y,90)) continue;
+    drawEnemy(ctx, e);
+  }
+  /* player */
+  drawPlayer(ctx, P);
+  /* projectiles */
+  for(const p of G.projs){
+    ctx.strokeStyle=p.col; ctx.lineWidth=Math.max(2,p.r*0.7); ctx.globalAlpha=.45;
+    if(p.trail.length>1){ ctx.beginPath(); ctx.moveTo(p.trail[0].x,p.trail[0].y);
+      for(const t of p.trail) ctx.lineTo(t.x,t.y); ctx.lineTo(p.x,p.y); ctx.stroke(); }
+    ctx.globalAlpha=1;
+    ctx.fillStyle=p.col; ctx.beginPath(); ctx.arc(p.x,p.y,p.r,0,TAU); ctx.fill();
+    ctx.fillStyle="#fff"; ctx.globalAlpha=.65;
+    ctx.beginPath(); ctx.arc(p.x,p.y,p.r*0.42,0,TAU); ctx.fill(); ctx.globalAlpha=1;
+  }
+  /* impact marks */
+  for(const m of G.marks){
+    const k=m.life/m.max;
+    ctx.strokeStyle=m.col; ctx.globalAlpha=k*.8; ctx.lineWidth=3;
+    ctx.beginPath(); ctx.arc(m.x,m.y,m.r*(1.3-k*0.3),0,TAU); ctx.stroke(); ctx.globalAlpha=1;
+  }
+  /* damage numbers */
+  ctx.textAlign="center"; ctx.textBaseline="middle";
+  for(const f of G.floaters){
+    const k=Math.min(1,f.life/0.85);
+    ctx.globalAlpha=Math.min(1,k*1.8);
+    ctx.font=(f.big?"800 21px ":"700 14px ")+"ui-monospace,Menlo,monospace";
+    ctx.lineWidth=3; ctx.strokeStyle="rgba(0,0,0,.72)";
+    ctx.strokeText(f.txt, f.x, f.y); ctx.fillStyle=f.col; ctx.fillText(f.txt, f.x, f.y);
+    ctx.globalAlpha=1;
+  }
+  ctx.restore();
+  drawHud(ctx, W, H);
+}
+function drawTelegraph(ctx, z){
+  const k = 1 - z.life/z.total;
+  ctx.save();
+  ctx.translate(z.x, z.y);
+  ctx.rotate(z.facing||0);
+  const fill="rgba(255,90,70,", line="rgba(255,140,110,";
+  ctx.lineWidth=2.5;
+  if(z.shape==="box"){
+    ctx.fillStyle=fill+(0.14+0.16*k)+")"; ctx.fillRect(0,-z.wide/2, z.long*k, z.wide);
+    ctx.strokeStyle=line+"0.95)"; ctx.strokeRect(0,-z.wide/2, z.long, z.wide);
+  } else if(z.shape==="arc"){
+    ctx.fillStyle=fill+(0.14+0.16*k)+")";
+    ctx.beginPath(); ctx.moveTo(0,0); ctx.arc(0,0,z.reach*k,-z.half,z.half); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle=line+"0.95)";
+    ctx.beginPath(); ctx.moveTo(0,0); ctx.arc(0,0,z.reach,-z.half,z.half); ctx.closePath(); ctx.stroke();
+  } else if(z.shape==="ring"){
+    ctx.strokeStyle=line+"0.95)"; ctx.lineWidth=3;
+    ctx.beginPath(); ctx.arc(0,0,z.r,0,TAU); ctx.stroke();
+    ctx.beginPath(); ctx.arc(0,0,z.rIn,0,TAU); ctx.stroke();
+    ctx.fillStyle=fill+(0.10+0.14*k)+")";
+    ctx.beginPath(); ctx.arc(0,0,z.r,0,TAU); ctx.arc(0,0,z.rIn,0,TAU,true); ctx.fill();
+  } else {
+    ctx.fillStyle=fill+(0.14+0.2*k)+")";
+    ctx.beginPath(); ctx.arc(0,0,z.r*Math.max(0.08,k),0,TAU); ctx.fill();
+    ctx.strokeStyle=line+"0.95)";
+    ctx.beginPath(); ctx.arc(0,0,z.r,0,TAU); ctx.stroke();
+  }
+  ctx.restore();
+}
+function drawEnemy(ctx, e){
+  const def=ENEMY[e.type];
+  if(e.dead){
+    ctx.globalAlpha=Math.max(0,e.deadT/0.35);
+    ctx.fillStyle="#3a2530"; ctx.beginPath(); ctx.arc(e.x,e.y,e.r*(1+ (1-e.deadT/0.35)*0.5),0,TAU); ctx.fill();
+    ctx.globalAlpha=1; return;
+  }
+  /* body */
+  ctx.fillStyle = e.flash>0 ? "#ffffff" : def.col;
+  ctx.strokeStyle = e.frozen>0 ? EL.frost.col : "#0a0d13";
+  ctx.lineWidth = e.frozen>0 ? 3 : 2;
+  ctx.beginPath();
+  if(def.shape==="square"){ ctx.rect(e.x-e.r,e.y-e.r,e.r*2,e.r*2); }
+  else if(def.shape==="diamond"){ ctx.moveTo(e.x,e.y-e.r); ctx.lineTo(e.x+e.r,e.y);
+    ctx.lineTo(e.x,e.y+e.r); ctx.lineTo(e.x-e.r,e.y); ctx.closePath(); }
+  else ctx.arc(e.x,e.y,e.r,0,TAU);
+  ctx.fill(); ctx.stroke();
+  /* facing nub */
+  ctx.fillStyle="rgba(0,0,0,.45)";
+  ctx.beginPath(); ctx.arc(e.x+Math.cos(e.facing)*e.r*0.62, e.y+Math.sin(e.facing)*e.r*0.62, e.r*0.26,0,TAU); ctx.fill();
+  if(e.stagger > 0){
+    ctx.strokeStyle="#ffd24a"; ctx.lineWidth=4; ctx.globalAlpha=.75+.25*Math.sin(G.t*18);
+    ctx.beginPath(); ctx.arc(e.x,e.y,e.r+9,0,TAU); ctx.stroke(); ctx.globalAlpha=1;
+    ctx.fillStyle="#ffd24a"; ctx.font="700 10px system-ui,sans-serif"; ctx.textAlign="center";
+    ctx.fillText("OPENING", e.x, e.y-e.r-24);
+  }
+  if(e.ward > 0){
+    const w=e.r*2.6;
+    ctx.fillStyle="rgba(0,0,0,.6)"; ctx.fillRect(e.x-w/2, e.y-e.r-20, w, 5);
+    ctx.fillStyle="#8fd8ff"; ctx.fillRect(e.x-w/2, e.y-e.r-20, w*Math.max(0,e.ward/e.wardMax), 5);
+  }
+  /* windup tell on the body itself */
+  if(e.state==="windup"){
+    const k=e.stateT/e.wind.windup;
+    ctx.strokeStyle="#ff8a6a"; ctx.lineWidth=3; ctx.globalAlpha=.5+.5*Math.sin(G.t*30);
+    ctx.beginPath(); ctx.arc(e.x,e.y,e.r+5+k*4,0,TAU); ctx.stroke(); ctx.globalAlpha=1;
+  }
+  /* health */
+  if(e.hp < e.maxHp){
+    const w=e.r*2.2, h=4;
+    ctx.fillStyle="rgba(0,0,0,.6)"; ctx.fillRect(e.x-w/2, e.y-e.r-12, w, h);
+    ctx.fillStyle= e.boss ? "#ff6257" : "#d1544c";
+    ctx.fillRect(e.x-w/2, e.y-e.r-12, w*Math.max(0,e.hp/e.maxHp), h);
+  }
+  /* status pips */
+  let px=e.x-10;
+  const pip=(col)=>{ ctx.fillStyle=col; ctx.fillRect(px, e.y-e.r-19, 6,3); px+=8; };
+  if(e.frozen>0) pip(EL.frost.col);
+  if(e.marked>0) pip("#ffd24a");
+  if(e.weak>0) pip("#9aa4b4");
+  if(e.dots) for(const k in e.dots) if(e.dots[k].stacks>0) pip(EL[e.dots[k].elem]?EL[e.dots[k].elem].col:"#ff7a5c");
+}
+function drawPlayer(ctx, P){
+  /* dash trail */
+  if(P.iframe>0){ ctx.globalAlpha=.30; ctx.fillStyle="#9be7d8";
+    ctx.beginPath(); ctx.arc(P.x,P.y,P.r+7,0,TAU); ctx.fill(); ctx.globalAlpha=1; }
+  if(P.block>0){ ctx.strokeStyle="#57b2ff"; ctx.lineWidth=3; ctx.globalAlpha=.8;
+    ctx.beginPath(); ctx.arc(P.x,P.y,P.r+9,0,TAU); ctx.stroke(); ctx.globalAlpha=1; }
+  if(P.shield>0){ ctx.strokeStyle="#9ad0ff"; ctx.lineWidth=2; ctx.globalAlpha=.55;
+    ctx.beginPath(); ctx.arc(P.x,P.y,P.r+13,0,TAU); ctx.stroke(); ctx.globalAlpha=1; }
+  /* swing arc */
+  if(P.swing){
+    const sw=P.swing, k=sw.t/(sw.windup+sw.active);
+    const active = sw.t>=sw.windup && sw.t<=sw.windup+sw.active;
+    ctx.save(); ctx.translate(P.x,P.y); ctx.rotate(sw.facing);
+    ctx.fillStyle= active ? "rgba(255,240,200,.30)" : "rgba(255,240,200,.10)";
+    ctx.beginPath(); ctx.moveTo(0,0);
+    ctx.arc(0,0, sw.reach*Math.min(1,Math.max(0.2,k)), -sw.half, sw.half); ctx.closePath(); ctx.fill();
+    if(active){ ctx.strokeStyle="rgba(255,255,255,.8)"; ctx.lineWidth=2.5;
+      ctx.beginPath(); ctx.arc(0,0, sw.reach, -sw.half, sw.half); ctx.stroke(); }
+    ctx.restore();
+  }
+  ctx.fillStyle = P.flash>0 ? "#fff" : "#e8bd63";
+  ctx.strokeStyle="#0a0d13"; ctx.lineWidth=2.5;
+  ctx.beginPath(); ctx.arc(P.x,P.y,P.r,0,TAU); ctx.fill(); ctx.stroke();
+  ctx.fillStyle="#0a0d13";
+  ctx.beginPath(); ctx.arc(P.x+Math.cos(P.facing)*P.r*0.6, P.y+Math.sin(P.facing)*P.r*0.6, P.r*0.28,0,TAU); ctx.fill();
+}
+function drawPoi(ctx, p){
+  if(p.done && p.once){ ctx.globalAlpha=.3; }
+  const col = POI_COL[p.kind] || "#8894a8";
+  ctx.strokeStyle=col; ctx.lineWidth=2; ctx.globalAlpha*= .9;
+  ctx.beginPath(); ctx.arc(p.x,p.y, p.r||46, 0, TAU); ctx.stroke();
+  ctx.fillStyle=col; ctx.globalAlpha*=.10;
+  ctx.beginPath(); ctx.arc(p.x,p.y, p.r||46, 0, TAU); ctx.fill();
+  ctx.globalAlpha=1;
+  ctx.fillStyle=col; ctx.font="700 11px ui-monospace,Menlo,monospace";
+  ctx.textAlign="center"; ctx.textBaseline="middle";
+  ctx.fillText(POI_ICON[p.kind]||"?", p.x, p.y);
+  if(p.nodes) for(const n of p.nodes){
+    ctx.strokeStyle = n.done ? "#6fd3a6" : "#4a5566"; ctx.lineWidth=2;
+    ctx.beginPath(); ctx.arc(n.x, n.y, 18, 0, TAU); ctx.stroke();
+    if(n.done){ ctx.fillStyle="rgba(111,211,166,.35)"; ctx.beginPath(); ctx.arc(n.x,n.y,18,0,TAU); ctx.fill(); }
+  }
+  if(p.label){ ctx.fillStyle="rgba(217,223,234,.75)"; ctx.font="600 10px system-ui,sans-serif";
+    ctx.fillText(p.label, p.x, p.y+(p.r||46)+11); }
+  ctx.globalAlpha=1;
+}
+const POI_COL={camp:"#ff8a5c", shrine:"#c88bff", cave:"#57b2ff", merchant:"#e8bd63",
+               puzzle:"#6fd3a6", boss:"#ff5f56", gate:"#8894a8"};
+const POI_ICON={camp:"CAMP", shrine:"SHRINE", cave:"CAVE", merchant:"TRADE",
+                puzzle:"?", boss:"BOSS", gate:"GATE"};
+
+/* ---- on-canvas HUD: health, mana, boss bar ---- */
+function drawHud(ctx, W, H){
+  const P=G.player;
+  ctx.save();
+  const bw=Math.min(300, W-150), bx=14, by=H-84;
+  /* health */
+  ctx.fillStyle="rgba(8,11,16,.8)"; ctx.fillRect(bx-2, by-2, bw+4, 34);
+  ctx.fillStyle="#2a1013"; ctx.fillRect(bx, by, bw, 14);
+  ctx.fillStyle="#d1544c"; ctx.fillRect(bx, by, bw*Math.max(0,P.hp/P.maxHp), 14);
+  if(P.shield>0){ ctx.fillStyle="rgba(154,208,255,.8)";
+    ctx.fillRect(bx, by, bw*Math.min(1,P.shield/P.maxHp), 5); }
+  ctx.fillStyle="#0e1c2c"; ctx.fillRect(bx, by+17, bw, 11);
+  ctx.fillStyle="#3f9ae0"; ctx.fillRect(bx, by+17, bw*Math.max(0,P.mana/P.maxMana), 11);
+  ctx.fillStyle="#cfd7e4"; ctx.font="700 11px ui-monospace,Menlo,monospace"; ctx.textAlign="left";
+  ctx.textBaseline="middle";
+  ctx.fillText(Math.max(0,Math.round(P.hp))+" / "+Math.round(P.maxHp), bx+6, by+7);
+  ctx.fillText(Math.round(P.mana)+" / "+Math.round(P.maxMana), bx+6, by+22);
+  /* boss bar */
+  if(G.bossFight && !G.bossFight.dead){
+    const b=G.bossFight, w=Math.min(W-40, 420), x=(W-w)/2;
+    ctx.fillStyle="rgba(8,11,16,.85)"; ctx.fillRect(x-2, 10, w+4, 30);
+    ctx.fillStyle="#2a1013"; ctx.fillRect(x, 24, w, 12);
+    ctx.fillStyle="#ff5f56"; ctx.fillRect(x, 24, w*Math.max(0,b.hp/b.maxHp), 12);
+    if(b.ward > 0){
+      ctx.fillStyle="#8fd8ff"; ctx.fillRect(x, 24, w*Math.max(0,b.ward/b.wardMax), 12);
+      ctx.fillStyle="#04202e"; ctx.font="700 10px ui-monospace,Menlo,monospace";
+      ctx.textAlign="right"; ctx.fillText("WARD "+b.wardTime.toFixed(1)+"s", x+w-6, 30);
+    }
+    ctx.fillStyle="#ffd6d2"; ctx.font="700 12px system-ui,sans-serif"; ctx.textAlign="center";
+    ctx.fillText(ENEMY[b.type].name+"   ·   phase "+(b.phase+1), W/2, 17);
+  }
+  /* region banner */
+  if(G.msgT > 0){
+    ctx.globalAlpha=Math.min(1, G.msgT);
+    ctx.fillStyle="#e8bd63"; ctx.font="700 15px system-ui,sans-serif"; ctx.textAlign="center";
+    ctx.fillText(G.msg, W/2, 64); ctx.globalAlpha=1;
+  }
+  /* minimap: the whole authored map at a glance */
+  const mw=104, mh=Math.round(mw*WORLD.h/WORLD.w), mx=W-mw-10, my=10;
+  const sx=mw/WORLD.w, sy=mh/WORLD.h;
+  ctx.fillStyle="rgba(6,9,13,.82)"; ctx.fillRect(mx-3,my-3,mw+6,mh+6);
+  ctx.strokeStyle="var";
+  ctx.strokeStyle="#2a3444"; ctx.lineWidth=1; ctx.strokeRect(mx-3,my-3,mw+6,mh+6);
+  for(const f of WORLD.floor){
+    ctx.fillStyle = f.region ? REGION_BY_ID[f.region].tint : "#39425440";
+    ctx.globalAlpha = f.region ? .34 : .22;
+    ctx.fillRect(mx+f.x*sx, my+f.y*sy, Math.max(1,f.w*sx), Math.max(1,f.h*sy));
+  }
+  ctx.globalAlpha=1;
+  for(const gt of WORLD.gates){ if(gt.open) continue;
+    ctx.fillStyle="#e8bd63"; ctx.fillRect(mx+gt.x*sx-1, my+gt.y*sy-1, Math.max(2,gt.w*sx), Math.max(2,gt.h*sy)); }
+  for(const pp of WORLD.pois){
+    if(pp.done && pp.once !== false && pp.kind!=="merchant") continue;
+    ctx.fillStyle = POI_COL[pp.kind]||"#8894a8";
+    ctx.globalAlpha = pp.done ? .3 : .95;
+    const r = pp.kind==="boss" ? 3 : 2;
+    ctx.beginPath(); ctx.arc(mx+pp.x*sx, my+pp.y*sy, r, 0, TAU); ctx.fill();
+  }
+  ctx.globalAlpha=1;
+  ctx.fillStyle="#fff"; ctx.beginPath(); ctx.arc(mx+P.x*sx, my+P.y*sy, 2.6, 0, TAU); ctx.fill();
+  ctx.strokeStyle="#0a0d13"; ctx.lineWidth=1; ctx.stroke();
+  /* virtual stick */
+  if(IN.stick.on){
+    ctx.strokeStyle="rgba(217,223,234,.30)"; ctx.lineWidth=2;
+    ctx.beginPath(); ctx.arc(IN.stick.ox, IN.stick.oy, 52, 0, TAU); ctx.stroke();
+    const dx=IN.stick.x-IN.stick.ox, dy=IN.stick.y-IN.stick.oy;
+    const l=Math.min(52, Math.hypot(dx,dy)), a=Math.atan2(dy,dx);
+    ctx.fillStyle="rgba(232,189,99,.55)";
+    ctx.beginPath(); ctx.arc(IN.stick.ox+Math.cos(a)*l, IN.stick.oy+Math.sin(a)*l, 20, 0, TAU); ctx.fill();
+  }
+  /* aim line */
+  if(IN.aim.on){
+    const P2=G.player;
+    const sx=W/2+(P2.x-G.camx)*G.zoom, sy=H/2+(P2.y-G.camy)*G.zoom;
+    const dx=IN.aim.x-IN.aim.ox, dy=IN.aim.y-IN.aim.oy;
+    if(Math.hypot(dx,dy)>12){
+      const a=Math.atan2(dy,dx);
+      ctx.strokeStyle="rgba(232,189,99,.55)"; ctx.lineWidth=2; ctx.setLineDash([7,7]);
+      ctx.beginPath(); ctx.moveTo(sx,sy); ctx.lineTo(sx+Math.cos(a)*170, sy+Math.sin(a)*170); ctx.stroke();
+      ctx.setLineDash([]);
+    }
+  }
+  ctx.restore();
+}
+
+/* ================================================================
+   LOOP
+   ================================================================ */
+function frame(now){
+  if(!G.running) return;
+  requestAnimationFrame(frame);
+  const dtReal = Math.min(0.05, (now - G.last)/1000 || 0);
+  G.last = now;
+  if(!G.paused && !G.dead){
+    if(G.hitstop > 0){ G.hitstop -= dtReal; }
+    else {
+      G.acc += dtReal;
+      let guard=0;
+      while(G.acc >= DT && guard++ < 5){ stepWorld(DT); G.acc -= DT; }
+    }
+    if(G.msgT>0) G.msgT -= dtReal;
+    worldTick(dtReal);
+    G.uiT = (G.uiT||0) + dtReal;
+    if(G.uiT > 0.12){ G.uiT = 0; renderPrompt(); tickPadUi(); }
+  }
+  render();
+}
+function startGame(){
+  if(G.running) return;
+  G.running = true; G.last = performance.now();
+  requestAnimationFrame(frame);
+}
+
+/* ================================================================
+   THE MAP — one handcrafted layout, authored by hand, loaded whole.
+   Floor is an explicit list of rectangles; anything not on the floor
+   is solid. Corridors overlap the regions they join so a body can
+   never catch on a seam.
+   ================================================================ */
+const REGIONS = [
+  {id:"ember", name:"The Emberfields", elem:"cinder", lvl:1,  floor:"#241812", tint:"#ff6a3c",
+   x:150,  y:1400, w:1450, h:1400, blurb:"Slag flats west of everything. Warm, and getting warmer."},
+  {id:"rime",  name:"The Rimeshelf",   elem:"frost",  lvl:4,  floor:"#141f2a", tint:"#4fb9ff",
+   x:1800, y:250,  w:1500, h:1150, blurb:"A shelf of black ice over water nobody has measured."},
+  {id:"gale",  name:"Galewalk Flats",  elem:"gale",   lvl:7,  floor:"#1d1830", tint:"#b98cff",
+   x:3500, y:1400, w:1550, h:1400, blurb:"Open ground. Nothing to hide behind, for either of you."},
+  {id:"stone", name:"Stoneward Deeps", elem:"stone",  lvl:10, floor:"#18231a", tint:"#74cf4a",
+   x:1800, y:3000, w:1500, h:1050, blurb:"Quarried out and then quarried into."},
+  {id:"volt",  name:"The Volt Spine",  elem:"volt",   lvl:13, floor:"#26200e", tint:"#ffd23c",
+   x:2000, y:1650, w:1150, h:1050, blurb:"The middle of the map, and the last place you should go."}
+];
+const CORRIDORS = [
+  {x:1480, y:1500, w:450,  h:230, to:"ember-rime"},      // Emberfields -> Rimeshelf
+  {x:1800, y:1180, w:260,  h:420, to:"ember-rime2"},
+  {x:3180, y:900,  w:460,  h:230, to:"rime-gale"},       // Rimeshelf -> Galewalk
+  {x:3420, y:900,  w:250,  h:680, to:"rime-gale2"},
+  {x:3600, y:2680, w:250,  h:520, to:"gale-stone"},      // Galewalk -> Stoneward
+  {x:3180, y:3050, w:520,  h:240, to:"gale-stone2"},
+  {x:1520, y:2500, w:400,  h:230, to:"ember-volt"},      // spokes into the middle
+  {x:2450, y:1320, w:240,  h:420, to:"rime-volt"},
+  {x:3080, y:2050, w:480,  h:230, to:"gale-volt"},
+  {x:2450, y:2620, w:240,  h:450, to:"stone-volt"}
+];
+/* gates: a wall until the condition is met */
+const GATES = [
+  {id:"g_rime",  x:1800, y:1330, w:260, h:60,  open:false, region:"rime",
+   need:{boss:"orlo"}, label:"Rimeshelf — clear the Emberfields boss"},
+  {id:"g_gale",  x:3420, y:1500, w:250, h:60,  open:false, region:"gale",
+   need:{boss:"bells"}, label:"Galewalk — clear the Rimeshelf boss"},
+  {id:"g_stone", x:3600, y:2900, w:250, h:60,  open:false, region:"stone",
+   need:{boss:"verdict"}, label:"Stoneward — clear the Galewalk boss"},
+  {id:"g_volt1", x:1900, y:2500, w:60,  h:230, open:false, region:"volt",
+   need:{boss:"anvil", elem:{volt:34}}, label:"The Volt Spine — clear Stoneward, and 34 Volt to survive the path"},
+  {id:"g_volt2", x:3080, y:2050, w:60,  h:230, open:false, region:"volt",
+   need:{boss:"anvil", elem:{volt:34}}, label:"The Volt Spine — clear Stoneward, and 34 Volt to survive the path"},
+  {id:"g_volt3", x:2450, y:1590, w:240, h:60,  open:false, region:"volt",
+   need:{boss:"anvil", elem:{volt:34}}, label:"The Volt Spine — clear Stoneward, and 34 Volt to survive the path"},
+  {id:"g_volt4", x:2450, y:2640, w:240, h:60,  open:false, region:"volt",
+   need:{boss:"anvil", elem:{volt:34}}, label:"The Volt Spine — clear Stoneward, and 34 Volt to survive the path"}
+];
+const WORLD = {
+  w:5400, h:4200, respawn:{x:1020, y:1650},
+  regions:REGIONS, floor:[], walls:[], gates:GATES, pois:[]
+};
+for(const r of REGIONS) WORLD.floor.push({x:r.x, y:r.y, w:r.w, h:r.h, region:r.id});
+for(const c of CORRIDORS) WORLD.floor.push({x:c.x, y:c.y, w:c.w, h:c.h, region:null});
+/* handcrafted obstacles: cover to fight around */
+const OBST = [
+  [420,1620,220,90],[900,1900,120,300],[1250,1560,200,110],[600,2380,300,110],[1180,2420,150,240],
+  [2050,420,240,110],[2600,380,110,260],[3000,600,220,110],[2200,1000,300,110],[2900,1050,260,110],
+  [3750,1600,260,110],[4400,1750,110,300],[3900,2200,300,110],[4600,2350,240,110],[4200,2600,110,160],
+  [2000,3200,260,110],[2600,3150,110,280],[3000,3400,240,110],[2200,3700,300,110],[2850,3750,180,110],
+  [2150,1800,200,100],[2800,1800,180,100],[2150,2400,180,100],[2750,2380,240,100],[2450,2050,180,110]
+];
+for(const o of OBST) WORLD.walls.push({x:o[0], y:o[1], w:o[2], h:o[3]});
+
+function regionAt(x,y){
+  for(const r of REGIONS) if(x>=r.x && x<=r.x+r.w && y>=r.y && y<=r.y+r.h) return r;
+  return null;
+}
+function gateOpen(gt){
+  if(gt.open) return true;
+  if(gt.need.boss && !(S.bosses && S.bosses[gt.need.boss])) return false;
+  if(gt.need.elem){ for(const e in gt.need.elem) if((CTX.pool[e]||0) < gt.need.elem[e]) return false; }
+  return true;
+}
+function refreshGates(){
+  for(const gt of GATES){
+    const was = gt.open;
+    gt.open = gateOpen(gt);
+    if(gt.open && !was) toast("The way into "+gt.label.split(" — ")[0]+" is open");
+  }
+}
+
+/* ================================================================
+   ENEMIES — three per region plus a boss, each with its own
+   telegraph shapes and its own small loot pool
+   ================================================================ */
+const ENEMY = {
+/* ---- Emberfields ---- */
+husk:{name:"Ash Husk", region:"ember", col:"#b5563c", shape:"circle", r:19, hp:145, speed:98,
+  aggro:520, leash:1000, range:78, res:{cinder:35, frost:-20}, gold:[3,7],
+  attacks:[{shape:"arc", windup:0.60, recover:0.40, cd:1.4, reach:108, arc:100,
+            dmg:{cinder:22, neutral:9}, knock:14}]},
+embermoth:{name:"Embermoth", region:"ember", col:"#e08a3c", shape:"diamond", r:14, hp:78, speed:168,
+  aggro:600, leash:1100, range:230, res:{cinder:45, gale:-25}, gold:[2,5],
+  attacks:[{shape:"circle", windup:0.52, recover:0.30, cd:1.7, reach:220, r:62,
+            dmg:{cinder:18, gale:8}}]},
+slagger:{name:"Slagger", region:"ember", col:"#8a3f2c", shape:"square", r:25, hp:360, speed:62,
+  aggro:480, leash:900, range:120, res:{cinder:55, neutral:20, frost:-30}, gold:[8,16],
+  attacks:[{shape:"box", windup:0.85, recover:0.62, cd:2.4, long:220, wide:96,
+            dmg:{cinder:38, stone:22}, knock:48, heavy:true}]},
+/* ---- Rimeshelf ---- */
+rimewolf:{name:"Rimewolf", region:"rime", col:"#5a9fd6", shape:"diamond", r:17, hp:300, speed:186,
+  aggro:640, leash:1200, range:86, res:{frost:45, cinder:-25}, gold:[6,12],
+  attacks:[{shape:"arc", windup:0.42, recover:0.34, cd:1.15, reach:116, arc:80,
+            dmg:{frost:30, neutral:14}, knock:22}]},
+frostcaller:{name:"Frostcaller", region:"rime", col:"#7fc6ef", shape:"circle", r:18, hp:250, speed:78,
+  aggro:700, leash:1200, range:330, res:{frost:50, volt:-20}, gold:[7,14],
+  attacks:[{shape:"circle", windup:0.92, recover:0.48, cd:2.2, reach:320, r:96,
+            dmg:{frost:46}, heavy:true}]},
+icebound:{name:"Icebound", region:"rime", col:"#3f6f96", shape:"square", r:27, hp:760, speed:58,
+  aggro:520, leash:900, range:110, res:{frost:60, neutral:25, cinder:-35}, gold:[12,22],
+  attacks:[{shape:"ring", windup:0.95, recover:0.70, cd:3.0, r:215, rIn:95,
+            dmg:{frost:52, neutral:18}, knock:70, heavy:true},
+           {shape:"arc", windup:0.55, recover:0.40, cd:1.6, reach:120, arc:120, dmg:{frost:28}}]},
+/* ---- Galewalk ---- */
+galehound:{name:"Galehound", region:"gale", col:"#9d7bd6", shape:"diamond", r:17, hp:430, speed:216,
+  aggro:760, leash:1400, range:92, res:{gale:50, stone:-25}, gold:[10,18],
+  attacks:[{shape:"box", windup:0.48, recover:0.40, cd:1.5, long:210, wide:62,
+            dmg:{gale:44, neutral:16}, knock:60}]},
+skirmisher:{name:"Windskirmisher", region:"gale", col:"#c2a5f0", shape:"circle", r:18, hp:380, speed:120,
+  aggro:800, leash:1400, range:380, res:{gale:45, volt:-20}, gold:[11,19],
+  attacks:[{shape:"box", windup:0.55, recover:0.34, cd:1.4, long:400, wide:54,
+            dmg:{gale:38, neutral:12}}]},
+cyclone:{name:"Cyclone Adept", region:"gale", col:"#7a5bb0", shape:"square", r:24, hp:900, speed:84,
+  aggro:700, leash:1200, range:150, res:{gale:55, neutral:25}, gold:[16,28],
+  attacks:[{shape:"ring", windup:0.88, recover:0.60, cd:2.8, r:245, rIn:108,
+            dmg:{gale:62, neutral:22}, knock:80, heavy:true},
+           {shape:"circle", windup:0.62, recover:0.38, cd:1.8, reach:180, r:88, dmg:{gale:40}}]},
+/* ---- Stoneward ---- */
+granite:{name:"Granite Peer", region:"stone", col:"#6f9a54", shape:"square", r:28, hp:1650, speed:66,
+  aggro:560, leash:1000, range:126, res:{stone:60, neutral:35, gale:-25}, gold:[22,38],
+  attacks:[{shape:"arc", windup:0.78, recover:0.58, cd:2.0, reach:150, arc:130,
+            dmg:{stone:74, neutral:26}, knock:70, heavy:true}]},
+quarryman:{name:"Quarryman", region:"stone", col:"#8fbf62", shape:"circle", r:23, hp:1150, speed:104,
+  aggro:640, leash:1100, range:150, res:{stone:45, cinder:-20}, gold:[18,32],
+  attacks:[{shape:"box", windup:0.70, recover:0.50, cd:1.9, long:265, wide:104,
+            dmg:{stone:66, neutral:22}, knock:95, heavy:true}]},
+geode:{name:"Geode Sentry", region:"stone", col:"#4f7a3a", shape:"diamond", r:21, hp:820, speed:92,
+  aggro:700, leash:1200, range:260, res:{stone:50, volt:-30}, gold:[16,29], deathBlast:{r:130, dmg:{stone:70}},
+  attacks:[{shape:"circle", windup:0.80, recover:0.42, cd:2.1, reach:250, r:104,
+            dmg:{stone:58}, heavy:true}]},
+/* ---- Volt Spine ---- */
+arcling:{name:"Arcling", region:"volt", col:"#ffd23c", shape:"diamond", r:16, hp:1250, speed:232,
+  aggro:820, leash:1500, range:96, res:{volt:55, frost:-25}, gold:[30,50],
+  attacks:[{shape:"arc", windup:0.34, recover:0.28, cd:0.95, reach:120, arc:90,
+            dmg:{volt:86, neutral:26}, knock:30}]},
+coilguard:{name:"Coilguard", region:"volt", col:"#c9a02c", shape:"square", r:26, hp:2600, speed:74,
+  aggro:700, leash:1200, range:400, res:{volt:60, neutral:35}, gold:[38,62],
+  attacks:[{shape:"box", windup:0.86, recover:0.56, cd:2.3, long:520, wide:80,
+            dmg:{volt:120, neutral:34}, heavy:true}]},
+stormspine:{name:"Stormspine", region:"volt", col:"#e8b42c", shape:"circle", r:24, hp:2100, speed:96,
+  aggro:760, leash:1300, range:170, res:{volt:50, gale:25, stone:-20}, gold:[34,56],
+  attacks:[{shape:"ring", windup:0.80, recover:0.52, cd:2.4, r:255, rIn:112,
+            dmg:{volt:104, gale:30}, knock:85, heavy:true},
+           {shape:"circle", windup:0.58, recover:0.34, cd:1.5, reach:200, r:92, dmg:{volt:70}}]}
+};
+
+/* ================================================================
+   BOSSES — a pattern set you can learn, a phase that adds one, and
+   a punish window after the heavy attack
+   ================================================================ */
+const BOSSES = {
+orlo:{name:"Kiln-Warden Orlo", region:"ember", col:"#ff7a3c", shape:"square", r:42, hp:5200,
+  speed:70, aggro:1e4, leash:1e4, range:170, boss:true, gold:[120,180],
+  checks:"Elemental coverage — it resists Cinder hard and punishes you for owning only one damage type.",
+  res:{cinder:70, neutral:25, frost:-15, volt:-10},
+  phases:[
+    [{shape:"arc",  windup:0.72, recover:0.52, cd:1.7, reach:190, arc:120, dmg:{cinder:64, neutral:24}, knock:70},
+     {shape:"circle",windup:0.95, recover:0.75, cd:2.6, reach:240, r:130, dmg:{cinder:96}, heavy:true, opening:1.5}],
+    [{shape:"arc",  windup:0.66, recover:0.46, cd:1.5, reach:200, arc:130, dmg:{cinder:74, neutral:28}, knock:80},
+     {shape:"ring", windup:1.0,  recover:0.80, cd:3.0, r:300, rIn:120, dmg:{cinder:130}, heavy:true, opening:1.7},
+     {shape:"circle",windup:0.85, recover:0.55, cd:2.2, reach:260, r:140, dmg:{cinder:92}}]]},
+bells:{name:"The Nine Bells", region:"rime", col:"#6fd0ff", shape:"circle", r:40, hp:9800,
+  speed:62, aggro:1e4, leash:1e4, range:340, boss:true, gold:[200,280],
+  checks:"Burst inside a window — it raises a ward you have to break before it reseals.",
+  res:{frost:60, neutral:30, cinder:-20},
+  ward:{hp:2600, every:11, window:4.2, first:6},
+  phases:[
+    [{shape:"circle",windup:0.90, recover:0.50, cd:2.0, reach:330, r:120, dmg:{frost:88}},
+     {shape:"ring",  windup:1.05, recover:0.85, cd:3.2, r:320, rIn:130, dmg:{frost:140}, heavy:true, opening:1.8}],
+    [{shape:"circle",windup:0.80, recover:0.44, cd:1.7, reach:340, r:130, dmg:{frost:104}},
+     {shape:"ring",  windup:0.98, recover:0.78, cd:2.8, r:340, rIn:120, dmg:{frost:160}, heavy:true, opening:1.6},
+     {shape:"box",   windup:0.62, recover:0.40, cd:1.6, long:460, wide:90, dmg:{frost:96, neutral:30}}]]},
+verdict:{name:"The Hollow Verdict", region:"gale", col:"#c79bff", shape:"diamond", r:44, hp:16500,
+  speed:112, aggro:1e4, leash:1e4, range:220, boss:true, gold:[300,420],
+  checks:"Mobility — almost everything it does covers ground, and standing still is the only way to lose.",
+  res:{gale:60, neutral:35, volt:-15},
+  phases:[
+    [{shape:"box",  windup:0.50, recover:0.34, cd:1.2, long:520, wide:110, dmg:{gale:118, neutral:36}, knock:90},
+     {shape:"ring", windup:0.85, recover:0.66, cd:2.6, r:340, rIn:140, dmg:{gale:170}, heavy:true, opening:1.4}],
+    [{shape:"box",  windup:0.42, recover:0.28, cd:1.0, long:560, wide:120, dmg:{gale:132, neutral:40}, knock:100},
+     {shape:"ring", windup:0.76, recover:0.58, cd:2.2, r:360, rIn:130, dmg:{gale:196}, heavy:true, opening:1.3},
+     {shape:"circle",windup:0.55, recover:0.30, cd:1.3, reach:300, r:150, dmg:{gale:124}}]]},
+anvil:{name:"The Anvil of Noon", region:"stone", col:"#8fd05c", shape:"square", r:50, hp:46000,
+  speed:54, aggro:1e4, leash:1e4, range:190, boss:true, gold:[500,700], regen:190,
+  checks:"Sustained damage — it has more health than anything else and it heals what you cannot keep up with.",
+  res:{stone:65, neutral:45, cinder:40, frost:40, gale:40, volt:40},
+  phases:[
+    [{shape:"arc",  windup:0.85, recover:0.62, cd:1.9, reach:230, arc:140, dmg:{stone:150, neutral:50}, knock:110},
+     {shape:"box",  windup:0.95, recover:0.80, cd:2.8, long:380, wide:150, dmg:{stone:210}, heavy:true, opening:2.0}],
+    [{shape:"arc",  windup:0.76, recover:0.54, cd:1.7, reach:250, arc:150, dmg:{stone:172, neutral:58}, knock:120},
+     {shape:"box",  windup:0.88, recover:0.72, cd:2.5, long:420, wide:160, dmg:{stone:240}, heavy:true, opening:1.8},
+     {shape:"ring", windup:1.0,  recover:0.85, cd:3.4, r:380, rIn:150, dmg:{stone:230, neutral:70}, heavy:true, opening:1.6}]]},
+null_:{name:"Null, Who Counts", region:"volt", col:"#ffe066", shape:"diamond", r:46, hp:62000,
+  speed:100, aggro:1e4, leash:1e4, range:260, boss:true, gold:[800,1100],
+  checks:"Not standing still — it fills the floor, and the safe ground moves every few seconds.",
+  res:{volt:55, neutral:45, cinder:45, frost:45, gale:45, stone:45},
+  phases:[
+    [{shape:"circle",windup:0.66, recover:0.30, cd:1.0, reach:340, r:150, dmg:{volt:180}},
+     {shape:"box",   windup:0.58, recover:0.34, cd:1.3, long:600, wide:120, dmg:{volt:190, neutral:60}},
+     {shape:"ring",  windup:0.90, recover:0.70, cd:2.8, r:400, rIn:150, dmg:{volt:280}, heavy:true, opening:1.5}],
+    [{shape:"circle",windup:0.52, recover:0.24, cd:0.8, reach:380, r:165, dmg:{volt:210}},
+     {shape:"box",   windup:0.48, recover:0.28, cd:1.0, long:640, wide:130, dmg:{volt:225, neutral:70}},
+     {shape:"ring",  windup:0.80, recover:0.60, cd:2.3, r:420, rIn:140, dmg:{volt:330}, heavy:true, opening:1.3},
+     {shape:"circle",windup:0.62, recover:0.26, cd:1.1, reach:300, r:190, dmg:{volt:250, gale:80}}]]}
+};
+for(const k in BOSSES){ const b=BOSSES[k]; b.attacks = b.phases[0]; ENEMY[k]=b; }
+
+/* ================================================================
+   POINTS OF INTEREST — every one of them a reason to walk somewhere
+   ================================================================ */
+function poi(o){ WORLD.pois.push(Object.assign({r:52, done:false, alive:0}, o)); return o; }
+/* --- Emberfields --- */
+poi({id:"camp_e1", kind:"camp", region:"ember", x:640,  y:1660, label:"Slagworks",      pack:["husk","husk","embermoth"], chest:"ch_e1"});
+poi({id:"camp_e2", kind:"camp", region:"ember", x:1310, y:2560, label:"The Cinder Pit", pack:["husk","slagger","embermoth","embermoth"], chest:"ch_e2"});
+poi({id:"cave_e",  kind:"cave", region:"ember", x:360,  y:2560, label:"Kiln Throat",    pack:["slagger","husk","husk"], chest:"ch_e3", r:64});
+poi({id:"shr_e",   kind:"shrine", region:"ember", x:1180, y:1520, label:"Ashen Shrine", once:true,
+     choice:[{id:"hp", name:"Banked Coals", text:"+120 maximum health, permanently.", stats:{hp:120}},
+             {id:"dmg",name:"Open Flame",   text:"+8% damage, permanently.",          stats:{"dmg.all":8}}]});
+poi({id:"mer_e",   kind:"merchant", region:"ember", x:860,  y:2150, label:"Tallow, scrap-dealer"});
+poi({id:"puz_e",   kind:"puzzle", region:"ember", x:1490, y:1820, label:"Three Cold Braziers", once:true,
+     nodes:[{x:1420,y:1720},{x:1560,y:1900},{x:1360,y:1960}], limit:14, chest:"ch_ep"});
+poi({id:"boss_e",  kind:"boss", region:"ember", x:420,  y:2610, label:"Kiln-Warden Orlo", boss:"orlo", r:80});
+/* --- Rimeshelf --- */
+poi({id:"camp_r1", kind:"camp", region:"rime", x:2180, y:640,  label:"Cracked Shelf",  pack:["rimewolf","rimewolf","frostcaller"], chest:"ch_r1"});
+poi({id:"camp_r2", kind:"camp", region:"rime", x:3020, y:1180, label:"The Drift",      pack:["icebound","rimewolf","frostcaller"], chest:"ch_r2"});
+poi({id:"cave_r",  kind:"cave", region:"rime", x:2500, y:380,  label:"Blue Hollow",    pack:["icebound","icebound"], chest:"ch_r3", r:64});
+poi({id:"shr_r",   kind:"shrine", region:"rime", x:2860, y:520, label:"Rime Shrine", once:true,
+     choice:[{id:"res", name:"Thick Ice", text:"+14 to every elemental defence.", stats:{"res.all":14}},
+             {id:"mana",name:"Deep Melt", text:"+45 mana and +2/s regeneration.",  stats:{mana:45, manaRegen:2}}]});
+poi({id:"mer_r",   kind:"merchant", region:"rime", x:2330, y:1235, label:"Sigrun, ice-cutter"});
+poi({id:"puz_r",   kind:"puzzle", region:"rime", x:3160, y:760, label:"The Sounding Line", once:true,
+     nodes:[{x:3080,y:660},{x:3230,y:700},{x:3180,y:880}], limit:12, chest:"ch_rp"});
+poi({id:"boss_r",  kind:"boss", region:"rime", x:2640, y:1160, label:"The Nine Bells", boss:"bells", r:80});
+/* --- Galewalk --- */
+poi({id:"camp_g1", kind:"camp", region:"gale", x:3880, y:1700, label:"Windbreak",      pack:["galehound","skirmisher","galehound"], chest:"ch_g1"});
+poi({id:"camp_g2", kind:"camp", region:"gale", x:4680, y:2520, label:"The Long Flat",  pack:["cyclone","skirmisher","galehound","galehound"], chest:"ch_g2"});
+poi({id:"cave_g",  kind:"cave", region:"gale", x:4920, y:1620, label:"Whistling Cut",  pack:["cyclone","galehound","galehound"], chest:"ch_g3", r:64});
+poi({id:"shr_g",   kind:"shrine", region:"gale", x:4260, y:1560, label:"Gale Shrine", once:true,
+     choice:[{id:"spd", name:"Tailwind",  text:"+18% attack and cast speed.", stats:{speed:18, cast:18}},
+             {id:"crit",name:"Clear Eye", text:"+10% critical chance and +40 critical damage.", stats:{crit:10, critMult:40}}]});
+poi({id:"mer_g",   kind:"merchant", region:"gale", x:4120, y:2320, label:"Reeve, courier"});
+poi({id:"puz_g",   kind:"puzzle", region:"gale", x:4520, y:1880, label:"Four Weathervanes", once:true,
+     nodes:[{x:4420,y:1790},{x:4640,y:1830},{x:4600,y:2010},{x:4400,y:1990}], limit:15, chest:"ch_gp"});
+poi({id:"boss_g",  kind:"boss", region:"gale", x:4740, y:2080, label:"The Hollow Verdict", boss:"verdict", r:86});
+/* --- Stoneward --- */
+poi({id:"camp_s1", kind:"camp", region:"stone", x:2120, y:3480, label:"Cut Face",      pack:["quarryman","granite","geode"], chest:"ch_s1"});
+poi({id:"camp_s2", kind:"camp", region:"stone", x:3080, y:3760, label:"The Undercut",  pack:["granite","granite","geode","quarryman"], chest:"ch_s2"});
+poi({id:"cave_s",  kind:"cave", region:"stone", x:3180, y:3160, label:"Deep Adit",     pack:["granite","quarryman","quarryman"], chest:"ch_s3", r:64});
+poi({id:"shr_s",   kind:"shrine", region:"stone", x:2420, y:3180, label:"Stone Shrine", once:true,
+     choice:[{id:"hp2", name:"Bedrock",  text:"+320 maximum health, permanently.", stats:{hp:320}},
+             {id:"thorn",name:"Sharp Seam", text:"+22% thorns and +10 to every defence.", stats:{thorns:22, "res.all":10}}]});
+poi({id:"mer_s",   kind:"merchant", region:"stone", x:2700, y:3560, label:"Ord, quarry factor"});
+poi({id:"puz_s",   kind:"puzzle", region:"stone", x:2320, y:3880, label:"The Plumb Line", once:true,
+     nodes:[{x:2220,y:3820},{x:2430,y:3860},{x:2330,y:3980}], limit:13, chest:"ch_sp"});
+poi({id:"boss_s",  kind:"boss", region:"stone", x:2900, y:3360, label:"The Anvil of Noon", boss:"anvil", r:92});
+/* --- Volt Spine --- */
+poi({id:"camp_v1", kind:"camp", region:"volt", x:2250, y:1900, label:"First Coil",   pack:["arcling","stormspine","arcling"], chest:"ch_v1"});
+poi({id:"camp_v2", kind:"camp", region:"volt", x:2990, y:2570, label:"The Discharge",pack:["coilguard","arcling","stormspine"], chest:"ch_v2"});
+poi({id:"cave_v",  kind:"cave", region:"volt", x:2200, y:2500, label:"Earthing Pit",  pack:["coilguard","coilguard"], chest:"ch_v3", r:64});
+poi({id:"shr_v",   kind:"shrine", region:"volt", x:3000, y:1800, label:"Volt Shrine", once:true,
+     choice:[{id:"mult", name:"Overcharge", text:"All damage multiplied by 1.14.", stats:{"mult.all":14}},
+             {id:"surv", name:"Grounding",  text:"+420 health and +18 to every defence.", stats:{hp:420, "res.all":18}}]});
+poi({id:"mer_v",   kind:"merchant", region:"volt", x:2560, y:1820, label:"The Countinghouse"});
+poi({id:"boss_v",  kind:"boss", region:"volt", x:2600, y:2320, label:"Null, Who Counts", boss:"null_", r:92});
+
+/* ================================================================
+   LOOT SOURCING
+   Tables are generated from authored rules, then inverted so every
+   item can name where it comes from. An item with no source is a
+   bug, and the test suite treats it as one.
+   ================================================================ */
+const LOOT = {enemy:{}, chest:{}, boss:{}, merchant:{}};
+const SOURCES = {};
+function addSource(itemId, entry){ (SOURCES[itemId] || (SOURCES[itemId]=[])).push(entry); }
+function regionForLevel(lv){
+  if(lv <= 3) return "ember";
+  if(lv <= 6) return "rime";
+  if(lv <= 9) return "gale";
+  if(lv <= 12) return "stone";
+  return "volt";
+}
+const REGION_BY_ID = {}; for(const r of REGIONS) REGION_BY_ID[r.id]=r;
+const BOSS_OF = {ember:"orlo", rime:"bells", gale:"verdict", stone:"anvil", volt:"null_"};
+function buildLoot(){
+  for(const k in LOOT) for(const j in LOOT[k]) delete LOOT[k][j];
+  for(const k in SOURCES) delete SOURCES[k];
+  const byRegion = {}; for(const r of REGIONS) byRegion[r.id] = {mob:[], chest:[], boss:[], shop:[]};
+  const enemiesOf = {};
+  for(const id in ENEMY){ const e=ENEMY[id]; if(e.boss) continue;
+    (enemiesOf[e.region] || (enemiesOf[e.region]=[])).push(id); }
+  const chestsOf = {};
+  for(const p of WORLD.pois) if(p.chest) (chestsOf[p.region] || (chestsOf[p.region]=[])).push(p);
+  /* mythics are boss-only, spread one region apiece */
+  const mythics = Object.values(ITEMS).filter(i=>i.rarity==="mythic");
+  const bossIds = ["orlo","bells","verdict","anvil","null_"];
+  mythics.forEach((it,i)=>{
+    const b = bossIds[i % bossIds.length];
+    (LOOT.boss[b] || (LOOT.boss[b]=[])).push({id:it.id, chance:0.34});
+  });
+  /* everything else is placed by its own level band, then spread across
+     that band's enemies, chests and shop so nothing is orphaned */
+  const pools = {};
+  for(const it of Object.values(ITEMS)){
+    if(it.rarity === "mythic") continue;
+    if(it.cls && it.cls !== S.cls) continue;      // another class's weapon is not loot for you
+    (pools[regionForLevel(it.lvl)] || (pools[regionForLevel(it.lvl)]=[])).push(it);
+  }
+  for(const reg in pools){
+    const list = pools[reg].sort((x,y)=>x.lvl-y.lvl || x.id.localeCompare(y.id));
+    const mobs = enemiesOf[reg] || [];
+    const chests = (chestsOf[reg] || []).map(p=>p.chest);
+    const bId = BOSS_OF[reg];
+    const tough = mobs.slice().sort((a,b)=>ENEMY[b].hp-ENEMY[a].hp)[0];
+    list.forEach((it, i)=>{
+      const rank = RARITY[it.rarity].rank;
+      const chest = chests.length ? chests[i % chests.length] : null;
+      const mob = mobs.length ? mobs[i % mobs.length] : null;
+      if(rank >= 4){                                  // fabled: the boss, and one deep chest
+        (LOOT.boss[bId] || (LOOT.boss[bId]=[])).push({id:it.id, chance:0.55});
+        if(chest) (LOOT.chest[chest] || (LOOT.chest[chest]=[])).push({id:it.id, chance:0.22});
+      } else if(rank === 3){                          // legendary: chests, rarely off the toughest thing
+        if(chest) (LOOT.chest[chest] || (LOOT.chest[chest]=[])).push({id:it.id, chance:0.40});
+        if(tough) (LOOT.enemy[tough] || (LOOT.enemy[tough]=[])).push({id:it.id, chance:0.04});
+      } else {                                        // the ordinary run of gear
+        if(mob) (LOOT.enemy[mob] || (LOOT.enemy[mob]=[])).push({id:it.id, chance:rank<=1?0.18:0.11});
+        if(chest) (LOOT.chest[chest] || (LOOT.chest[chest]=[])).push({id:it.id, chance:0.30});
+        if(rank <= 2) (LOOT.merchant["mer_"+reg[0]] || (LOOT.merchant["mer_"+reg[0]]=[])).push({id:it.id});
+      }
+    });
+  }
+  /* a later region also drops what the one before it did, so nothing you
+     can kill is ever worthless and no chest is ever empty */
+  const ORDER = ["ember","rime","gale","stone","volt"];
+  ORDER.forEach((reg, ri)=>{
+    if(ri === 0) return;
+    const prev = pools[ORDER[ri-1]] || [];
+    const mobs = enemiesOf[reg] || [];
+    const chests = (chestsOf[reg] || []).map(p=>p.chest);
+    prev.forEach((it, i)=>{
+      if(RARITY[it.rarity].rank >= 4) return;
+      const mob = mobs.length ? mobs[i % mobs.length] : null;
+      const chest = chests.length ? chests[i % chests.length] : null;
+      if(mob) (LOOT.enemy[mob] || (LOOT.enemy[mob]=[])).push({id:it.id, chance:0.07});
+      if(chest) (LOOT.chest[chest] || (LOOT.chest[chest]=[])).push({id:it.id, chance:0.18});
+    });
+  });
+  /* last pass: nothing in the world is allowed to have an empty table */
+  const bandOf = {}; for(const reg in pools) bandOf[reg] = pools[reg].filter(i=>RARITY[i.rarity].rank < 4);
+  for(const t in ENEMY){
+    const e = ENEMY[t];
+    if(e.boss || (LOOT.enemy[t] && LOOT.enemy[t].length)) continue;
+    const band = (bandOf[e.region] && bandOf[e.region].length) ? bandOf[e.region]
+               : Object.values(bandOf).flat();
+    for(let i=0;i<2 && i<band.length;i++)
+      (LOOT.enemy[t] || (LOOT.enemy[t]=[])).push({id:band[Math.abs(hashStr(t)+i*7)%band.length].id, chance:0.12});
+  }
+  for(const p of WORLD.pois){
+    if(!p.chest || (LOOT.chest[p.chest] && LOOT.chest[p.chest].length)) continue;
+    const band = (bandOf[p.region] && bandOf[p.region].length) ? bandOf[p.region]
+               : Object.values(bandOf).flat();
+    for(let i=0;i<2 && i<band.length;i++)
+      (LOOT.chest[p.chest] || (LOOT.chest[p.chest]=[])).push({id:band[Math.abs(hashStr(p.id)+i*5)%band.length].id, chance:0.4});
+  }
+  /* invert into something the inspect panel can read out */
+  for(const t in LOOT.enemy) for(const d of LOOT.enemy[t])
+    addSource(d.id, {kind:"enemy", name:ENEMY[t].name, region:ENEMY[t].region, chance:d.chance});
+  for(const c in LOOT.chest) for(const d of LOOT.chest[c]){
+    const p = WORLD.pois.find(x=>x.chest===c);
+    addSource(d.id, {kind:"chest", name:p?p.label:c, region:p?p.region:null, chance:d.chance});
+  }
+  for(const b in LOOT.boss) for(const d of LOOT.boss[b])
+    addSource(d.id, {kind:"boss", name:BOSSES[b].name, region:BOSSES[b].region, chance:d.chance});
+  for(const m in LOOT.merchant) for(const d of LOOT.merchant[m]){
+    const p = WORLD.pois.find(x=>x.id===m);
+    addSource(d.id, {kind:"merchant", name:p?p.label:m, region:p?p.region:null});
+  }
+}
+function hashStr(s){ let h=0; for(let i=0;i<s.length;i++) h=(h*31+s.charCodeAt(i))|0; return h; }
+function sourceText(itemId){
+  const src = SOURCES[itemId] || [];
+  if(!src.length) return "Nowhere — this is a bug.";
+  return src.map(s=>{
+    const reg = s.region ? REGION_BY_ID[s.region].name : "";
+    if(s.kind==="enemy")    return s.name+" · "+reg+"  ("+Math.round(s.chance*100)+"%)";
+    if(s.kind==="chest")    return "Chest: "+s.name+" · "+reg+"  ("+Math.round(s.chance*100)+"%)";
+    if(s.kind==="boss")     return "Boss: "+s.name+"  ("+Math.round(s.chance*100)+"%)";
+    if(s.kind==="merchant") return "Sold by "+s.name+" · "+reg;
+    return s.name;
+  }).join("\\n");
+}
+function itemPrice(def){
+  const base = [26, 60, 150, 420, 950, 2200][RARITY[def.rarity].rank];
+  return Math.round(base * (1 + def.lvl*0.14));
+}
+
+let ENEMY_UID = 1;
+function spawnEnemy(type, x, y, opt){
+  const d = ENEMY[type];
+  const e = {id:ENEMY_UID++, type, x, y, r:d.r, hp:d.hp*((opt&&opt.hpMul)||1),
+    maxHp:d.hp*((opt&&opt.hpMul)||1), res:Object.assign({}, d.res),
+    state:"idle", stateT:0, atkCd:Math.random()*0.8, atkIx:0, facing:0, flash:0,
+    kx:0, ky:0, dots:null, homeX:x, homeY:y, mult:(opt&&opt.mult)||1,
+    boss:!!d.boss, phase:0, dead:false, deadT:0, spawnRef:(opt&&opt.ref)||null};
+  G.enemies.push(e);
+  return e;
+}
+function killEnemy(e){
+  if(e.dead) return;
+  e.dead = true; e.deadT = 0.35; e.hp = 0;
+  G.telemetry.kills++;
+  burst(e.x, e.y, "#ffcf7a", e.r*2.2);
+  if(e.spawnRef) e.spawnRef.alive--;
+  onEnemyKilled(e);
+}
+function playerDied(){
+  G.dead = true;
+  G.player.hp = 0;
+  if(typeof showDeath === "function") showDeath();
+}
+
+/* ================================================================
+   ENTERING THE WORLD
+   ================================================================ */
+function makePlayer(){
+  const dodge = CTX.dodge;
+  return {x:WORLD.respawn.x, y:WORLD.respawn.y, r:15, facing:0,
+    hp:CTX.maxHp, maxHp:CTX.maxHp, mana:CTX.maxMana, maxMana:CTX.maxMana,
+    speed: 205 * (1 + Math.min(0.45, dodge/160)),
+    iframe:0, dashT:0, dashVX:0, dashVY:0, castLock:0, cd:{}, swing:null,
+    block:0, blockPct:0, counter:0, counterAll:false, counterDot:null,
+    shield:0, dodgeBuff:0, dodgeBuffPct:0, flash:0, rooted:0, lastHurt:-99, moving:false};
+}
+function enterWorld(){
+  clearResCache();
+  G.enemies.length=0; G.projs.length=0; G.zones.length=0; G.minions.length=0;
+  G.floaters.length=0; G.marks.length=0; G.pickups.length=0;
+  G.dead=false; G.paused=false; G.bossFight=null;
+  G.player = makePlayer();
+  G.camx = G.player.x; G.camy = G.player.y;
+  G.zoom = Math.min(1.15, Math.max(0.72, ($("#cv").clientWidth||390)/520));
+  resetTelemetry();
+  populateWorld();
+  startGame();
+}
+
+/* ================================================================
+   LIVING WORLD — spawns, respawns, POIs, boss encounters
+   ================================================================ */
+function populateWorld(){
+  buildLoot();
+  refreshGates();
+  for(const p of WORLD.pois){
+    p.alive = 0; p.spawned = false; p.respawnAt = 0;
+    if(p.kind === "puzzle" && p.nodes) for(const n of p.nodes) n.done = false;
+    p.done = !!(S.poi && S.poi[p.id]);
+  }
+  for(const r of REGIONS) spawnAmbient(r);
+}
+/* a handful of wanderers per region so the place is never empty */
+function spawnAmbient(r){
+  const types = Object.keys(ENEMY).filter(k=>ENEMY[k].region===r.id && !ENEMY[k].boss);
+  if(!types.length) return;
+  for(let i=0;i<9;i++){
+    const t = types[i % types.length];
+    let x,y,tries=0;
+    do { x = r.x+90+Math.random()*(r.w-180); y = r.y+90+Math.random()*(r.h-180); tries++; }
+    while(blocked(x,y,26) && tries<40);
+    if(tries<40) spawnEnemy(t, x, y, {ambient:r.id});
+  }
+}
+function packFor(p){
+  if(!p.pack) return;
+  p.alive = 0;
+  for(let i=0;i<p.pack.length;i++){
+    const a = (i/p.pack.length)*TAU;
+    const rr = (p.r||52)*0.75;
+    let x = p.x+Math.cos(a)*rr, y = p.y+Math.sin(a)*rr;
+    if(blocked(x,y,26)){ x=p.x; y=p.y; }
+    spawnEnemy(p.pack[i], x, y, {ref:p});
+    p.alive++;
+  }
+  p.spawned = true;
+}
+function worldTick(dt){
+  const P = G.player;
+  if(!P) return;
+  /* which region am I standing in */
+  const r = regionAt(P.x, P.y);
+  if(r && r !== G.region){ G.region = r; toast(r.name + " — " + r.blurb); }
+  /* camps wake up when you come near, and come back after a while */
+  for(const p of WORLD.pois){
+    const d = Math.hypot(P.x-p.x, P.y-p.y);
+    if(p.pack){
+      if(!p.spawned && d < 900) packFor(p);
+      if(p.spawned && p.alive <= 0 && !p.cleared){ p.cleared = true; p.clearedAt = G.t; }
+      if(p.cleared && p.kind !== "cave" && G.t - p.clearedAt > 50 && d > 950){
+        p.cleared = false; p.spawned = false;      // the region stays alive
+      }
+    }
+    if(p.kind === "boss" && !p.spawned && d < (p.r||80)+120 && !(S.bosses && S.bosses[p.boss])){
+      const b = spawnEnemy(p.boss, p.x, p.y, {ref:p});
+      b.boss = true; b.arena = p; G.bossFight = b; p.spawned = true;
+      toast(BOSSES[p.boss].name);
+    }
+    if(p.kind === "puzzle" && !p.done && p.nodes){
+      for(const n of p.nodes){
+        if(!n.done && Math.hypot(P.x-n.x, P.y-n.y) < 42){
+          n.done = true; p.startedAt = p.startedAt || G.t;
+          burst(n.x, n.y, "#6fd3a6", 40);
+          toast("Brazier lit  "+p.nodes.filter(z=>z.done).length+" / "+p.nodes.length);
+        }
+      }
+      if(p.startedAt && G.t - p.startedAt > p.limit && p.nodes.some(n=>!n.done)){
+        for(const n of p.nodes) n.done = false;
+        p.startedAt = 0; toast("They went out. Start again.");
+      }
+      if(p.nodes.every(n=>n.done)){ p.done = true; markPoiDone(p); openChest(p, true); }
+    }
+  }
+  /* boss upkeep */
+  const b = G.bossFight;
+  if(b){
+    if(b.dead){ G.bossFight = null; }
+    else if(b.arena && Math.hypot(P.x-b.arena.x, P.y-b.arena.y) > 1000){
+      /* you left: it goes home and resets rather than following you across the map */
+      b.x = b.arena.x; b.y = b.arena.y; b.hp = b.maxHp; b.phase = 0;
+      b.attacks = BOSSES[b.type].phases[0]; b.state="idle"; b.wind=null;
+      b.ward = 0; b.wardT = null; b.arena.spawned = false;
+      G.enemies = G.enemies.filter(x=>x!==b);
+      G.bossFight = null;
+      toast(BOSSES[b.type].name+" returned to its ground");
+    }
+    else {
+      const def = BOSSES[b.type];
+      const frac = b.hp/b.maxHp;
+      const want = frac <= 0.5 ? 1 : 0;
+      if(want > b.phase){
+        b.phase = want; b.attacks = def.phases[want]; b.wind = null;
+        b.state = "chase"; b.stateT = 0; b.atkCd = 1.2;
+        b.stagger = 1.4;
+        burst(b.x, b.y, "#ffd24a", b.r*3);
+        G.shake = 12;
+        toast(def.name + " — phase two");
+      }
+      if(def.regen && b.hp < b.maxHp) b.hp = Math.min(b.maxHp, b.hp + def.regen*dt);
+      if(def.ward){
+        b.wardT = (b.wardT==null) ? def.ward.first : b.wardT - dt;
+        if(b.ward > 0){
+          b.wardTime -= dt;
+          if(b.ward <= 0){ b.ward = 0; b.stagger = 2.0; toast("Ward broken — punish it"); }
+          else if(b.wardTime <= 0){
+            b.ward = 0; b.hp = Math.min(b.maxHp, b.hp + def.ward.hp*0.9);
+            toast("The ward resealed. It healed."); b.wardT = def.ward.every;
+          }
+        } else if(b.wardT <= 0){
+          b.ward = def.ward.hp; b.wardMax = def.ward.hp; b.wardTime = def.ward.window;
+          toast("Ward up — "+fmt(def.ward.hp)+" in "+def.ward.window+"s");
+        }
+      }
+    }
+  }
+}
+function markPoiDone(p){
+  S.poi = S.poi || {}; S.poi[p.id] = true; p.done = true; save();
+}
+
+/* ================================================================
+   DROPS — everything that falls has a table behind it
+   ================================================================ */
+function rollTable(list, luck){
+  const out = [];
+  for(const d of (list||[])){
+    if(Math.random() < d.chance*(luck||1)) out.push(rollItem(d.id));
+  }
+  return out;
+}
+function onEnemyKilled(e){
+  const def = ENEMY[e.type];
+  if(def.gold){
+    const n = Math.round(def.gold[0] + Math.random()*(def.gold[1]-def.gold[0]));
+    dropPickup(e.x, e.y, "gold", {n});
+  }
+  if(def.deathBlast){
+    for(const o of G.enemies) if(!o.dead && o!==e && Math.hypot(o.x-e.x,o.y-e.y) < def.deathBlast.r) {}
+    const P=G.player;
+    if(Math.hypot(P.x-e.x, P.y-e.y) < def.deathBlast.r + P.r){
+      hurtPlayer(def.deathBlast.dmg, def.name+" (death blast)", {heavy:true});
+    }
+    burst(e.x, e.y, "#8fbf62", def.deathBlast.r);
+  }
+  if(Math.random() < 0.13) dropPickup(e.x, e.y, "orb", {stat: Math.random()<0.6?"hp":"mana"});
+  let drops;
+  if(def.boss){
+    drops = rollTable(LOOT.boss[e.type], 1);
+    if(!drops.length && LOOT.boss[e.type] && LOOT.boss[e.type].length){
+      const d = LOOT.boss[e.type][Math.floor(Math.random()*LOOT.boss[e.type].length)];
+      drops = [rollItem(d.id)];                    // a boss never gives you nothing
+    }
+    S.bosses = S.bosses || {}; S.bosses[e.type] = true;
+    if(e.arena) markPoiDone(e.arena);
+    refreshGates();
+    S.level = Math.max(S.level, Math.min(15, (REGION_BY_ID[def.region].lvl || 1) + 3));
+    toast(def.name + " is down");
+    G.bossFight = null;
+    recompute(false);
+  } else {
+    drops = rollTable(LOOT.enemy[e.type], 1);
+  }
+  for(const inst of drops) dropPickup(e.x, e.y, "item", {inst});
+}
+function openChest(p, silent){
+  const pool = LOOT.chest[p.chest] || [];
+  let drops = rollTable(pool, 1.2);
+  if(!drops.length && pool.length){
+    const d = pool[Math.floor(Math.random()*pool.length)];
+    drops = [rollItem(d.id)];
+  }
+  const extra = 40 + Math.round(Math.random()*90) * (REGION_BY_ID[p.region].lvl||1);
+  dropPickup(p.x, p.y, "gold", {n:extra});
+  for(const inst of drops) dropPickup(p.x, p.y+18, "item", {inst});
+  markPoiDone(p);
+  if(!silent) toast("Opened  ·  "+p.label);
+}
+
+/* ================================================================
+   STANDING NEXT TO SOMETHING — the only diegetic UI in the game
+   ================================================================ */
+function poiPrompt(){
+  const P = G.player;
+  if(!P) return null;
+  let best=null, bd=1e9;
+  for(const p of WORLD.pois){
+    const d = Math.hypot(P.x-p.x, P.y-p.y);
+    if(d > (p.r||52)+30 || d > bd) continue;
+    bd = d; best = p;
+  }
+  return best;
+}
+function poiAction(p){
+  if(p.kind === "camp" || p.kind === "cave"){
+    if(p.done) return {label:"Emptied", dead:true};
+    if(!p.spawned) return {label:"Approach", dead:true};
+    if(p.alive > 0) return {label:p.alive+" still guarding it", dead:true};
+    return {label:"Open the chest", fn:()=>openChest(p)};
+  }
+  if(p.kind === "shrine") return p.done ? {label:"Already taken", dead:true}
+                                        : {label:"Read the shrine", fn:()=>openShrine(p)};
+  if(p.kind === "merchant") return {label:"Trade", fn:()=>openMerchant(p)};
+  if(p.kind === "puzzle") return p.done ? {label:"Solved", dead:true}
+                                        : {label:"Light them in "+p.limit+"s", dead:true};
+  if(p.kind === "boss"){
+    if(S.bosses && S.bosses[p.boss]) return {label:"Cleared", dead:true};
+    return {label:"What it checks", fn:()=>openBossCard(p)};
+  }
+  return null;
+}
+function renderPrompt(){
+  const el = $("#poiPrompt");
+  if(!el) return;
+  const p = poiPrompt();
+  G.nearPoi = p;
+  if(!p || G.dead){ el.style.display="none"; return; }
+  const a = poiAction(p);
+  if(!a){ el.style.display="none"; return; }
+  el.style.display="block";
+  el.className = a.dead ? "dead" : "";
+  el.innerHTML = '<b>'+esc(p.label)+'</b><span>'+esc(a.label)+'</span>';
+  el.onclick = a.dead ? null : a.fn;
+}
+function openShrine(p){
+  let body = '<div class="note">A one-time choice. Whatever you take here is permanent for this run, and the other one is gone.</div>';
+  body += '<div class="stab">';
+  for(const c of p.choice)
+    body += '<button class="slot" data-ch="'+c.id+'" style="width:100%;grid-template-columns:1fr auto">'+
+      '<span class="body"><div class="iname" style="color:#c88bff">'+esc(c.name)+'</div>'+
+      '<div class="ts" style="font-size:12px;color:var(--tx2);margin-top:3px">'+esc(c.text)+'</div></span>'+
+      '<span class="chev">›</span></button>';
+  body += '</div>';
+  openSheet({head:'<div class="sh-title">'+esc(p.label)+'</div><div class="sh-sub">shrine · one of two</div>',
+    body, buttons:[{label:"Leave it", cls:"gho", action:()=>closeSheet(true)}],
+    onDraw:root=>{ root.querySelectorAll("[data-ch]").forEach(b=>b.onclick=()=>{
+      const c = p.choice.find(x=>x.id===b.dataset.ch);
+      S.shrines = S.shrines || {}; S.shrines[p.id] = c.id;
+      markPoiDone(p); closeSheet(true); recompute(true);
+      toast(c.name + " taken");
+    }); }});
+}
+function openBossCard(p){
+  const def = BOSSES[p.boss];
+  let body = '<div class="note">'+esc(def.checks)+'</div>';
+  body += '<div class="sgrp">Its resistances</div><div class="stab">';
+  for(const b of ALLBUCKETS){
+    const r = def.res[b]||0;
+    body += '<div class="srow"><span class="k e-'+b+'">'+EL[b].name+'</span>'+
+      '<span class="v num '+(r>40?"neg":(r<0?"pos":"zero"))+'">'+(r>0?"+":"")+r+'%</span></div>';
+  }
+  body += '</div>';
+  body += '<div class="sgrp">Its pattern</div><div class="stab">';
+  def.phases.forEach((ph,i)=>{
+    body += '<div class="sgrp" style="border:none">Phase '+(i+1)+(i?" — below half health":"")+'</div>';
+    for(const a of ph)
+      body += '<div class="srow"><span class="k">'+esc(SHAPE_NAME[a.shape])+
+        (a.heavy?' <span class="tag" style="border-color:#7a3a2a;color:#ff9a7a">heavy</span>':'')+
+        (a.opening?' <span class="tag ab">opening</span>':'')+'</span>'+
+        '<span class="v num">'+a.windup.toFixed(2)+'s tell</span>'+
+        '<span class="dlt num" style="color:var(--tx3)">'+fmt(sumB(a.dmg))+'</span></div>';
+  });
+  body += '</div>';
+  body += '<div class="sgrp">What it drops</div><div class="stab">';
+  for(const d of (LOOT.boss[p.boss]||[])){
+    const it = ITEMS[d.id];
+    body += '<div class="srow"><span class="k '+RARITY[it.rarity].cls+'">'+esc(it.name)+'</span>'+
+      '<span class="v num">'+Math.round(d.chance*100)+'%</span></div>';
+  }
+  body += '</div>';
+  openSheet({head:'<div class="sh-title">'+esc(def.name)+'</div><div class="sh-sub">'+
+    REGION_BY_ID[def.region].name+' · boss</div>', body,
+    buttons:[{label:"Close", cls:"gho", action:()=>closeSheet(true)}]});
+}
+const SHAPE_NAME = {arc:"A sweep in front of it", box:"A line along the ground",
+                    circle:"A circle where you are standing", ring:"A ring — the middle is safe"};
+function openMerchant(p){
+  const stock = (LOOT.merchant[p.id] || []).map(d=>d.id);
+  S.bought = S.bought || {};
+  let body = '<div class="note">Gold: <b class="num">'+fmt(S.gold||0)+
+    '</b>. Stock is fixed — this is the only place some of this is sold.</div><div class="stab">';
+  if(!stock.length) body += '<div class="empty">Nothing in stock here.</div>';
+  for(const id of stock){
+    const def = ITEMS[id];
+    if(def.cls && def.cls !== S.cls) continue;
+    const price = itemPrice(def);
+    const owned = S.bought[p.id+"|"+id];
+    body += '<button class="slot" data-buy="'+id+'" style="width:100%;grid-template-columns:1fr auto auto">'+
+      '<span class="body"><div class="iname '+RARITY[def.rarity].cls+'">'+esc(def.name)+'</div>'+
+      '<div class="line2"><span class="tag">'+RARITY[def.rarity].name+'</span>'+
+      Object.keys(def.req||{}).map(e=>pipHtml(e, def.req[e], (CTX.pool[e]||0)<def.req[e]?"unmet":"")).join("")+
+      '</div></span>'+
+      '<span style="padding:0 10px;text-align:right"><div class="num '+
+        ((S.gold||0)>=price && !owned ?"pos":"neg")+'" style="font-weight:700">'+
+        (owned?"sold":fmt(price))+'</div><div class="num" style="font-size:9px;color:var(--tx3)">gold</div></span>'+
+      '<span class="chev">›</span></button>';
+  }
+  body += '</div>';
+  openSheet({head:'<div class="sh-title">'+esc(p.label)+'</div><div class="sh-sub">'+
+    REGION_BY_ID[p.region].name+' · merchant</div>', body,
+    buttons:[{label:"Done", cls:"gho", action:()=>closeSheet(true)}],
+    onDraw:root=>{ root.querySelectorAll("[data-buy]").forEach(b=>b.onclick=()=>{
+      const id = b.dataset.buy, def = ITEMS[id], price = itemPrice(def);
+      if(S.bought[p.id+"|"+id]) return;
+      if((S.gold||0) < price){ toast("Not enough gold"); return; }
+      S.gold -= price; S.bought[p.id+"|"+id] = true;
+      const inst = rollItem(id); S.inv.push(inst);
+      save(); closeSheet(true); openItem(inst);
+      toast("Bought "+def.name);
+    }); }});
+}
+
+/* ================================================================
+   TOUCH / KEYBOARD
+   ================================================================ */
+function bindControls(){
+  const cv = $("#cv");
+  cv.addEventListener("pointerdown", ev=>{
+    if(G.paused) return;
+    cv.setPointerCapture(ev.pointerId);
+    const r=cv.getBoundingClientRect(), x=ev.clientX-r.left, y=ev.clientY-r.top;
+    if(ev.pointerType === "mouse"){ IN.usedKeys = true; tryCast(0); return; }
+    if(x < r.width*0.5){
+      IN.stick.id=ev.pointerId; IN.stick.ox=x; IN.stick.oy=y; IN.stick.x=x; IN.stick.y=y; IN.stick.on=true;
+    }
+  });
+  cv.addEventListener("pointermove", ev=>{
+    const r=cv.getBoundingClientRect(), x=ev.clientX-r.left, y=ev.clientY-r.top;
+    IN.mouse.x=x; IN.mouse.y=y;
+    if(IN.stick.on && ev.pointerId===IN.stick.id){ IN.stick.x=x; IN.stick.y=y; }
+  });
+  const end=ev=>{
+    if(IN.stick.on && ev.pointerId===IN.stick.id){ IN.stick.on=false; IN.stick.id=null; }
+  };
+  cv.addEventListener("pointerup", end);
+  cv.addEventListener("pointercancel", end);
+  window.addEventListener("keydown", ev=>{
+    IN.usedKeys = true;
+    IN.keys[ev.key] = true;
+    if(ev.key===" "){ ev.preventDefault(); tryCast(0); }
+    if(ev.key>="1" && ev.key<="4") tryCast(+ev.key);
+  });
+  window.addEventListener("keyup", ev=>{ IN.keys[ev.key]=false; });
+}
+function renderPad(){
+  const wrap=$("#padBtns");
+  if(!wrap || !CTX) return;
+  let h='<button class="pb basic" data-slot="0"><b>'+esc(CTX.weapon?CTX.weapon.strikeName:"Strike")+'</b></button>';
+  for(const sp of CTX.spells.slice().sort((a,b)=>a.slot-b.slot)){
+    h+='<button class="pb" data-slot="'+sp.slot+'" data-sid="'+sp.id+'">'+
+       '<b>'+esc(sp.name)+'</b><i class="num">'+Math.round(spellCost(CTX,sp))+'</i>'+
+       '<u class="cdmask"></u></button>';
+  }
+  wrap.innerHTML=h;
+  bindPadOnly();
+}
+function bindPadOnly(){
+  for(const b of $$("#padBtns .pb")){
+    const slot=+b.dataset.slot;
+    b.addEventListener("pointerdown", ev=>{
+      ev.preventDefault(); b.setPointerCapture(ev.pointerId);
+      IN.aim.id=ev.pointerId; IN.aim.slot=slot; IN.aim.on=true;
+      const r=b.getBoundingClientRect();
+      IN.aim.ox=r.left+r.width/2; IN.aim.oy=r.top+r.height/2;
+      IN.aim.x=IN.aim.ox; IN.aim.y=IN.aim.oy;
+      b.classList.add("held");
+    });
+    b.addEventListener("pointermove", ev=>{
+      if(!IN.aim.on||ev.pointerId!==IN.aim.id) return;
+      IN.aim.x=ev.clientX; IN.aim.y=ev.clientY;
+    });
+    const up=ev=>{
+      if(!IN.aim.on||ev.pointerId!==IN.aim.id) return;
+      b.classList.remove("held"); tryCast(slot);
+      IN.aim.on=false; IN.aim.id=null; IN.aim.slot=-1;
+    };
+    b.addEventListener("pointerup", up);
+    b.addEventListener("pointercancel", up);
+  }
+}
+/* keep the cooldown shading honest */
+function tickPadUi(){
+  if(!G.player) return;
+  for(const b of $$("#padBtns .pb")){
+    const sid=b.dataset.sid;
+    const mask=b.querySelector(".cdmask");
+    if(!mask) continue;
+    const sp=CTX.spells.find(x=>x.id===sid);
+    if(!sp){ mask.style.height="0%"; continue; }
+    const cd=G.player.cd[sid]||0;
+    const total=(sp.util&&sp.util.cd)?sp.util.cd:castTime(CTX,sp);
+    mask.style.height=(cd>0? Math.min(100, cd/total*100):0)+"%";
+    const cost=spellCost(CTX,sp);
+    b.classList.toggle("poor", !CTX.flags.thirst && G.player.mana < cost);
+  }
+}
 
 /* ================================================================
    ================  UI  ==========================================
@@ -2565,14 +4509,16 @@ const SAVE_KEY = "solver.run.v1";
 function cloneState(s){
   return {cls:s.cls, level:s.level, alloc:Object.assign({},s.alloc), tree:s.tree.slice(),
           equipped:Object.assign({},s.equipped), inv:s.inv, cleared:s.cleared, salvaged:s.salvaged,
-          best:s.best, wpnPity:s.wpnPity};
+          best:s.best, wpnPity:s.wpnPity, gold:s.gold, bosses:s.bosses, poi:s.poi,
+          shrines:s.shrines, bought:s.bought};
 }
 function save(){
   try{
     const eq = {}; for(const k in S.equipped) if(S.equipped[k]) eq[k]=S.equipped[k].uid;
     localStorage.setItem(SAVE_KEY, JSON.stringify({
       cls:S.cls, level:S.level, alloc:S.alloc, tree:S.tree, inv:S.inv, eq,
-      cleared:S.cleared, salvaged:S.salvaged, best:S.best, wpnPity:S.wpnPity, uid:UID
+      cleared:S.cleared, salvaged:S.salvaged, best:S.best, wpnPity:S.wpnPity, uid:UID,
+      gold:S.gold||0, bosses:S.bosses||{}, poi:S.poi||{}, shrines:S.shrines||{}, bought:S.bought||{}
     }));
   }catch(e){}
 }
@@ -2582,7 +4528,8 @@ function load(){
     const d = JSON.parse(raw);
     if(!d || !CLASSES[d.cls]) return null;
     const s = {cls:d.cls, level:d.level||1, alloc:d.alloc||{}, tree:d.tree||[], inv:d.inv||[],
-               equipped:{}, cleared:d.cleared||{}, salvaged:d.salvaged||{}, best:d.best||{}, wpnPity:d.wpnPity||0};
+               equipped:{}, cleared:d.cleared||{}, salvaged:d.salvaged||{}, best:d.best||{}, wpnPity:d.wpnPity||0,
+               gold:d.gold||0, bosses:d.bosses||{}, poi:d.poi||{}, shrines:d.shrines||{}, bought:d.bought||{}};
     for(const e of ELEMS) if(s.alloc[e]==null) s.alloc[e]=0;
     const byUid = {}; for(const i of s.inv) byUid[i.uid]=i;
     for(const k in (d.eq||{})) if(byUid[d.eq[k]]) s.equipped[k]=byUid[d.eq[k]];
@@ -2714,7 +4661,7 @@ function renderHud(){
   else if(bad.length){ req.textContent = bad.length+" UNMET"; req.className="hudpill alert"; }
   else { req.textContent="REQ OK"; req.className="hudpill"; }
   const tl = treeLeft(S), eb = elemBudget(S.level)-elemSpent(S);
-  $("#hudSp").textContent = tl+" SP · "+eb+" EP";
+  $("#hudSp").textContent = tl+" SP · "+eb+" EP · "+fmt(S.gold||0)+"g";
   $("#hudSp").className = "hudpill"+((tl>0||eb>0)?" ":"");
   const vals = {dps:HL.dps, ehp:HL.ehp, sus:HL.sustain, burst:HL.burst};
   for(const t of $$("#hudStats .hs")){
@@ -3047,6 +4994,20 @@ function itemStatsHtml(def, inst){
   if(def.major) h += '<div class="major"><div class="mt">Major ID</div><div class="mn">'+esc(MAJORS[def.major].name)+
     '</div><div class="md">'+esc(MAJORS[def.major].text)+'</div></div>';
   if(def.lore) h += '<div class="lore">'+esc(def.lore)+'</div>';
+  const src = (typeof SOURCES !== "undefined" && SOURCES[def.id]) || [];
+  h += '<div class="sgrp">Where this comes from</div><div class="stab">';
+  if(!src.length) h += '<div class="empty">Unsourced — that is a bug.</div>';
+  for(const so of src){
+    const reg = so.region ? REGION_BY_ID[so.region] : null;
+    h += '<div class="srow"><span class="k">'+
+      (so.kind==="boss" ? '<span class="tag" style="border-color:#7a3a2a;color:#ff9a7a">boss</span> ' :
+       so.kind==="chest" ? '<span class="tag mo">chest</span> ' :
+       so.kind==="merchant" ? '<span class="tag ab">shop</span> ' : '<span class="tag st">drop</span> ')+
+      esc(so.name)+'</span>'+
+      '<span class="v num" style="font-size:12px">'+(so.chance!=null ? Math.round(so.chance*100)+"%" : "for gold")+'</span>'+
+      (reg ? '<span class="dlt num" style="color:'+reg.tint+'">'+esc(reg.name)+'</span>' : '')+'</div>';
+  }
+  h += '</div>';
   return h;
 }
 function openItem(inst, slotId){
@@ -3713,228 +5674,71 @@ function renderTree(){
 }
 
 /* ================================================================
-   TRIAL SCREEN
+   WORLD SCREEN — the canvas runs the game; this is only the frame
+   around it
    ================================================================ */
-let LAST = null;
-function trialUnlocked(i){ return i===0 || S.cleared["t"+(i)] || S.level > TRIALS[i].lvl; }
-function renderTrial(){
-  const scr = $("#scrTrial");
-  let h = "";
-  if(LAST) h += verdictHtml(LAST);
-  const cleared = TRIALS.filter(t=>S.cleared[t.id]).length;
-  h += '<div class="sect"><div class="sect-h">The Ladder<span class="rt"><b>'+cleared+'</b> of 15 cleared</span></div>';
-  for(let i=0;i<TRIALS.length;i++){
-    const t = TRIALS[i];
-    const done = !!S.cleared[t.id];
-    const unlocked = trialUnlocked(i);
-    const cur = unlocked && !done;
-    const best = S.best[t.id];
-    h += '<button class="trial '+(done?"done ":"")+(cur?"cur ":"")+(unlocked?"":"lock ")+'" data-trial="'+t.id+'" '+(unlocked?"":"disabled")+'>'+
-      '<span class="ix">'+(done?"✓":t.n)+'</span>'+
-      '<span class="body"><div class="tn2">'+esc(t.name)+'</div>'+
-      '<div class="ts">'+ARCH[t.arch].name+' · checks '+ARCH[t.arch].check+'</div></span>'+
-      '<span class="rt">'+(done? "cleared" : (best? fmt(best.pct*100)+"%" : "tier "+t.lvl))+'</span></button>';
+function renderWorld(){
+  if(!CTX.weapon){
+    $("#padBtns").innerHTML = "";
+    return;
   }
-  h += '</div><div style="height:24px"></div>';
-  scr.innerHTML = h;
-  scr.querySelectorAll("[data-trial]").forEach(b=>b.onclick=()=>openTrial(TRIAL_BY_ID[b.dataset.trial]));
-  if(LAST) drawTimeline(scr.querySelector("#tlCanvas"), LAST.r, true);
-  const rb = scr.querySelector("#btnRerun"); if(rb) rb.onclick = ()=>runTrial(LAST.t);
+  renderPad();
+  if(!G.player) enterWorld();
+  else { syncPlayerToBuild(); startGame(); }
 }
-function enemyBody(t){
-  let h = '<div class="note">'+esc(t.flavor)+'</div>';
-  h += '<div class="diffhead">'+
-    '<div class="dh"><div class="k">Health</div><div class="v num">'+fmt(t.hp)+'</div><div class="s num">'+t.timeLimit+'s limit</div></div>'+
-    '<div class="dh"><div class="k">DPS needed</div><div class="v num">'+fmt((t.hp+(t.regen||0)*t.timeLimit)/t.timeLimit)+'</div><div class="s num">sustained</div></div>'+
-    '<div class="dh"><div class="k">Your DPS</div><div class="v num '+(HL.dps>=(t.hp/t.timeLimit)?"pos":"neg")+'">'+fmt(HL.dps)+'</div><div class="s num">on a dummy</div></div></div>';
-  h += '<div class="sgrp">What this one checks</div><div class="note"><b>'+ARCH[t.arch].name+'</b> — '+ARCH[t.arch].check+'.</div>';
-  h += '<div class="sgrp">Its resistances</div><div class="stab">';
-  for(const b of ALLBUCKETS){
-    const r = t.res[b]||0;
-    h += '<div class="srow"><span class="k e-'+b+'">'+EL[b].name+'</span>'+
-      '<span class="v num '+(r>40?"neg":(r<0?"pos":"zero"))+'">'+(r>0?"+":"")+r+'%</span>'+
-      '<span class="dlt num" style="color:var(--tx3)">'+(r<0?"vulnerable":(r>=50?"heavily resistant":(r>0?"resistant":"none")))+'</span></div>';
-  }
-  h += '</div>';
-  h += '<div class="sgrp">What it does to you</div><div class="stab">';
-  if(t.dps){ for(const k in t.dps) h += '<div class="srow"><span class="k e-'+k+'">'+EL[k].name+' per second</span><span class="v num e-'+k+'">'+t.dps[k]+'</span>'+
-    '<span class="dlt num" style="color:var(--tx3)">'+fmt(playerIncoming(CTX,{[k]:t.dps[k]}).total)+' after your defences</span></div>'; }
-  if(t.spike){
-    const inc = playerIncoming(CTX, t.spike.dmg).total;
-    h += '<div class="srow"><span class="k">Burst every '+t.spike.every+'s</span><span class="v num">'+fmt(sumB(t.spike.dmg))+'</span>'+
-      '<span class="dlt num '+(inc>=CTX.maxHp?"neg":"")+'">'+fmt(inc)+' lands vs '+fmt(CTX.maxHp)+' HP</span></div>';
-  }
-  if(t.ward) h += '<div class="srow"><span class="k">Ward every '+t.ward.every+'s</span><span class="v num">'+fmt(t.ward.hp)+'</span>'+
-    '<span class="dlt num '+(burstWindow(CTX,t.ward.window)>=t.ward.hp?"pos":"neg")+'">your '+t.ward.window+'s burst: '+fmt(burstWindow(CTX,t.ward.window))+'</span></div>';
-  if(t.regen) h += '<div class="srow"><span class="k">Regenerates</span><span class="v num">'+fmt(t.regen)+'/s</span>'+
-    '<span class="dlt num" style="color:var(--tx3)">'+fmt(t.regen*t.timeLimit)+' over the fight</span></div>';
-  if(t.drain) h += '<div class="srow"><span class="k">Drains mana</span><span class="v num">'+t.drain+'/s</span>'+
-    '<span class="dlt num '+(CTX.manaRegen<=t.drain?"neg":"")+'">your regen is '+CTX.manaRegen.toFixed(1)+'/s</span></div>';
-  if(t.thorns) h += '<div class="srow"><span class="k">Reflects</span><span class="v num">'+t.thorns+'%</span>'+
-    '<span class="dlt num" style="color:var(--tx3)">of the damage you deal</span></div>';
-  if(t.adds) h += '<div class="srow"><span class="k">Additional targets</span><span class="v num">'+t.adds+'</span>'+
-    '<span class="dlt num" style="color:var(--tx3)">area damage is worth more here</span></div>';
-  h += '</div>';
-  return h;
+/* respeccing mid-run must not silently heal you or change your position */
+function syncPlayerToBuild(){
+  clearResCache();
+  const P = G.player;
+  const hpFrac = P.maxHp > 0 ? P.hp/P.maxHp : 1;
+  const mpFrac = P.maxMana > 0 ? P.mana/P.maxMana : 1;
+  P.maxHp = CTX.maxHp; P.maxMana = CTX.maxMana;
+  P.hp = Math.min(P.maxHp, hpFrac*P.maxHp);
+  P.mana = Math.min(P.maxMana, mpFrac*P.maxMana);
+  P.speed = 205 * (1 + Math.min(0.45, CTX.dodge/160));
 }
-function openTrial(t){
-  openSheet({head:'<div class="sh-title">'+esc(t.name)+'</div><div class="sh-sub">Trial '+t.n+' · '+ARCH[t.arch].name+' · tier '+t.lvl+'</div>',
-    body: enemyBody(t),
-    buttons:[{label:"Back", cls:"gho", action:()=>closeSheet(true)},
-             {label:S.cleared[t.id]?"Run again":"Run trial", cls:"pri", action:()=>{ closeSheet(true); runTrial(t); }}]});
-}
-function runTrial(t){
-  const r = simulate(CTX, t);
-  const d = diagnose(r);
-  LAST = {t, r, d};
-  const prev = S.best[t.id];
-  if(!prev || r.enemyPct > prev.pct) S.best[t.id] = {pct:r.enemyPct, win:r.win};
-  let rewards = [], levelled = false;
-  if(r.win && !S.cleared[t.id]){
-    S.cleared[t.id] = true;
-    if(S.level < t.lvl+1 && t.n < 15){ S.level = t.lvl+1; levelled = true; }
-    rewards = rollDrops(S, t.lvl, 3);
-  } else if(!r.win){
-    /* Losing is a readout, not a wall. Every failed attempt still hands
-       you an input, so a run can never dead-end with nothing left to try. */
-    S.salvaged[t.id] = (S.salvaged[t.id]||0) + 1;
-    rewards = rollDrops(S, Math.max(1, t.lvl - (S.salvaged[t.id]>3?0:1)), 1);
+function showDeath(){
+  const T = G.telemetry;
+  const parts = Object.entries(T.takenBy).sort((a,b)=>b[1]-a[1]);
+  const tt = parts.reduce((a,b)=>a+b[1],0) || 1;
+  const top = parts[0] || ["neutral",0];
+  const src = Object.entries(T.takenFrom).sort((a,b)=>b[1]-a[1])[0];
+  const myRes = Math.round(g(CTX.agg,"res."+top[0]) + g(CTX.agg,"res.all"));
+  let body = '<div class="verdict loss"><div class="vt">You died</div><div class="vs">'+
+    esc((src? src[0] : "Something")+" finished you. "+
+    Math.round(top[1]/tt*100)+"% of the damage you took was "+(EL[top[0]]?EL[top[0]].name:top[0])+
+    " and your "+(EL[top[0]]?EL[top[0]].name:top[0])+" defence is "+(myRes>=0?"+":"")+myRes+"%.")+
+    '</div></div>';
+  body += '<div class="kv"><span class="k">Damage taken</span><span class="v num">'+fmt(T.taken)+'</span></div>';
+  body += '<div class="kv"><span class="k">Damage dealt</span><span class="v num">'+fmt(T.dealt)+'</span></div>';
+  body += '<div class="kv"><span class="k">Kills</span><span class="v num">'+T.kills+'</span></div>';
+  if(T.hits+T.misses>0) body += '<div class="kv"><span class="k">Attacks that connected</span><span class="v num">'+
+    Math.round(T.hits/(T.hits+T.misses)*100)+'%</span></div>';
+  if(tt>1){
+    body += '<div class="sect-h">What hit you</div><div class="mixbar">';
+    for(const [k,v] of parts) body += '<i class="bg-'+k+'" style="flex:'+v+'"></i>';
+    body += '</div><div class="mixleg">';
+    for(const [k,v] of parts) body += '<span class="e-'+k+'">'+EL[k].name+' <b>'+Math.round(v/tt*100)+'%</b></span>';
+    body += '</div>';
   }
-  for(const it of rewards) S.inv.push(it);
-  showTab("Trial");
+  body += '<div class="note">You keep everything you picked up. Respec is still free.</div>';
+  openSheet({head:'<div class="sh-title">Dead</div><div class="sh-sub">'+esc(G.region?G.region.name:"")+'</div>',
+    body, locked:true,
+    buttons:[{label:"Respawn", cls:"pri", action:()=>{ closeSheet(true); respawn(); }}]});
+}
+function respawn(){
+  const P = G.player;
+  G.dead = false;
+  P.hp = P.maxHp; P.mana = P.maxMana; P.iframe = 1.2;
+  const home = WORLD.respawn || {x:400, y:900};
+  P.x = home.x; P.y = home.y;
+  G.camx = P.x; G.camy = P.y;
+  G.projs.length = 0; G.zones.length = 0;
+  for(const e of G.enemies) e.state = "idle";
+  resetTelemetry();
   recompute(false);
-  if(rewards.length || levelled) setTimeout(()=>openRewards(t, r, rewards, levelled), 260);
-}
-function openRewards(t, r, rewards, levelled){
-  let body = '<div class="verdict '+(r.win?"win":"loss")+'" style="border:none"><div class="vt">'+(r.win?"Trial cleared":"Salvage")+'</div>'+
-    '<div class="vs">'+(r.win? esc(t.name)+' is down.' : 'You lost, but nothing is lost. Take this and try again — respec is free.')+'</div></div>';
-  if(levelled) body += '<div class="note"><b>Level '+S.level+'.</b> +7 element points (now '+elemBudget(S.level)+
-    ') and +3 skill points (now '+treeBudget(S.level)+').</div>';
-  body += '<div class="sgrp">'+rewards.length+' item'+(rewards.length===1?"":"s")+' recovered</div><div class="stab">';
-  for(const inst of rewards){
-    const def = ITEMS[inst.def], q = itemQuality(inst);
-    const sl = def.slot==="ring" ? "ring1" : def.slot;
-    const s2 = cloneState(S); s2.equipped = Object.assign({}, S.equipped); s2.equipped[sl] = inst;
-    const cb = buildContext(s2), hb = headline(cb);
-    const dd = hb.dps - HL.dps;
-    body += '<button class="slot" data-uid="'+inst.uid+'" style="width:100%;text-align:left;grid-template-columns:1fr auto auto">'+
-      '<span class="body"><div class="iname '+RARITY[def.rarity].cls+'">'+esc(def.name)+'</div>'+
-      '<div class="line2"><span class="rollchip '+(q>=0.75?"hi":(q<=0.35?"lo":""))+'">'+Math.round(q*100)+'%</span>'+
-      '<span class="tag">'+RARITY[def.rarity].name+'</span>'+
-      Object.keys(def.req||{}).map(e=>pipHtml(e, def.req[e], (CTX.pool[e]||0)<def.req[e]?"unmet":"")).join("")+
-      (def.major?'<span class="tag ab">'+esc(MAJORS[def.major].name)+'</span>':'')+'</div></span>'+
-      '<span style="padding:0 10px;text-align:right"><div class="num '+pcls(dd)+'" style="font-size:13px;font-weight:700">'+sign(dd)+
-      '</div><div class="num" style="font-size:9px;color:var(--tx3)">DPS if worn</div></span><span class="chev">›</span></button>';
-  }
-  body += '</div>';
-  openSheet({head:'<div class="sh-title">'+(r.win?"Cleared":"Salvaged")+'</div><div class="sh-sub">'+esc(t.name)+'</div>',
-    body, buttons:[{label:"Continue", cls:"pri", action:()=>closeSheet(true)}],
-    onDraw:(root)=>{ root.querySelectorAll("[data-uid]").forEach(b=>b.onclick=()=>{
-      const inst = S.inv.find(x=>x.uid===b.dataset.uid); if(inst) openItem(inst); }); }});
-}
-function verdictHtml(L){
-  const {t, r, d} = L;
-  let h = '<div class="verdict '+(r.win?"win":"loss")+'">'+
-    '<div class="vt">'+(r.win?"Cleared":"Failed")+' · '+esc(t.name)+'</div>'+
-    '<div class="vs">'+esc(d.line)+'</div></div>';
-  h += '<div class="timeline"><canvas id="tlCanvas"></canvas></div>';
-  h += '<div class="note" style="display:flex;justify-content:space-between;gap:8px">'+
-    '<span><b style="color:var(--gold)">▮</b> damage dealt</span><span><b style="color:#ff6257">▬</b> your health</span>'+
-    '<span><b style="color:#4fb9ff">▬</b> your mana</span><span class="num">0–'+Math.ceil(r.dur)+'s</span></div>';
-  for(const f of d.facts)
-    h += '<div class="kv"><span class="k">'+esc(f[0])+'</span><span class="v '+(f[2]||"")+'">'+esc(f[1])+'</span></div>';
-  /* damage taken mix */
-  const taken = Object.entries(r.takenBy).filter(([k,v])=>v>0).sort((a,b)=>b[1]-a[1]);
-  const tt = taken.reduce((a,b)=>a+b[1],0);
-  if(tt>0){
-    h += '<div class="sect-h">What hit you</div><div class="mixbar">';
-    for(const [k,v] of taken) h += '<i class="bg-'+k+'" style="flex:'+v+'"></i>';
-    h += '</div><div class="mixleg">';
-    for(const [k,v] of taken) h += '<span class="e-'+k+'">'+EL[k].name+' <b>'+Math.round(v/tt*100)+'%</b> · '+fmt(v)+'</span>';
-    h += '</div>';
-  }
-  /* damage by mechanism — the node you took should show up as its own bar */
-  const kinds = Object.entries(r.byKind||{}).filter(([k,v])=>v>0).sort((a,b)=>b[1]-a[1]);
-  const kt = kinds.reduce((a,b)=>a+b[1],0);
-  if(kt>0 && kinds.length>1){
-    h += '<div class="sect-h">How that damage was produced</div><div class="mixbar">';
-    for(const [k,v] of kinds) h += '<i style="flex:'+v+';background:'+(KIND_COLOUR[k]||"#8894a8")+'"></i>';
-    h += '</div><div class="mixleg">';
-    for(const [k,v] of kinds) h += '<span style="color:'+(KIND_COLOUR[k]||"#8894a8")+'">'+esc(KIND_LABEL[k]||k)+
-      ' <b>'+Math.round(v/kt*100)+'%</b> · '+fmt(v)+'</span>';
-    h += '</div>';
-  }
-  /* the fight itself, in order */
-  if(r.log && r.log.length){
-    h += '<div class="sect-h">What happened</div><div class="stab">';
-    for(const e of r.log.slice(0,16))
-      h += '<div class="srow" style="min-height:32px;padding:5px 12px"><span class="k num" style="flex:0 0 42px;color:var(--tx3);font-size:11px">'+
-        e.t.toFixed(1)+'s</span><span class="k" style="font-size:12px">'+esc(e.text)+'</span></div>';
-    h += '</div>';
-  }
-  if(r.maxStacks>1 || r.minionPeak>0 || r.freezes>0 || r.counters>0){
-    const bits = [];
-    if(r.maxStacks>1) bits.push(r.maxStacks+" stacks at the peak");
-    if(r.minionPeak>0) bits.push(r.minionPeak+" minions at once");
-    if(r.freezes>0) bits.push(r.freezes+" freezes, "+r.shatters+" shattered");
-    if(r.counters>0) bits.push(r.counters+" counters");
-    if(r.blasts>0) bits.push(r.blasts+" detonations");
-    h += '<div class="note">'+esc(bits.join(" · "))+'</div>';
-  }
-  /* damage dealt mix */
-  const dealt = Object.entries(r.dealtBy).filter(([k,v])=>v>0).sort((a,b)=>b[1]-a[1]);
-  const dt = dealt.reduce((a,b)=>a+b[1],0);
-  if(dt>0){
-    h += '<div class="sect-h">Which spell did it</div><div class="mixbar">';
-    const cols = ["#e8bd63","#57b2ff","#c88bff","#54d391","#ff7a5c","#9aa4b4"];
-    dealt.forEach(([k,v],i)=>{ h += '<i style="flex:'+v+';background:'+cols[i%cols.length]+'"></i>'; });
-    h += '</div><div class="mixleg">';
-    dealt.forEach(([k,v],i)=>{ h += '<span style="color:'+cols[i%cols.length]+'">'+esc(k)+' <b>'+Math.round(v/dt*100)+'%</b></span>'; });
-    h += '</div>';
-  }
-  h += '<div style="display:flex;gap:1px"><button class="btn sm gho" id="btnRerun">Run it again</button></div>';
-  return h;
-}
-function drawTimeline(cv, r, animate){
-  if(!cv) return;
-  const dpr = window.devicePixelRatio||1;
-  const w = cv.parentElement.clientWidth, h = 44;
-  cv.width = w*dpr; cv.height = h*dpr; cv.style.width=w+"px"; cv.style.height=h+"px";
-  const c = cv.getContext("2d"); c.scale(dpr,dpr);
-  const n = Math.max(1, r.curve.length);
-  const mx = Math.max(1, ...r.curve);
-  let frame = 0;
-  const totalFrames = animate ? 22 : 1;
-  function paint(){
-    const upto = Math.ceil(n * Math.min(1, (frame+1)/totalFrames));
-    c.clearRect(0,0,w,h);
-    c.fillStyle = "#0a0d13"; c.fillRect(0,0,w,h);
-    const bw = w/n;
-    for(let i=0;i<upto;i++){
-      const bh = (r.curve[i]/mx)*(h-8);
-      c.fillStyle = "rgba(232,189,99,.85)";
-      c.fillRect(i*bw+0.5, h-bh, Math.max(1,bw-1), bh);
-    }
-    c.strokeStyle="#ff6257"; c.lineWidth=1.5; c.beginPath();
-    for(let i=0;i<upto && i<r.hpSeries.length;i++){
-      const y = h - 3 - r.hpSeries[i]*(h-8);
-      i?c.lineTo(i*bw+bw/2,y):c.moveTo(i*bw+bw/2,y);
-    }
-    c.stroke();
-    c.strokeStyle="#4fb9ff"; c.lineWidth=1.2; c.beginPath();
-    for(let i=0;i<upto && i<r.manaCurve.length;i++){
-      const y = h - 3 - r.manaCurve[i]*(h-8);
-      i?c.lineTo(i*bw+bw/2,y):c.moveTo(i*bw+bw/2,y);
-    }
-    c.stroke();
-    if(frame < totalFrames-1){ frame++; requestAnimationFrame(paint); }
-  }
-  paint();
 }
 
-/* ================================================================
-   BOOT
-   ================================================================ */
 let curScreen = "Gear";
 function showTab(name){
   curScreen = name;
@@ -3945,7 +5749,8 @@ function showTab(name){
 function renderCurrent(){
   if(curScreen==="Gear") renderGear();
   else if(curScreen==="Tree") renderTree();
-  else if(curScreen==="Trial") renderTrial();
+  else if(curScreen==="World") renderWorld();
+  G.paused = (curScreen !== "World");
 }
 $$(".tab").forEach(t=>t.onclick=()=>showTab(t.dataset.scr));
 $$("#hudStats .hs").forEach(b=>b.onclick=()=>openStat(b.dataset.stat));
@@ -3969,7 +5774,7 @@ function chooseClass(){
       RNG = mulberry32((Date.now()^0x9e3779b9)>>>0);
       S = newState(b.dataset.cls);
       closeSheet(true);
-      treeBuiltFor = null; LAST = null;
+      treeBuiltFor = null; G.player = null; G.running = false;
       recompute(false);
       showTab("Gear");
     }); }});
@@ -3985,6 +5790,7 @@ function boot(){
     const ro = new ResizeObserver(()=>{ measureChrome(); if(curScreen==="Tree"){ fitTree(); updateTree(); } });
     ro.observe($("#hud")); ro.observe($("#tabs"));
   }
+  bindControls();
   S = load();
   if(S){ recompute(false); showTab("Gear"); }
   else { S = newState("warden"); recompute(false); showTab("Gear"); chooseClass(); }
@@ -3993,7 +5799,7 @@ function boot(){
 bindHold($("#hudClass"), ()=>{
   openSheet({head:'<div class="sh-title">New run?</div><div class="sh-sub">this discards the current one</div>',
     body:'<div class="note">Level '+S.level+', '+S.inv.length+' items, '+S.tree.length+' nodes allocated, '+
-      Object.keys(S.cleared).length+' trials cleared. All of it goes.</div>',
+      Object.keys(S.bosses||{}).length+' bosses down, '+fmt(S.gold||0)+' gold. All of it goes.</div>',
     buttons:[{label:"Keep playing", cls:"gho", action:()=>closeSheet(true)},
              {label:"New run", cls:"dan", action:()=>{ localStorage.removeItem(SAVE_KEY); closeSheet(true); chooseClass(); }}]});
 });
