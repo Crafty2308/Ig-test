@@ -413,7 +413,10 @@ h2{margin:0 0 14px; font-size:clamp(20px,4.5vw,30px); letter-spacing:.08em; colo
     // summoning
     minionCount: 0, minionDamage: 0, minionHealth: 0, minionSpeed: 1, minionRate: 1,
     essenceRegen: 0, summonCost: 0, essenceOnKill: 0,
-    consumePower: 0, consumeHeal: 0, consumeRefund: 0, rallyPower: 0, rallyTime: 0
+    consumePower: 0, consumeHeal: 0, consumeRefund: 0, rallyPower: 0, rallyTime: 0,
+    // placed weapons and stances
+    fireDamage: 0, fireDuration: 0, fireSize: 1, stickyCount: 0,
+    prismCount: 0, prismPower: 0, aegisPower: 0, aegisReflect: 0, catchHeal: 0
   };
 
   const FLAGS = [
@@ -426,7 +429,8 @@ h2{margin:0 0 14px; font-size:clamp(20px,4.5vw,30px); letter-spacing:.08em; colo
     'bounceSplit', 'amplify', 'noFalloff', 'critPierce',
     'steadyAim', 'critBoom', 'volatile', 'carpet', 'megaShell',
     'adrenaline', 'frenzy', 'deathMark', 'executioner', 'desperate',
-    'soulLink', 'thrallBurst', 'phylactery'
+    'soulLink', 'thrallBurst', 'phylactery',
+    'aegisBurst', 'chainDetonate', 'catchReset'
   ];
 
   const TREES = {};
@@ -449,23 +453,23 @@ h2{margin:0 0 14px; font-size:clamp(20px,4.5vw,30px); letter-spacing:.08em; colo
       w('plate', 'Plating', '+25 max HP.', add('maxHp', 25)),
       w('cell', 'Shield Cell', '+30 shield capacity.', add('shield', 30)),
       w('coolant', 'Coolant Loop', 'Your shield starts recharging 0.6s sooner and regenerates 5 more per second.', add('shieldRecharge', 1)),
-      y('hardlight', 'Hardlight Weave', '+45 shield capacity and 6% damage reduction.', add('shield', 45), add('armor', 0.06)),
+      y('hardlight', 'Hardlight Weave', 'The Aegis blocks 92% of frontal damage instead of 85%, and +30 shield capacity.', add('aegisPower', 0.07), add('shield', 30)),
       w('deflect', 'Deflector', '7% damage reduction.', add('armor', 0.07)),
-      r('overshield', 'Overshield', 'When your shield breaks it detonates for 140 damage in a 150-unit radius. +20 shield capacity.', flag('shieldBurst'), add('shield', 20)),
+      r('overshield', 'Aegis Burst', 'Lowering the Aegis releases a 150-damage shockwave in a 170-unit radius. Your shield also detonates for 140 when it breaks.', flag('aegisBurst'), flag('shieldBurst')),
       w('capacitor', 'Capacitor', '+35 shield capacity.', add('shield', 35)),
       y('secondskin', 'Second Skin', 'Shield recharge starts 0.6s sooner, regenerates 5 more per second, and gains 25 capacity.', add('shieldRecharge', 1), add('shield', 25)),
-      r('immovable', 'IMMOVABLE', 'While any shield remains, incoming damage is reduced 25%. Shield recharge starts a further 0.6s sooner with +5 regeneration, and you gain 20% damage reduction at all times.', flag('fortress'), add('shieldRecharge', 1), add('armor', 0.20))
+      r('immovable', 'IMMOVABLE', 'The Aegis blocks 97% of frontal damage, damage is reduced 25% while any shield remains, and you gain 15% damage reduction at all times.', add('aegisPower', 0.12), flag('fortress'), add('armor', 0.15))
     ],
     retribution: [
       w('spikes', 'Spikes', 'Enemies that touch you take 8% of their own max HP.', add('thorns', 0.08)),
       w('counter', 'Counterweight', '+7% damage.', mult('damage', 1.07)),
-      w('riposte', 'Riposte', 'Enemies that touch you take a further 8% of their own max HP.', add('thorns', 0.08)),
+      w('riposte', 'Riposte', 'Shots reflected by the Aegis deal 100% more damage.', add('aegisReflect', 1)),
       y('barbed', 'Barbed Plate', 'Enemies that touch you take a further 14% of their own max HP.', add('thorns', 0.14)),
       w('hardened', 'Hardened', '6% damage reduction.', add('armor', 0.06)),
       r('painengine', 'Pain Engine', '+4% damage for every 10% of max HP you are missing, up to +40% at 1 HP. Nothing at full health.', add('berserk', 0.04)),
       w('vengeance', 'Vengeance', '+9% damage.', mult('damage', 1.09)),
       y('backlash', 'Backlash', 'Every enemy you kill detonates for 55 damage in an 80-unit radius.', add('onKillBlast', 55)),
-      r('retaliation', 'RETALIATION ENGINE', 'Enemies that touch you take a further 30% of their own max HP, your shield detonates for 140 damage when it breaks, and every kill detonates for 55.', add('thorns', 0.30), flag('shieldBurst'), add('onKillBlast', 55))
+      r('retaliation', 'RETALIATION ENGINE', 'Enemies that touch you take a further 30% of their own max HP, reflected shots deal 150% more damage, and every kill detonates for 55.', add('thorns', 0.30), add('aegisReflect', 1.5), add('onKillBlast', 55))
     ],
     suppression: [
       w('trigger', 'Hair Trigger', '+7% fire rate.', mult('fireRate', 1.07)),
@@ -482,7 +486,7 @@ h2{margin:0 0 14px; font-size:clamp(20px,4.5vw,30px); letter-spacing:.08em; colo
       y('reactive', 'Reactive Plating', '+30 shield capacity, and enemies that touch you take 10% of their own max HP.', add('shield', 30), add('thorns', 0.10)),
       r('thornfield', 'Thornfield', 'While any shield remains, incoming damage is reduced 25%. Enemies that touch you take a further 20% of their own max HP.', flag('fortress'), add('thorns', 0.20)),
       y('counterfield', 'Counterfield', '+40 shield capacity and +10% damage.', add('shield', 40), mult('damage', 1.10)),
-      r('doctrine', 'FORTRESS DOCTRINE', 'Your shield detonates for 140 damage when it breaks, enemies that touch you take 30% of their own max HP, and damage taken is reduced 25% while any shield remains.', flag('shieldBurst'), add('thorns', 0.30), flag('fortress'))
+      r('doctrine', 'FORTRESS DOCTRINE', 'Lowering the Aegis releases a 150-damage shockwave, enemies that touch you take 30% of their own max HP, and damage is reduced 25% while any shield remains.', flag('aegisBurst'), add('thorns', 0.30), flag('fortress'))
     ],
     retribution_suppression: [
       y('spite', 'Suppressive Spite', '+10% fire rate, and enemies that touch you take 10% of their own max HP.', mult('fireRate', 1.10), add('thorns', 0.10)),
@@ -507,15 +511,15 @@ h2{margin:0 0 14px; font-size:clamp(20px,4.5vw,30px); letter-spacing:.08em; colo
         { difficulty: 'Medium', damage: 'Medium', defense: 'Medium', range: 'Low', speed: 'High' })
     ], {
     wildfire: [
-      w('accel', 'Accelerant', 'Burning enemies take 3 more damage per second.', add('burnDamage', 3)),
-      w('fuel', 'Fuel Tanks', 'Burns last 0.7s longer.', add('burnDuration', 0.7)),
+      w('accel', 'Accelerant', 'Burning ground deals 6 more damage per second (26 to 32).', add('fireDamage', 6)),
+      w('fuel', 'Fuel Tanks', 'Burning ground lasts 1s longer (3.5s to 4.5s).', add('fireDuration', 1)),
       w('pressure', 'Pressure Valve', '+8% fire rate.', mult('fireRate', 1.08)),
-      y('catalyst', 'Catalyst', 'Burning enemies take 5 more damage per second, and every status you apply lasts 25% longer.', add('burnDamage', 5), mult('statusDuration', 1.25)),
-      w('napalm', 'Napalm', 'Burns last 0.8s longer.', add('burnDuration', 0.8)),
+      y('catalyst', 'Catalyst', 'Burning ground deals 8 more damage per second and lasts 1s longer.', add('fireDamage', 8), add('fireDuration', 1)),
+      w('napalm', 'Napalm', 'Burning patches are 25% wider.', mult('fireSize', 1.25)),
       r('spread', 'Wildfire', 'When a burning enemy dies, everything within 110 units catches fire at your current burn damage.', flag('wildfire')),
-      w('bellows', 'Bellows', 'Burning enemies take 5 more damage per second.', add('burnDamage', 5)),
+      w('bellows', 'Bellows', 'Burning ground deals 8 more damage per second.', add('fireDamage', 8)),
       y('feast', 'Ember Feast', 'Killing a burning enemy heals you for 5, and you heal for 2% of all damage dealt.', flag('emberFeast'), add('lifesteal', 0.02)),
-      r('firestorm', 'FIRESTORM', 'Burning enemies take 45% more damage from every source and 10 more damage per second, and any burning corpse sets fire to everything within 110 units.', flag('inferno'), add('burnDamage', 10), flag('wildfire'))
+      r('firestorm', 'FIRESTORM', 'Burning ground deals 20 more damage per second and is 40% wider, burning enemies take 45% more damage from every source, and burning corpses set fire to everything within 110 units.', add('fireDamage', 20), mult('fireSize', 1.4), flag('inferno'), flag('wildfire'))
     ],
     immolation: [
       w('pilot', 'Pilot Light', 'Everything within 70 units of you burns for 12 damage per second.', flag('immolate')),
@@ -540,13 +544,13 @@ h2{margin:0 0 14px; font-size:clamp(20px,4.5vw,30px); letter-spacing:.08em; colo
       r('cometrun', 'COMET RUN', '+2 dash charges, dashes leave a burning trail, and each one ends in a 90-damage explosion.', add('dashCharges', 2), flag('afterimage'), flag('dashBlast'))
     ],
     wildfire_immolation: [
-      y('emberfield', 'Ember Field', 'Aura radius +20%, and burning enemies take 4 more damage per second.', mult('auraRadius', 1.20), add('burnDamage', 4)),
+      y('emberfield', 'Ember Field', 'Aura radius +20%, and burning ground deals 6 more damage per second.', mult('auraRadius', 1.20), add('fireDamage', 6)),
       r('conflagration', 'Conflagration', 'Everything within 70 units of you burns for 12 per second, and any burning corpse sets fire to everything within 110 units.', flag('immolate'), flag('wildfire')),
       y('hearth', 'Hearth', 'Killing a burning enemy heals 5, and burns last 30% longer.', flag('emberFeast'), mult('statusDuration', 1.30)),
       r('pyreclasm', 'PYRECLASM', 'Burning enemies take 45% more damage from every source, your aura burns everything within 70 units, and burning corpses spread the fire.', flag('inferno'), flag('immolate'), flag('wildfire'))
     ],
     immolation_backdraft: [
-      y('scorchrun', 'Scorched Run', 'Dashes leave a burning trail, and aura radius +15%.', flag('afterimage'), mult('auraRadius', 1.15)),
+      y('scorchrun', 'Scorched Run', 'Dashes leave a burning trail, and burning patches are 20% wider.', flag('afterimage'), mult('fireSize', 1.20)),
       r('wildfiredash', 'Firewalker', 'Every dash ends in a 90-damage explosion and every kill refunds a dash charge.', flag('dashBlast'), flag('dashRefund')),
       y('emberwake', 'Ember Wake', '+8% move speed, and every kill heals you for 6.', mult('moveSpeed', 1.08), add('killHealAmount', 6)),
       r('inferno_engine', 'INFERNO ENGINE', '+2 dash charges, each dash ends in a 90-damage blast and leaves a burning trail, and enemies within 70 units burn continuously.', add('dashCharges', 2), flag('dashBlast'), flag('afterimage'), flag('immolate'))
@@ -875,7 +879,7 @@ h2{margin:0 0 14px; font-size:clamp(20px,4.5vw,30px); letter-spacing:.08em; colo
     payload: [
       w('charge', 'Bigger Charge', 'Explosions deal 15% more damage.', mult('explosionDamage', 1.15)),
       w('casing', 'Thin Casing', 'Explosions are 12% larger.', mult('explosionSize', 1.12)),
-      w('fuse', 'Fast Fuse', '+8% fire rate.', mult('fireRate', 1.08)),
+      w('fuse', 'Fast Fuse', '+8% fire rate, so charges go up faster.', mult('fireRate', 1.08)),
       y('he', 'High Explosive', 'Explosions deal 30% more damage and are 15% larger.', mult('explosionDamage', 1.30), mult('explosionSize', 1.15)),
       w('tamper', 'Tamper Plate', 'Explosions deal 18% more damage.', mult('explosionDamage', 1.18)),
       r('fatman', 'Fat Man', 'Every sixth shell is a mega shell: 2.4x radius and 3x damage. The five shells between are unchanged.', flag('megaShell')),
@@ -886,17 +890,17 @@ h2{margin:0 0 14px; font-size:clamp(20px,4.5vw,30px); letter-spacing:.08em; colo
     submunitions: [
       w('bomblet', 'Bomblets', 'Every explosion throws 3 bomblets dealing 55% of its damage.', add('clusterCount', 3)),
       w('scatter', 'Scatter Pack', 'Explosions are 12% larger.', mult('explosionSize', 1.12)),
-      w('timer', 'Short Timers', '+7% fire rate.', mult('fireRate', 1.07)),
+      w('timer', 'Charge Rack', '+2 charges you can have stuck at once (6 to 8).', add('stickyCount', 2)),
       y('clusterpack', 'Cluster Pack', 'Explosions throw 2 more bomblets and deal 20% more damage.', add('clusterCount', 2), mult('explosionDamage', 1.20)),
       w('spread', 'Wide Pattern', 'Explosions are 15% larger.', mult('explosionSize', 1.15)),
       r('carpet', 'Carpet Bombing', 'Bomblets throw bomblets of their own, one layer deeper. Capped at 80 live bomblets.', flag('carpet')),
-      w('filler', 'Dense Filler', 'Explosions deal 18% more damage.', mult('explosionDamage', 1.18)),
+      w('filler', 'Daisy Chain', 'DETONATE sets charges off in sequence 0.06s apart instead of all at once, so each blast catches what the last one threw.', flag('chainDetonate')),
       y('saturation', 'Saturation', 'Explosions throw 3 more bomblets.', add('clusterCount', 3)),
       r('steelrain', 'STEEL RAIN', 'Explosions throw 4 more bomblets, bomblets split again, and explosions deal 40% more damage.', add('clusterCount', 4), flag('carpet'), mult('explosionDamage', 1.40))
     ],
     shockwave: [
       w('concussion', 'Concussion', 'Slows applied by any source slow 20% harder.', add('slowPower', 0.20)),
-      w('bracing', 'Bracing', '6% damage reduction.', add('armor', 0.06)),
+      w('bracing', 'Charge Bandolier', '+2 charges you can have stuck at once.', add('stickyCount', 2)),
       w('overpressure', 'Overpressure', 'Slows last 25% longer.', mult('statusDuration', 1.25)),
       y('shockplate', 'Shock Plate', 'Anything that survives one of your explosions is slowed 50% for 2s.', flag('gravityWell'), add('slowPower', 0.15)),
       w('blastshield', 'Blast Shield', '8% damage reduction.', add('armor', 0.08)),
@@ -958,11 +962,11 @@ h2{margin:0 0 14px; font-size:clamp(20px,4.5vw,30px); letter-spacing:.08em; colo
     harvest: [
       w('gleaner', 'Gleaner', 'Kills drop soul orbs that heal 6 on pickup.', add('soulHeal', 6)),
       w('pull', 'Soul Pull', 'Pickups are drawn from 70 units further away.', add('magnet', 70)),
-      w('toll', 'Toll', '+15% score, which is also +15% cores banked.', add('scoreBonus', 0.15)),
+      w('toll', 'Clean Catch', 'Catching the scythe resets the throw completely instead of leaving 0.12s, so a caught scythe can be thrown again at once.', flag('catchReset')),
       y('reaping', 'Reaping', 'Soul orbs heal 6 more, and 60% more pickups drop.', add('soulHeal', 6), add('dropBonus', 0.6)),
-      w('wake', 'Wake', 'You regenerate 1 HP per second.', add('regen', 1.0)),
+      w('wake', 'Wake', 'Catching the scythe heals you for 12.', add('catchHeal', 12)),
       r('soulreaper', 'Soul Reaper', 'Every kill grants 1s of +25% fire rate and heals you for 6.', flag('frenzy'), add('killHealAmount', 6)),
-      w('harvester', 'Harvester', '50% more pickups drop.', add('dropBonus', 0.5)),
+      w('harvester', 'Harvester', '50% more pickups drop, and catching the scythe heals 8 more.', add('dropBonus', 0.5), add('catchHeal', 8)),
       y('massgrave', 'Mass Grave', 'Every kill detonates for 55 damage in an 80-unit radius.', add('onKillBlast', 55)),
       r('endless', 'ENDLESS HARVEST', 'Every kill heals 6, grants 1s of +25% fire rate, and detonates for 55 damage.', add('killHealAmount', 6), flag('frenzy'), add('onKillBlast', 55))
     ],
@@ -996,14 +1000,14 @@ h2{margin:0 0 14px; font-size:clamp(20px,4.5vw,30px); letter-spacing:.08em; colo
     ], {
     refraction: [
       w('bounce', 'First Bounce', 'Shots bounce off walls 1 more time.', add('bounces', 1)),
-      w('angle', 'Angle Optics', '+6% damage.', mult('damage', 1.06)),
+      w('angle', 'Angle Optics', 'Shots crossing a prism split at +45% damage instead of +25%.', add('prismPower', 0.20)),
       w('carom', 'Carom', 'Shots bounce off walls 1 more time.', add('bounces', 1)),
       y('refract', 'Refraction', 'Shots bounce 1 more time and gain 30% damage per bounce instead of losing it.', add('bounces', 1), flag('amplify')),
-      w('polish', 'Polished Core', '+8% damage.', mult('damage', 1.08)),
+      w('polish', 'Polished Core', '+1 prism you can have placed (2 to 3).', add('prismCount', 1)),
       r('splitbeam', 'Split Beam', 'Every bounce splits the shot into 2, each dealing 60% of the parent. Capped at 180 live projectiles.', flag('bounceSplit')),
       w('mirror', 'Mirror Finish', 'Shots bounce off walls 1 more time.', add('bounces', 1)),
-      y('resonant', 'Resonant Cavity', 'Shots bounce 2 more times and gain 30% damage per bounce.', add('bounces', 2), flag('amplify')),
-      r('kaleidoscope', 'KALEIDOSCOPE', 'Shots bounce 2 more times, split in two on every bounce, and gain 30% damage per bounce.', add('bounces', 2), flag('bounceSplit'), flag('amplify'))
+      y('resonant', 'Resonant Cavity', 'Shots bounce 2 more times, gain 30% damage per bounce, and prism splits deal +45% instead of +25%.', add('bounces', 2), flag('amplify'), add('prismPower', 0.20)),
+      r('kaleidoscope', 'KALEIDOSCOPE', '+2 prisms, shots bounce 2 more times and split in two on every bounce, and prism splits deal +75% instead of +25%.', add('prismCount', 2), add('bounces', 2), flag('bounceSplit'), add('prismPower', 0.50))
     ],
     seeker: [
       w('tracker', 'Tracker', 'Shots curve toward the nearest enemy within 460 units.', add('homingStrength', 2.6)),
@@ -1021,7 +1025,7 @@ h2{margin:0 0 14px; font-size:clamp(20px,4.5vw,30px); letter-spacing:.08em; colo
       w('coherence', 'Coherence', '+7% damage.', mult('damage', 1.07)),
       w('cycle', 'Fast Cycle', '+8% fire rate.', mult('fireRate', 1.08)),
       y('spectrum', 'Full Spectrum', '+1 projectile and +10% fire rate.', add('projectiles', 1), mult('fireRate', 1.10)),
-      w('prismatic', 'Prismatic', '+8% damage.', mult('damage', 1.08)),
+      w('prismatic', 'Prismatic', '+1 prism you can have placed.', add('prismCount', 1)),
       r('scatter', 'Scatter Array', '+3 projectiles per shot. Every projectile deals 30% less damage.', add('projectiles', 3), mult('damage', 0.70)),
       w('rapid', 'Rapid Array', '+10% fire rate.', mult('fireRate', 1.10)),
       y('overdrive', 'Overdrive', '+18% fire rate.', mult('fireRate', 1.18)),
@@ -2195,7 +2199,7 @@ function shoot() {
     base *= player.dischargePower;
   }
 
-  emitProjectiles({
+  const made = emitProjectiles({
     x: bx, y: by, angle: player.angle, base: base, count: w.count,
     spread: w.spread, speed: w.speed, size: w.size, life: w.life,
     pierce: w.pierce, explode: w.explode, color: w.color, trail: w.speed > 1500 || w.trail,
@@ -2203,6 +2207,11 @@ function shoot() {
     bounce: w.bounce, curve: w.curve, fade: w.fade, mega: mega, source: 'shot'
   });
 
+  for (const b of made) {
+    if (w.groundFire) b.ground = 1;
+    if (w.sticky) { b.sticky = 1; b.explode = 0; }
+    if (w.returning) { b.returning = 1; b.phase = 'out'; b.outT = 0.42; player.scytheOut = b; }
+  }
   if (player.ammo !== Infinity) player.ammo--;
   player.recoil = Math.min(10, w.kick);
   camera.shake = Math.min(18, camera.shake + w.kick * 0.55);
@@ -2218,6 +2227,14 @@ function swapWeapon(key) {
 function damagePlayer(amount, srcX, srcY) {
   if (dev.god) return;
   if (player.invuln > 0 || game.state !== 'play') return;
+  if (player.aegisOn && srcX !== undefined && aegisCovers(srcX, srcY)) {
+    amount *= 1 - player.aegisBlock;
+    if (amount < 1) {
+      burst(player.x + Math.cos(player.angle) * 22, player.y + Math.sin(player.angle) * 22, 6, '#6ec6ff', 160, 2);
+      player.invuln = 0.2;
+      return;
+    }
+  }
   let dealt = Math.max(1, amount * (1 - player.armor));
   if (player.shield > 0 && player.shieldDR > 0) dealt *= (1 - player.shieldDR);
   dealt = absorbWithShield(dealt);
@@ -2378,6 +2395,26 @@ function focusDrones() {
   for (const d of player.droneList) d.cd = Math.min(d.cd, 0.05);
 }
 
+/* ROOK - the Aegis. Raising it stops you firing and slows you to a walk, but
+   the front of you stops being a place damage can come from. */
+function toggleAegis() {
+  if (game.state !== 'play' || player.aegisCap <= 0) return;
+  player.aegisOn = !player.aegisOn;
+  if (!player.aegisOn && player.aegisBurst > 0) {
+    explode(player.x, player.y, 170 * player.explodeMul, player.aegisBurst, true);
+  }
+  burst(player.x + Math.cos(player.angle) * 24, player.y + Math.sin(player.angle) * 24,
+        10, '#6ec6ff', 200, 2.4);
+}
+
+/* is something coming at the shield face? */
+function aegisCovers(fromX, fromY) {
+  if (!player.aegisOn) return false;
+  const a = Math.atan2(fromY - player.y, fromX - player.x);
+  let d = ((a - player.angle + Math.PI) % TAU + TAU) % TAU - Math.PI;
+  return Math.abs(d) < 1.15;                    // a 132 degree face
+}
+
 /* ARC - two firing modes on one meter. Charge shots fill it, Discharge spends
    it. Running it dry drops you back to Charge. */
 function setArcMode(mode) {
@@ -2432,6 +2469,24 @@ function updateWeapon(dt, firing) {
     return;
   }
 
+  if (w.autoAim) {
+    // VEX - the rifle finds the target; you decide when to let go
+    let best = null, bestD = w.lockRange;
+    for (const e of enemies) {
+      if (e.dead || e.spawnT > 0) continue;
+      const d = len(e.x - player.x, e.y - player.y);
+      if (d < bestD && lineOfSight(player.x, player.y, e.x, e.y)) { bestD = d; best = e; }
+    }
+    player.lockTarget = best;
+    if (best) {
+      const lead = (len(best.vx, best.vy) > 20) ? bestD / (w.speed * player.bulletSpeedMul) : 0;
+      const tx = best.x + best.vx * lead, ty = best.y + best.vy * lead;
+      player.angle = angleLerp(player.angle, Math.atan2(ty - player.y, tx - player.x), Math.min(1, dt * 16));
+    }
+  }
+
+  if (player.aegisOn) return;                   // a raised shield cannot shoot
+
   if (w.summon) {
     // VESSEL - the trigger does not shoot, it binds a thrall where you are pointing
     if (firing && player.fireCd <= 0) {
@@ -2439,6 +2494,13 @@ function updateWeapon(dt, firing) {
       if (summonMinion(p.x, p.y)) { player.fireCd = w.rof; camera.shake = Math.min(14, camera.shake + 3); }
       else player.fireCd = 0.2;
     }
+    return;
+  }
+
+  if (w.returning) {
+    // MOURN - one scythe. Throw it, and it comes back to your hand.
+    if (player.scytheOut && !player.scytheOut.gone) return;
+    if (firing && player.fireCd <= 0) shoot();
     return;
   }
 
@@ -2456,6 +2518,154 @@ function updateWeapon(dt, firing) {
   }
 
   if (firing && player.fireCd <= 0) shoot();
+}
+
+/* ============================================================
+   PLACED THINGS
+   Burning ground, stuck charges and prisms are entities the player leaves
+   behind. Each is placed by a weapon and lives on its own afterwards.
+   ============================================================ */
+let fires = [];        // CINDER: burning ground
+let stickies = [];     // BOOM: charges waiting for the trigger
+let prisms = [];       // IRIS: shots that pass through one split
+
+/* CINDER - the sprayer lays fuel; the fuel is what burns. */
+function layFire(x, y) {
+  for (const f of fires) {                       // refresh instead of stacking
+    if (len(f.x - x, f.y - y) < f.r * 0.6) { f.life = Math.max(f.life, player.fireLife); return; }
+  }
+  if (fires.length > 44) fires.shift();
+  fires.push({ x: x, y: y, r: 34 * player.fireSize, life: player.fireLife, max: player.fireLife, tick: 0 });
+}
+
+function updateFires(dt) {
+  for (let i = fires.length - 1; i >= 0; i--) {
+    const f = fires[i];
+    f.life -= dt;
+    if (f.life <= 0) { fires.splice(i, 1); continue; }
+    f.tick += dt;
+    if (f.tick < 0.25) continue;
+    const t = f.tick; f.tick = 0;
+    for (const e of enemies) {
+      if (e.dead || e.spawnT > 0) continue;
+      if (len(e.x - f.x, e.y - f.y) > f.r + e.r) continue;
+      dealDamage(e, player.fireDps * t, 'ground', { silent: true });
+      applyBurn(e, Math.max(player.burnDps, player.fireDps * 0.5), Math.max(player.burnDur, 1.5));
+    }
+    if (Math.random() < 0.6) {
+      spawnParticle(f.x + rand(-f.r, f.r), f.y + rand(-f.r, f.r), rand(-8, 8), -rand(18, 42),
+                    rand(0.3, 0.6), '#ff8a3d', rand(2, 3.6), true);
+    }
+  }
+}
+
+/* BOOM - charges stick where they land and wait for you to pull the trigger. */
+function stickCharge(x, y, host, dmg, radius) {
+  if (stickies.length >= player.stickyCap) blowCharge(stickies.shift());
+  stickies.push({ x: x, y: y, host: host || null, dmg: dmg, r: radius, life: 9 });
+}
+
+function blowCharge(c) {
+  if (!c || c.gone) return;
+  c.gone = true;
+  explode(c.x, c.y, c.r * player.explodeMul, c.dmg, true);
+}
+
+function detonateCharges() {
+  if (game.state !== 'play' || !stickies.length) return;
+  const list = stickies.slice();
+  stickies.length = 0;
+  list.forEach((c, i) => {
+    if (player.chainDetonate) fuses.push({ x: c.x, y: c.y, t: 0.06 * i, dmg: c.dmg, radius: c.r * player.explodeMul, depth: 0 });
+    else blowCharge(c);
+  });
+  camera.shake = Math.min(14, camera.shake + 4);
+}
+
+function updateStickies(dt) {
+  for (let i = stickies.length - 1; i >= 0; i--) {
+    const c = stickies[i];
+    c.life -= dt;
+    if (c.host) {
+      if (c.host.dead) c.host = null;              // it falls off the corpse
+      else { c.x = c.host.x; c.y = c.host.y; }
+    }
+    if (c.life <= 0) { stickies.splice(i, 1); blowCharge(c); }
+  }
+}
+
+/* IRIS - a prism splits any of your shots that crosses it. */
+function placePrism() {
+  if (game.state !== 'play' || player.prismCap <= 0) return;
+  const p = aimPoint();
+  if (prisms.length >= player.prismCap) prisms.shift();
+  prisms.push({ x: p.x, y: p.y, life: 14, spin: 0 });
+  particles.push({ x: p.x, y: p.y, vx: 0, vy: 0, life: 0.4, max: 0.4, color: '#7cffe0', size: 50, glow: true, ring: true });
+  floatText(p.x, p.y - 20, 'PRISM', '#7cffe0', 14);
+}
+
+function updatePrisms(dt) {
+  for (let i = prisms.length - 1; i >= 0; i--) {
+    const p = prisms[i];
+    p.life -= dt;
+    p.spin += dt * 2.2;
+    if (p.life <= 0) prisms.splice(i, 1);
+  }
+}
+
+/* called from the bullet loop: a shot crossing a prism becomes three */
+function prismSplit(b) {
+  if (!prisms.length || !b.friendly || b.prismed) return;
+  for (const p of prisms) {
+    if (len(b.x - p.x, b.y - p.y) > 26) continue;
+    b.prismed = p;
+    const a = Math.atan2(b.vy, b.vx), sp = len(b.vx, b.vy);
+    b.base *= 1 + player.prismPower;
+    if (bullets.length < 240) {
+      for (const off of [-0.34, 0.34]) {
+        const c = Object.assign({}, b, { hit: null, prismed: p });
+        c.vx = Math.cos(a + off) * sp; c.vy = Math.sin(a + off) * sp;
+        bullets.push(c);
+      }
+    }
+    burst(p.x, p.y, 5, '#7cffe0', 160, 2);
+    return;
+  }
+}
+
+function drawPlaced(ox, oy) {
+  for (const f of fires) {
+    const t = clamp(f.life / f.max, 0, 1);
+    const x = f.x - ox, y = f.y - oy;
+    ctx.save();
+    ctx.globalAlpha = 0.14 + t * 0.2 + Math.sin(game.time * 9 + f.x) * 0.04;
+    ctx.fillStyle = '#ff8a3d';
+    ctx.beginPath(); ctx.arc(x, y, f.r, 0, TAU); ctx.fill();
+    ctx.globalAlpha = 0.5 * t;
+    ctx.strokeStyle = '#ffc46b'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(x, y, f.r * 0.7, 0, TAU); ctx.stroke();
+    ctx.restore();
+  }
+  for (const c of stickies) {
+    const x = c.x - ox, y = c.y - oy;
+    ctx.save();
+    ctx.shadowBlur = 10; ctx.shadowColor = '#ff6b4a';
+    ctx.fillStyle = c.life < 3 && Math.floor(c.life * 8) % 2 ? '#ffffff' : '#ff6b4a';
+    ctx.beginPath(); ctx.arc(x, y, 6, 0, TAU); ctx.fill();
+    ctx.strokeStyle = 'rgba(255,107,74,.6)'; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.arc(x, y, 10 + Math.sin(game.time * 8) * 2, 0, TAU); ctx.stroke();
+    ctx.restore();
+  }
+  for (const p of prisms) {
+    const x = p.x - ox, y = p.y - oy;
+    ctx.save();
+    ctx.translate(x, y); ctx.rotate(p.spin);
+    ctx.shadowBlur = 16; ctx.shadowColor = '#7cffe0';
+    ctx.strokeStyle = '#7cffe0'; ctx.lineWidth = 2.5;
+    ctx.fillStyle = 'rgba(124,255,224,.16)';
+    drawPoly(0, 0, 15, 3, 0); ctx.fill(); ctx.stroke();
+    ctx.restore();
+  }
 }
 
 /* ============================================================
@@ -2735,6 +2945,7 @@ const SOURCE = {
   burn:   { kb: 0,   riders: true },
   frost:  { kb: 0,   riders: true },
   aura:   { kb: 0,   riders: true },
+  ground: { kb: 0,   riders: true },
   thorns: { kb: 0,   riders: true },
   onkill: { kb: 0,   riders: true, noBlast: true, noKill: true }
 };
@@ -3270,7 +3481,7 @@ function updatePlayer(dt) {
   }
   dashQueued = false;
 
-  const targetSpeed = player.speed * player.speedMul * rogueSpeedMul();
+  const targetSpeed = player.speed * player.speedMul * rogueSpeedMul() * (player.aegisOn ? 0.45 : 1);
   if (player.dashTime > 0) {
     player.dashTime -= dt;
     player.vx = player.dashDirX * targetSpeed * 3.4;
@@ -3343,6 +3554,28 @@ function updateBullets(dt) {
     }
     if (b.fade) b.r = (b.size0 || (b.size0 = b.r)) * (0.75 + 0.9 * (1 - clamp(b.life / b.maxLife, 0, 1)));
 
+    if (b.returning) {
+      if (b.phase === 'out') {
+        b.outT -= dt;
+        if (b.outT <= 0) { b.phase = 'back'; if (b.hit) b.hit.length = 0; }
+      } else {
+        const a = Math.atan2(player.y - b.y, player.x - b.x), sp = len(b.vx, b.vy);
+        const na = angleLerp(Math.atan2(b.vy, b.vx), a, Math.min(1, dt * 7));
+        b.vx = Math.cos(na) * sp; b.vy = Math.sin(na) * sp;
+        if (len(player.x - b.x, player.y - b.y) < 34) {         // caught
+          b.gone = true;
+          player.scytheOut = null;
+          player.fireCd = player.catchReset ? 0 : Math.min(player.fireCd, 0.12);
+          if (player.catchHeal > 0) healPlayer(player.catchHeal);
+          burst(player.x, player.y, 8, b.color, 180, 2.4);
+          bullets.splice(i, 1);
+          continue;
+        }
+      }
+      b.life = Math.max(b.life, 0.4);
+    }
+    if (b.friendly && prisms.length) prismSplit(b);
+
     const px = b.x, py = b.y;
     b.x += b.vx * dt;
     b.y += b.vy * dt;
@@ -3372,6 +3605,11 @@ function updateBullets(dt) {
         if ((e.x - b.x) ** 2 + (e.y - b.y) ** 2 > rr * rr) continue;
         if (b.hit && b.hit.indexOf(e) !== -1) continue;
         dealDamage(e, b.base, b.source || 'shot', { fromX: px, fromY: py });
+        if (b.sticky && !b.stuck) {
+          b.stuck = 1;
+          stickCharge(e.x, e.y, e, b.base * player.stickyPower, 92);
+          done = true; break;
+        }
         if (b.explode) { explode(b.x, b.y, b.explode, b.base * 0.7, true); done = true; break; }
         if (b.pierce > 0) {
           b.pierce--;
@@ -3381,6 +3619,20 @@ function updateBullets(dt) {
         break;
       }
     } else if (!done && !b.friendly) {
+      if (player.aegisOn && aegisCovers(b.x, b.y)) {
+        const rr = player.r + b.r + 14;
+        if ((player.x - b.x) ** 2 + (player.y - b.y) ** 2 < rr * rr) {
+          // reflected: it becomes yours, and it runs the pipeline as one of your shots
+          b.friendly = true;
+          b.source = 'shot';
+          b.base = b.dmg * player.aegisReflect;
+          b.vx = -b.vx; b.vy = -b.vy;
+          b.color = '#7ceaff';
+          b.hit = null;
+          burst(b.x, b.y, 6, '#7ceaff', 190, 2.2);
+          continue;
+        }
+      }
       for (const m of minions) {
         if (m.dead || m.spawnT > 0) continue;
         const mr = m.r + b.r;
@@ -3394,7 +3646,15 @@ function updateBullets(dt) {
       }
     }
 
-    if (done) { if (!b.explode) burst(b.x, b.y, 3, b.color, 110, 2); bullets.splice(i, 1); }
+    if (done && b.friendly) {
+      if (b.ground) layFire(b.x, b.y);
+      if (b.sticky && !b.stuck) { b.stuck = 1; stickCharge(b.x, b.y, null, b.base * player.stickyPower, 92); }
+    }
+    if (done) {
+      if (b.returning) player.scytheOut = null;
+      if (!b.explode) burst(b.x, b.y, 3, b.color, 110, 2);
+      bullets.splice(i, 1);
+    }
   }
 }
 
@@ -3852,6 +4112,37 @@ function drawHUD() {
     ctx.fillText(player.moveFire > 0.18 ? 'FIRING FROM MOVEMENT' : 'MOVE TO FIRE', pad + 5, my + 8);
     my += 16;
   }
+  if (player.aegisCap > 0) {
+    ctx.font = '700 11px "Segoe UI",Roboto,sans-serif';
+    ctx.fillStyle = player.aegisOn ? '#ffffff' : '#6ec6ff';
+    ctx.fillText(player.aegisOn ? 'AEGIS UP  -  cannot fire, half speed' : 'AEGIS DOWN' + (isTouch ? '' : '  (E)'), pad, my + 9);
+    my += 16;
+  }
+  if (wpn.sticky) {
+    bar(pad, my, barW * 0.8, 10, stickies.length / player.stickyCap, '#ff6b4a');
+    ctx.font = '700 10px "Segoe UI",Roboto,sans-serif';
+    ctx.fillStyle = '#04121c';
+    ctx.fillText(stickies.length + ' / ' + player.stickyCap + ' CHARGES' + (isTouch ? '' : '  (Q detonate)'), pad + 5, my + 8);
+    my += 16;
+  }
+  if (player.prismCap > 0) {
+    ctx.font = '700 11px "Segoe UI",Roboto,sans-serif';
+    ctx.fillStyle = '#7cffe0';
+    ctx.fillText(prisms.length + ' / ' + player.prismCap + ' PRISMS' + (isTouch ? '' : '  (Q place)'), pad, my + 9);
+    my += 16;
+  }
+  if (wpn.returning) {
+    ctx.font = '700 11px "Segoe UI",Roboto,sans-serif';
+    ctx.fillStyle = player.scytheOut ? '#7e9bc4' : '#d08bff';
+    ctx.fillText(player.scytheOut ? 'SCYTHE IN FLIGHT' : 'SCYTHE IN HAND', pad, my + 9);
+    my += 16;
+  }
+  if (wpn.groundFire) {
+    ctx.font = '700 11px "Segoe UI",Roboto,sans-serif';
+    ctx.fillStyle = '#ff8a3d';
+    ctx.fillText(fires.length + ' BURNING PATCHES  ' + Math.round(player.fireDps) + '/s', pad, my + 9);
+    my += 16;
+  }
   if (player.minionCap > 0) {
     bar(pad, my, barW * 0.8, 10, player.essence / player.essenceMax, player.essence >= player.summonCost ? '#b58cff' : '#4a3a6e');
     ctx.font = '700 10px "Segoe UI",Roboto,sans-serif';
@@ -4010,33 +4301,38 @@ function coresFor(score, wave) { return Math.floor(score / 25) + wave * 15; }
 /* ---------------- signature weapons ---------------- */
 Object.assign(WEAPONS, {
   bulwark:  { name: 'Bulwark Rifle',    ico: '🛡', dmg: 15, rof: 0.11,  speed: 1000, spread: 0.05, count: 1, ammo: Infinity, kick: 2.4, size: 4.5, color: '#7ceaff' },
-  flamer:   { name: 'Flame Projector',  ico: '🔥', dmg: 5,  rof: 0.035, speed: 560,  spread: 0.22, count: 1, ammo: Infinity, kick: 1.0, size: 7,   color: '#ff8a3d', life: 0.32, fade: true, burn: true },
+  flamer:   { name: 'Fuel Sprayer',     ico: '🔥', groundFire: true, dmg: 3, rof: 0.06, speed: 620, spread: 0.16,
+              count: 1, ammo: Infinity, kick: 1.0, size: 7, color: '#ff8a3d', life: 0.36, fade: true, burn: true },
   cryo:     { name: 'Cryo Beam',        ico: '❄', beam: true, dps: 34, range: 430, width: 7, rampTime: 2.6, rampMax: 2.8,
               rof: 0.1, dmg: 0, speed: 0, spread: 0, count: 1, ammo: Infinity, kick: 0, size: 5, color: '#8ad8ff', slow: true },
   coil:     { name: 'Arc Coil',         ico: '⚡', dualMode: true, dmg: 9, rof: 0.13, speed: 1150, spread: 0.06, count: 1, ammo: Infinity, kick: 1.6, size: 4.5, color: '#c8b4ff', chain: 1 },
-  longshot: { name: 'Longshot',         ico: '🎯', chargeUp: true, dmg: 26, rof: 0.5, speed: 1950, spread: 0.004, count: 1, ammo: Infinity, kick: 8, size: 5.5, color: '#ffd77a', pierce: 2, trail: true },
+  longshot: { name: 'Longshot',         ico: '🎯', chargeUp: true, autoAim: true, lockRange: 900, dmg: 26, rof: 0.5,
+              speed: 1950, spread: 0.004, count: 1, ammo: Infinity, kick: 8, size: 5.5, color: '#ffd77a', pierce: 2, trail: true },
   twins:    { name: 'Twin Pistols',     ico: '🔪', autoMove: true, dmg: 9, rof: 0.085, speed: 1100, spread: 0.08, count: 1, ammo: Infinity, kick: 1.3, size: 4, color: '#9dff5c', alt: true },
   nailer:   { name: 'Nail Driver',      ico: '🔩', droneMain: true, dmg: 5, rof: 0.16, speed: 1250, spread: 0.06, count: 1, ammo: Infinity, kick: 1.4, size: 4, color: '#b8c6d8', pierce: 1 },
-  mortar:   { name: 'Grenade Launcher', ico: '💣', dmg: 22, rof: 0.62,  speed: 720,  spread: 0.05, count: 1, ammo: Infinity, kick: 5,  size: 7,   color: '#ff8a3d', explode: 74 },
-  scythe:   { name: 'Soul Scythe',      ico: '🌙', dmg: 16, rof: 0.34,  speed: 840,  spread: 0.26, count: 3, ammo: Infinity, kick: 3.4, size: 6,   color: '#d08bff', curve: 1.5, life: 0.85 },
+  mortar:   { name: 'Sticky Launcher',  ico: '💣', sticky: true, dmg: 10, rof: 0.34, speed: 900, spread: 0.05,
+              count: 1, ammo: Infinity, kick: 4, size: 7, color: '#ff8a3d', explode: 92 },
+  scythe:   { name: 'Soul Scythe',      ico: '🌙', returning: true, dmg: 46, rof: 0.75, speed: 900, spread: 0,
+              count: 1, ammo: Infinity, kick: 4, size: 11, color: '#d08bff', pierce: 99, life: 3 },
   sigil:    { name: 'Binding Sigil',    ico: '🕯', summon: true, dmg: 0, rof: 0.35, speed: 0, spread: 0,
               count: 1, ammo: Infinity, kick: 0, size: 5, color: '#b58cff' },
-  prism:    { name: 'Prism Beam',       ico: '🔺', dmg: 10, rof: 0.17,  speed: 1080, spread: 0.06, count: 2, ammo: Infinity, kick: 2.0, size: 4.5, color: '#7cffe0', bounce: 1 }
+  prism:    { name: 'Prism Beam',       ico: '🔺', prisms: true, dmg: 10, rof: 0.17, speed: 1080, spread: 0.06,
+              count: 2, ammo: Infinity, kick: 2.0, size: 4.5, color: '#7cffe0', bounce: 1 }
 });
 
 /* ---------------- the ten operatives ---------------- */
 const CHARACTERS = [
   {
     id: 'vanguard', name: 'ROOK', title: 'Vanguard', ico: '🛡', color: '#7ceaff', cost: 0,
-    weapon: 'bulwark', role: 'Soak damage behind a recharging shield and punish whatever touches you.',
-    passive: '+40 max HP, starts with a 40-point recharging shield',
-    apply: p => { p.maxHp += 40; p.hp += 40; p.shieldMax = 40; p.shield = 40; p.armor += 0.05; }
+    weapon: 'bulwark', role: 'Raise the Aegis and the front of you stops being a place damage can come from - enemy fire bounces back as your own. You cannot shoot while it is up, and you walk at half speed.',
+    passive: 'AEGIS (E): blocks 85% of frontal damage and reflects enemy shots. +40 max HP and a 40-point recharging shield',
+    apply: p => { p.maxHp += 40; p.hp += 40; p.shieldMax = 40; p.shield = 40; p.armor += 0.05; p.aegisCap = 1; }
   },
   {
     id: 'cinder', name: 'CINDER', title: 'Pyro', ico: '🔥', color: '#ff8a3d', cost: 250,
-    weapon: 'flamer', role: 'Short range, melts crowds. Everything you touch keeps burning.',
-    passive: 'Every hit ignites: 8 damage/sec for 2s',
-    apply: p => { p.burnDps += 8; p.burnDur = Math.max(p.burnDur, 2); }
+    weapon: 'flamer', role: 'The sprayer barely hurts anything. It lays burning ground, and the ground does the killing - you fight by painting the room and deciding where they can walk.',
+    passive: 'Fuel lands as burning ground: 26 damage/sec for 3.5s per patch, and it ignites what stands in it',
+    apply: p => { p.burnDps += 6; p.burnDur = Math.max(p.burnDur, 2); }
   },
   {
     id: 'halcyon', name: 'HALCYON', title: 'Cryomancer', ico: '❄', color: '#8ad8ff', cost: 400,
@@ -4052,8 +4348,8 @@ const CHARACTERS = [
   },
   {
     id: 'vex', name: 'VEX', title: 'Marksman', ico: '🎯', color: '#ffd77a', cost: 700,
-    weapon: 'longshot', role: 'Hold the trigger to wind the rifle up, release to fire. A full wind-up is worth three snap shots.',
-    passive: 'Hold to charge: up to 3.2x damage over ~0.9s. +20% crit chance, +0.8x crit damage',
+    weapon: 'longshot', role: 'The rifle aims itself - it locks the nearest target and leads it. Your only job is deciding how long to hold, and a full wind-up is worth three snap shots.',
+    passive: 'Locks onto the nearest enemy within 900 and leads it. Hold to charge: up to 3.2x damage over ~0.9s. +20% crit, +0.8x crit damage',
     apply: p => { p.crit += 0.20; p.critMul += 0.8; p.chargeMax = 1; }
   },
   {
@@ -4070,14 +4366,14 @@ const CHARACTERS = [
   },
   {
     id: 'boom', name: 'BOOM', title: 'Demolitionist', ico: '💣', color: '#ff6b4a', cost: 1200,
-    weapon: 'mortar', role: 'Area denial. If one grenade does not clear it, the bomblets will.',
-    passive: '+35% explosion radius, +20% explosion damage',
-    apply: p => { p.explodeMul *= 1.35; p.explodeDmgMul *= 1.2; }
+    weapon: 'mortar', role: 'Nothing you fire explodes on its own. Charges stick to walls and to enemies and sit there until you press the trigger, so the damage happens when you say it does.',
+    passive: 'Shots stick instead of exploding, up to 6 at once. DETONATE (Q) sets off every one. They self-detonate after 9s',
+    apply: p => { p.explodeMul *= 1.35; p.explodeDmgMul *= 1.2; p.stickyCap = 6; }
   },
   {
     id: 'mourn', name: 'MOURN', title: 'Reaper', ico: '🌙', color: '#d08bff', cost: 1600,
-    weapon: 'scythe', role: 'Fragile and furious. The closer you are to death, the harder you hit.',
-    passive: '75 max HP, 5% lifesteal, +10% damage',
+    weapon: 'scythe', role: 'One scythe. You throw it, it cuts everything on the way out, turns around and cuts them again on the way back - and you cannot throw another until it is in your hand.',
+    passive: 'The scythe returns and passes through everything. Catching it lets you throw again immediately. 75 max HP, 5% lifesteal',
     apply: p => { p.maxHp = 75; p.hp = 75; p.lifesteal += 0.05; p.dmgMul *= 1.10; }
   },
   {
@@ -4088,9 +4384,9 @@ const CHARACTERS = [
   },
   {
     id: 'iris', name: 'IRIS', title: 'Prism', ico: '🔺', color: '#7cffe0', cost: 2000,
-    weapon: 'prism', role: 'Bank shots off the crates. Your bullets keep working after they miss.',
-    passive: 'Shots bounce off walls once, +1 projectile',
-    apply: p => { p.bounce += 1; p.extra += 1; }
+    weapon: 'prism', role: 'Place a prism, then shoot through it. Every shot that crosses one becomes three and hits harder, so the fight is about geometry you set up in advance.',
+    passive: 'PLACE PRISM (Q), up to 2 for 14s each. Shots crossing one split into 3 at +25% damage. Shots bounce off walls once',
+    apply: p => { p.bounce += 1; p.extra += 1; p.prismCap = 2; }
   }
 ];
 
@@ -4108,6 +4404,12 @@ function rogueStats() {
     dischargePower: 3.2, dischargeChain: 2,
     charge: 0, chargeMax: 0, chargePower: 2.2, chargeRate: 1.1, heldFire: false, moveFire: 0,
     // summoning
+    // placed weapons and stances
+    fireDps: 26, fireLife: 3.5, fireSize: 1,
+    stickyCap: 6, chainDetonate: 0, stickyPower: 1,
+    prismCap: 0, prismPower: 0.25,
+    aegisCap: 0, aegisOn: false, aegisBlock: 0.85, aegisReflect: 1, aegisBurst: 0,
+    lockTarget: null, scytheOut: null, catchHeal: 0, catchReset: 0,
     minionCap: 0, minionDmg: 20, minionHp: 60, minionSpeed: 165, minionRate: 0.75,
     essence: 0, essenceMax: 0, essenceRegen: 8, summonCost: 25, essenceOnKill: 12,
     consumePower: 120, consumeHeal: 25, consumeRefund: 20,
@@ -4393,6 +4695,9 @@ function updateFuses(dt) {
 /* ---------------- per-frame roguelite systems ---------------- */
 function updateRogue(dt) {
   if (player.minionCap > 0 || minions.length) updateMinions(dt);
+  if (fires.length) updateFires(dt);
+  if (stickies.length) updateStickies(dt);
+  if (prisms.length) updatePrisms(dt);
   updateShield(dt);
   updateOrbit(dt);
   updateDrones(dt);
@@ -4462,6 +4767,7 @@ function drawRogueFx(ox, oy) {
     ctx.restore();
   }
 
+  if (fires.length || stickies.length || prisms.length) drawPlaced(ox, oy);
   if (minions.length || player.rallyT > 0) drawMinions(ox, oy);
 
   // drones
@@ -4493,6 +4799,36 @@ function drawRogueFx(ox, oy) {
       ctx.fillStyle = 'rgba(207,230,255,.22)'; ctx.fill(); ctx.stroke();
       ctx.restore();
     }
+  }
+
+  // VEX's lock
+  if (player.lockTarget && !player.lockTarget.dead) {
+    const t = player.lockTarget;
+    ctx.save();
+    ctx.strokeStyle = '#ffd77a'; ctx.lineWidth = 2;
+    ctx.globalAlpha = 0.75;
+    const r = t.r + 14 + Math.sin(game.time * 6) * 2;
+    for (let i = 0; i < 4; i++) {
+      const a = game.time * 0.8 + i * (TAU / 4);
+      ctx.beginPath();
+      ctx.arc(t.x - ox, t.y - oy, r, a, a + 0.5);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  // ROOK's raised Aegis
+  if (player.aegisOn) {
+    ctx.save();
+    ctx.translate(player.x - ox, player.y - oy);
+    ctx.rotate(player.angle);
+    ctx.shadowBlur = 16; ctx.shadowColor = '#6ec6ff';
+    ctx.strokeStyle = '#6ec6ff'; ctx.lineWidth = 5;
+    ctx.beginPath(); ctx.arc(0, 0, player.r + 13, -1.15, 1.15); ctx.stroke();
+    ctx.globalAlpha = 0.18;
+    ctx.fillStyle = '#6ec6ff';
+    ctx.beginPath(); ctx.arc(0, 0, player.r + 13, -1.15, 1.15); ctx.lineTo(0, 0); ctx.fill();
+    ctx.restore();
   }
 
   // the beam
@@ -4715,7 +5051,11 @@ const TREE_FLAGS = {
   // summoning
   soulLink:    p => { p.soulLink = Math.max(p.soulLink, 0.25); },
   thrallBurst: p => { p.thrallBurst = Math.max(p.thrallBurst, 90); },
-  phylactery:  p => { p.phylactery = Math.max(p.phylactery, 6); }
+  phylactery:  p => { p.phylactery = Math.max(p.phylactery, 6); },
+  // stances and placed weapons
+  aegisBurst:    p => { p.aegisBurst = Math.max(p.aegisBurst, 150); },
+  chainDetonate: p => { p.chainDetonate = 1; },
+  catchReset:    p => { p.catchReset = 1; }
 };
 
 (function checkFlagCoverage() {
@@ -4802,6 +5142,15 @@ function applyTreeToPlayer(p, live) {
   p.consumeRefund += S.consumeRefund;
   p.rallyPower += S.rallyPower;
   p.rallyTime += S.rallyTime;
+  p.fireDps += S.fireDamage;
+  p.fireLife += S.fireDuration;
+  p.fireSize *= S.fireSize;
+  p.stickyCap += S.stickyCount;
+  p.prismCap += S.prismCount;
+  p.prismPower += S.prismPower;
+  p.aegisBlock = Math.min(0.97, p.aegisBlock + S.aegisPower);
+  p.aegisReflect += S.aegisReflect;
+  p.catchHeal += S.catchHeal;
   p.homing += S.homingStrength;
   p.cluster += S.clusterCount;
   p.frostbite += S.frostbiteDamage;
@@ -4839,16 +5188,22 @@ function applyTreeToPlayer(p, live) {
 function classAbility(slot) {
   if (!player || game.state !== 'play') return;
   if (slot === 1) {
-    if (player.minionCap > 0) rallyMinions();
+    if (player.aegisCap > 0) toggleAegis();
+    else if (player.minionCap > 0) rallyMinions();
     else if (player.drones > 0) focusDrones();
   } else {
-    if (player.minionCap > 0) consumeMinion();
+    if (player.stickyCap > 0 && WEAPONS[player.weapon].sticky) detonateCharges();
+    else if (player.prismCap > 0) placePrism();
+    else if (player.minionCap > 0) consumeMinion();
     else if (player.meterMax > 0) toggleArcMode();
   }
 }
 
 function abilityLabels() {
   if (!player) return [null, null];
+  if (player.aegisCap > 0) return [player.aegisOn ? 'LOWER AEGIS' : 'RAISE AEGIS', null];
+  if (WEAPONS[player.weapon].sticky) return [null, 'DETONATE'];
+  if (player.prismCap > 0) return [null, 'PLACE PRISM'];
   if (player.minionCap > 0) return ['RALLY', 'CONSUME'];
   if (player.meterMax > 0) return [null, player.mode === 'discharge' ? 'CHARGE MODE' : 'DISCHARGE'];
   if (player.drones > 0) return ['FOCUS DRONES', null];
@@ -4899,7 +5254,7 @@ function togglePause() {
 
 function startRun(charId) {
   bullets = []; enemies = []; pickups = []; particles = []; texts = []; telegraphs = [];
-  arcs = []; fuses = []; minions = [];
+  arcs = []; fuses = []; minions = []; fires = []; stickies = []; prisms = [];
   player = makePlayer(charId || selectedChar);
   game.time = 0; game.score = 0; game.kills = 0; game.wave = 0;
   game.betweenWaves = 0; game.spawnQueue = []; game.banner = null;

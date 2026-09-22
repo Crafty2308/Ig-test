@@ -148,7 +148,10 @@
     // summoning
     minionCount: 0, minionDamage: 0, minionHealth: 0, minionSpeed: 1, minionRate: 1,
     essenceRegen: 0, summonCost: 0, essenceOnKill: 0,
-    consumePower: 0, consumeHeal: 0, consumeRefund: 0, rallyPower: 0, rallyTime: 0
+    consumePower: 0, consumeHeal: 0, consumeRefund: 0, rallyPower: 0, rallyTime: 0,
+    // placed weapons and stances
+    fireDamage: 0, fireDuration: 0, fireSize: 1, stickyCount: 0,
+    prismCount: 0, prismPower: 0, aegisPower: 0, aegisReflect: 0, catchHeal: 0
   };
 
   const FLAGS = [
@@ -161,7 +164,8 @@
     'bounceSplit', 'amplify', 'noFalloff', 'critPierce',
     'steadyAim', 'critBoom', 'volatile', 'carpet', 'megaShell',
     'adrenaline', 'frenzy', 'deathMark', 'executioner', 'desperate',
-    'soulLink', 'thrallBurst', 'phylactery'
+    'soulLink', 'thrallBurst', 'phylactery',
+    'aegisBurst', 'chainDetonate', 'catchReset'
   ];
 
   const TREES = {};
@@ -184,23 +188,23 @@
       w('plate', 'Plating', '+25 max HP.', add('maxHp', 25)),
       w('cell', 'Shield Cell', '+30 shield capacity.', add('shield', 30)),
       w('coolant', 'Coolant Loop', 'Your shield starts recharging 0.6s sooner and regenerates 5 more per second.', add('shieldRecharge', 1)),
-      y('hardlight', 'Hardlight Weave', '+45 shield capacity and 6% damage reduction.', add('shield', 45), add('armor', 0.06)),
+      y('hardlight', 'Hardlight Weave', 'The Aegis blocks 92% of frontal damage instead of 85%, and +30 shield capacity.', add('aegisPower', 0.07), add('shield', 30)),
       w('deflect', 'Deflector', '7% damage reduction.', add('armor', 0.07)),
-      r('overshield', 'Overshield', 'When your shield breaks it detonates for 140 damage in a 150-unit radius. +20 shield capacity.', flag('shieldBurst'), add('shield', 20)),
+      r('overshield', 'Aegis Burst', 'Lowering the Aegis releases a 150-damage shockwave in a 170-unit radius. Your shield also detonates for 140 when it breaks.', flag('aegisBurst'), flag('shieldBurst')),
       w('capacitor', 'Capacitor', '+35 shield capacity.', add('shield', 35)),
       y('secondskin', 'Second Skin', 'Shield recharge starts 0.6s sooner, regenerates 5 more per second, and gains 25 capacity.', add('shieldRecharge', 1), add('shield', 25)),
-      r('immovable', 'IMMOVABLE', 'While any shield remains, incoming damage is reduced 25%. Shield recharge starts a further 0.6s sooner with +5 regeneration, and you gain 20% damage reduction at all times.', flag('fortress'), add('shieldRecharge', 1), add('armor', 0.20))
+      r('immovable', 'IMMOVABLE', 'The Aegis blocks 97% of frontal damage, damage is reduced 25% while any shield remains, and you gain 15% damage reduction at all times.', add('aegisPower', 0.12), flag('fortress'), add('armor', 0.15))
     ],
     retribution: [
       w('spikes', 'Spikes', 'Enemies that touch you take 8% of their own max HP.', add('thorns', 0.08)),
       w('counter', 'Counterweight', '+7% damage.', mult('damage', 1.07)),
-      w('riposte', 'Riposte', 'Enemies that touch you take a further 8% of their own max HP.', add('thorns', 0.08)),
+      w('riposte', 'Riposte', 'Shots reflected by the Aegis deal 100% more damage.', add('aegisReflect', 1)),
       y('barbed', 'Barbed Plate', 'Enemies that touch you take a further 14% of their own max HP.', add('thorns', 0.14)),
       w('hardened', 'Hardened', '6% damage reduction.', add('armor', 0.06)),
       r('painengine', 'Pain Engine', '+4% damage for every 10% of max HP you are missing, up to +40% at 1 HP. Nothing at full health.', add('berserk', 0.04)),
       w('vengeance', 'Vengeance', '+9% damage.', mult('damage', 1.09)),
       y('backlash', 'Backlash', 'Every enemy you kill detonates for 55 damage in an 80-unit radius.', add('onKillBlast', 55)),
-      r('retaliation', 'RETALIATION ENGINE', 'Enemies that touch you take a further 30% of their own max HP, your shield detonates for 140 damage when it breaks, and every kill detonates for 55.', add('thorns', 0.30), flag('shieldBurst'), add('onKillBlast', 55))
+      r('retaliation', 'RETALIATION ENGINE', 'Enemies that touch you take a further 30% of their own max HP, reflected shots deal 150% more damage, and every kill detonates for 55.', add('thorns', 0.30), add('aegisReflect', 1.5), add('onKillBlast', 55))
     ],
     suppression: [
       w('trigger', 'Hair Trigger', '+7% fire rate.', mult('fireRate', 1.07)),
@@ -217,7 +221,7 @@
       y('reactive', 'Reactive Plating', '+30 shield capacity, and enemies that touch you take 10% of their own max HP.', add('shield', 30), add('thorns', 0.10)),
       r('thornfield', 'Thornfield', 'While any shield remains, incoming damage is reduced 25%. Enemies that touch you take a further 20% of their own max HP.', flag('fortress'), add('thorns', 0.20)),
       y('counterfield', 'Counterfield', '+40 shield capacity and +10% damage.', add('shield', 40), mult('damage', 1.10)),
-      r('doctrine', 'FORTRESS DOCTRINE', 'Your shield detonates for 140 damage when it breaks, enemies that touch you take 30% of their own max HP, and damage taken is reduced 25% while any shield remains.', flag('shieldBurst'), add('thorns', 0.30), flag('fortress'))
+      r('doctrine', 'FORTRESS DOCTRINE', 'Lowering the Aegis releases a 150-damage shockwave, enemies that touch you take 30% of their own max HP, and damage is reduced 25% while any shield remains.', flag('aegisBurst'), add('thorns', 0.30), flag('fortress'))
     ],
     retribution_suppression: [
       y('spite', 'Suppressive Spite', '+10% fire rate, and enemies that touch you take 10% of their own max HP.', mult('fireRate', 1.10), add('thorns', 0.10)),
@@ -242,15 +246,15 @@
         { difficulty: 'Medium', damage: 'Medium', defense: 'Medium', range: 'Low', speed: 'High' })
     ], {
     wildfire: [
-      w('accel', 'Accelerant', 'Burning enemies take 3 more damage per second.', add('burnDamage', 3)),
-      w('fuel', 'Fuel Tanks', 'Burns last 0.7s longer.', add('burnDuration', 0.7)),
+      w('accel', 'Accelerant', 'Burning ground deals 6 more damage per second (26 to 32).', add('fireDamage', 6)),
+      w('fuel', 'Fuel Tanks', 'Burning ground lasts 1s longer (3.5s to 4.5s).', add('fireDuration', 1)),
       w('pressure', 'Pressure Valve', '+8% fire rate.', mult('fireRate', 1.08)),
-      y('catalyst', 'Catalyst', 'Burning enemies take 5 more damage per second, and every status you apply lasts 25% longer.', add('burnDamage', 5), mult('statusDuration', 1.25)),
-      w('napalm', 'Napalm', 'Burns last 0.8s longer.', add('burnDuration', 0.8)),
+      y('catalyst', 'Catalyst', 'Burning ground deals 8 more damage per second and lasts 1s longer.', add('fireDamage', 8), add('fireDuration', 1)),
+      w('napalm', 'Napalm', 'Burning patches are 25% wider.', mult('fireSize', 1.25)),
       r('spread', 'Wildfire', 'When a burning enemy dies, everything within 110 units catches fire at your current burn damage.', flag('wildfire')),
-      w('bellows', 'Bellows', 'Burning enemies take 5 more damage per second.', add('burnDamage', 5)),
+      w('bellows', 'Bellows', 'Burning ground deals 8 more damage per second.', add('fireDamage', 8)),
       y('feast', 'Ember Feast', 'Killing a burning enemy heals you for 5, and you heal for 2% of all damage dealt.', flag('emberFeast'), add('lifesteal', 0.02)),
-      r('firestorm', 'FIRESTORM', 'Burning enemies take 45% more damage from every source and 10 more damage per second, and any burning corpse sets fire to everything within 110 units.', flag('inferno'), add('burnDamage', 10), flag('wildfire'))
+      r('firestorm', 'FIRESTORM', 'Burning ground deals 20 more damage per second and is 40% wider, burning enemies take 45% more damage from every source, and burning corpses set fire to everything within 110 units.', add('fireDamage', 20), mult('fireSize', 1.4), flag('inferno'), flag('wildfire'))
     ],
     immolation: [
       w('pilot', 'Pilot Light', 'Everything within 70 units of you burns for 12 damage per second.', flag('immolate')),
@@ -275,13 +279,13 @@
       r('cometrun', 'COMET RUN', '+2 dash charges, dashes leave a burning trail, and each one ends in a 90-damage explosion.', add('dashCharges', 2), flag('afterimage'), flag('dashBlast'))
     ],
     wildfire_immolation: [
-      y('emberfield', 'Ember Field', 'Aura radius +20%, and burning enemies take 4 more damage per second.', mult('auraRadius', 1.20), add('burnDamage', 4)),
+      y('emberfield', 'Ember Field', 'Aura radius +20%, and burning ground deals 6 more damage per second.', mult('auraRadius', 1.20), add('fireDamage', 6)),
       r('conflagration', 'Conflagration', 'Everything within 70 units of you burns for 12 per second, and any burning corpse sets fire to everything within 110 units.', flag('immolate'), flag('wildfire')),
       y('hearth', 'Hearth', 'Killing a burning enemy heals 5, and burns last 30% longer.', flag('emberFeast'), mult('statusDuration', 1.30)),
       r('pyreclasm', 'PYRECLASM', 'Burning enemies take 45% more damage from every source, your aura burns everything within 70 units, and burning corpses spread the fire.', flag('inferno'), flag('immolate'), flag('wildfire'))
     ],
     immolation_backdraft: [
-      y('scorchrun', 'Scorched Run', 'Dashes leave a burning trail, and aura radius +15%.', flag('afterimage'), mult('auraRadius', 1.15)),
+      y('scorchrun', 'Scorched Run', 'Dashes leave a burning trail, and burning patches are 20% wider.', flag('afterimage'), mult('fireSize', 1.20)),
       r('wildfiredash', 'Firewalker', 'Every dash ends in a 90-damage explosion and every kill refunds a dash charge.', flag('dashBlast'), flag('dashRefund')),
       y('emberwake', 'Ember Wake', '+8% move speed, and every kill heals you for 6.', mult('moveSpeed', 1.08), add('killHealAmount', 6)),
       r('inferno_engine', 'INFERNO ENGINE', '+2 dash charges, each dash ends in a 90-damage blast and leaves a burning trail, and enemies within 70 units burn continuously.', add('dashCharges', 2), flag('dashBlast'), flag('afterimage'), flag('immolate'))
@@ -610,7 +614,7 @@
     payload: [
       w('charge', 'Bigger Charge', 'Explosions deal 15% more damage.', mult('explosionDamage', 1.15)),
       w('casing', 'Thin Casing', 'Explosions are 12% larger.', mult('explosionSize', 1.12)),
-      w('fuse', 'Fast Fuse', '+8% fire rate.', mult('fireRate', 1.08)),
+      w('fuse', 'Fast Fuse', '+8% fire rate, so charges go up faster.', mult('fireRate', 1.08)),
       y('he', 'High Explosive', 'Explosions deal 30% more damage and are 15% larger.', mult('explosionDamage', 1.30), mult('explosionSize', 1.15)),
       w('tamper', 'Tamper Plate', 'Explosions deal 18% more damage.', mult('explosionDamage', 1.18)),
       r('fatman', 'Fat Man', 'Every sixth shell is a mega shell: 2.4x radius and 3x damage. The five shells between are unchanged.', flag('megaShell')),
@@ -621,17 +625,17 @@
     submunitions: [
       w('bomblet', 'Bomblets', 'Every explosion throws 3 bomblets dealing 55% of its damage.', add('clusterCount', 3)),
       w('scatter', 'Scatter Pack', 'Explosions are 12% larger.', mult('explosionSize', 1.12)),
-      w('timer', 'Short Timers', '+7% fire rate.', mult('fireRate', 1.07)),
+      w('timer', 'Charge Rack', '+2 charges you can have stuck at once (6 to 8).', add('stickyCount', 2)),
       y('clusterpack', 'Cluster Pack', 'Explosions throw 2 more bomblets and deal 20% more damage.', add('clusterCount', 2), mult('explosionDamage', 1.20)),
       w('spread', 'Wide Pattern', 'Explosions are 15% larger.', mult('explosionSize', 1.15)),
       r('carpet', 'Carpet Bombing', 'Bomblets throw bomblets of their own, one layer deeper. Capped at 80 live bomblets.', flag('carpet')),
-      w('filler', 'Dense Filler', 'Explosions deal 18% more damage.', mult('explosionDamage', 1.18)),
+      w('filler', 'Daisy Chain', 'DETONATE sets charges off in sequence 0.06s apart instead of all at once, so each blast catches what the last one threw.', flag('chainDetonate')),
       y('saturation', 'Saturation', 'Explosions throw 3 more bomblets.', add('clusterCount', 3)),
       r('steelrain', 'STEEL RAIN', 'Explosions throw 4 more bomblets, bomblets split again, and explosions deal 40% more damage.', add('clusterCount', 4), flag('carpet'), mult('explosionDamage', 1.40))
     ],
     shockwave: [
       w('concussion', 'Concussion', 'Slows applied by any source slow 20% harder.', add('slowPower', 0.20)),
-      w('bracing', 'Bracing', '6% damage reduction.', add('armor', 0.06)),
+      w('bracing', 'Charge Bandolier', '+2 charges you can have stuck at once.', add('stickyCount', 2)),
       w('overpressure', 'Overpressure', 'Slows last 25% longer.', mult('statusDuration', 1.25)),
       y('shockplate', 'Shock Plate', 'Anything that survives one of your explosions is slowed 50% for 2s.', flag('gravityWell'), add('slowPower', 0.15)),
       w('blastshield', 'Blast Shield', '8% damage reduction.', add('armor', 0.08)),
@@ -693,11 +697,11 @@
     harvest: [
       w('gleaner', 'Gleaner', 'Kills drop soul orbs that heal 6 on pickup.', add('soulHeal', 6)),
       w('pull', 'Soul Pull', 'Pickups are drawn from 70 units further away.', add('magnet', 70)),
-      w('toll', 'Toll', '+15% score, which is also +15% cores banked.', add('scoreBonus', 0.15)),
+      w('toll', 'Clean Catch', 'Catching the scythe resets the throw completely instead of leaving 0.12s, so a caught scythe can be thrown again at once.', flag('catchReset')),
       y('reaping', 'Reaping', 'Soul orbs heal 6 more, and 60% more pickups drop.', add('soulHeal', 6), add('dropBonus', 0.6)),
-      w('wake', 'Wake', 'You regenerate 1 HP per second.', add('regen', 1.0)),
+      w('wake', 'Wake', 'Catching the scythe heals you for 12.', add('catchHeal', 12)),
       r('soulreaper', 'Soul Reaper', 'Every kill grants 1s of +25% fire rate and heals you for 6.', flag('frenzy'), add('killHealAmount', 6)),
-      w('harvester', 'Harvester', '50% more pickups drop.', add('dropBonus', 0.5)),
+      w('harvester', 'Harvester', '50% more pickups drop, and catching the scythe heals 8 more.', add('dropBonus', 0.5), add('catchHeal', 8)),
       y('massgrave', 'Mass Grave', 'Every kill detonates for 55 damage in an 80-unit radius.', add('onKillBlast', 55)),
       r('endless', 'ENDLESS HARVEST', 'Every kill heals 6, grants 1s of +25% fire rate, and detonates for 55 damage.', add('killHealAmount', 6), flag('frenzy'), add('onKillBlast', 55))
     ],
@@ -731,14 +735,14 @@
     ], {
     refraction: [
       w('bounce', 'First Bounce', 'Shots bounce off walls 1 more time.', add('bounces', 1)),
-      w('angle', 'Angle Optics', '+6% damage.', mult('damage', 1.06)),
+      w('angle', 'Angle Optics', 'Shots crossing a prism split at +45% damage instead of +25%.', add('prismPower', 0.20)),
       w('carom', 'Carom', 'Shots bounce off walls 1 more time.', add('bounces', 1)),
       y('refract', 'Refraction', 'Shots bounce 1 more time and gain 30% damage per bounce instead of losing it.', add('bounces', 1), flag('amplify')),
-      w('polish', 'Polished Core', '+8% damage.', mult('damage', 1.08)),
+      w('polish', 'Polished Core', '+1 prism you can have placed (2 to 3).', add('prismCount', 1)),
       r('splitbeam', 'Split Beam', 'Every bounce splits the shot into 2, each dealing 60% of the parent. Capped at 180 live projectiles.', flag('bounceSplit')),
       w('mirror', 'Mirror Finish', 'Shots bounce off walls 1 more time.', add('bounces', 1)),
-      y('resonant', 'Resonant Cavity', 'Shots bounce 2 more times and gain 30% damage per bounce.', add('bounces', 2), flag('amplify')),
-      r('kaleidoscope', 'KALEIDOSCOPE', 'Shots bounce 2 more times, split in two on every bounce, and gain 30% damage per bounce.', add('bounces', 2), flag('bounceSplit'), flag('amplify'))
+      y('resonant', 'Resonant Cavity', 'Shots bounce 2 more times, gain 30% damage per bounce, and prism splits deal +45% instead of +25%.', add('bounces', 2), flag('amplify'), add('prismPower', 0.20)),
+      r('kaleidoscope', 'KALEIDOSCOPE', '+2 prisms, shots bounce 2 more times and split in two on every bounce, and prism splits deal +75% instead of +25%.', add('prismCount', 2), add('bounces', 2), flag('bounceSplit'), add('prismPower', 0.50))
     ],
     seeker: [
       w('tracker', 'Tracker', 'Shots curve toward the nearest enemy within 460 units.', add('homingStrength', 2.6)),
@@ -756,7 +760,7 @@
       w('coherence', 'Coherence', '+7% damage.', mult('damage', 1.07)),
       w('cycle', 'Fast Cycle', '+8% fire rate.', mult('fireRate', 1.08)),
       y('spectrum', 'Full Spectrum', '+1 projectile and +10% fire rate.', add('projectiles', 1), mult('fireRate', 1.10)),
-      w('prismatic', 'Prismatic', '+8% damage.', mult('damage', 1.08)),
+      w('prismatic', 'Prismatic', '+1 prism you can have placed.', add('prismCount', 1)),
       r('scatter', 'Scatter Array', '+3 projectiles per shot. Every projectile deals 30% less damage.', add('projectiles', 3), mult('damage', 0.70)),
       w('rapid', 'Rapid Array', '+10% fire rate.', mult('fireRate', 1.10)),
       y('overdrive', 'Overdrive', '+18% fire rate.', mult('fireRate', 1.18)),
