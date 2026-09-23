@@ -148,10 +148,14 @@
     // summoning
     minionCount: 0, minionDamage: 0, minionHealth: 0, minionSpeed: 1, minionRate: 1,
     essenceRegen: 0, summonCost: 0, essenceOnKill: 0,
-    consumePower: 0, consumeHeal: 0, consumeRefund: 0, rallyPower: 0, rallyTime: 0,
+    consumePower: 0, consumeHeal: 0, consumeRefund: 0, rallyPower: 0, rallyRange: 0,
     // placed weapons and stances
     fireDamage: 0, fireDuration: 0, fireSize: 1, stickyCount: 0,
-    prismCount: 0, prismPower: 0, aegisPower: 0, aegisReflect: 0, catchHeal: 0
+    prismCount: 0, prismPower: 0, aegisPower: 0, aegisReflect: 0, catchHeal: 0,
+    // the revenant, the singularity and the harpoon
+    echoPower: 0, echoCount: 0, echoSpeed: 0,
+    wellPower: 0, wellRadius: 0, wellPull: 0, wellDuration: 0, wellCount: 0, wellCrowd: 0,
+    barbDamage: 0, lineDamage: 0, yankDamage: 0, harpoonHit: 0, reelSpeed: 0, tetherRange: 0
   };
 
   const FLAGS = [
@@ -165,7 +169,10 @@
     'steadyAim', 'critBoom', 'volatile', 'carpet', 'megaShell',
     'adrenaline', 'frenzy', 'deathMark', 'executioner', 'desperate',
     'soulLink', 'thrallBurst', 'phylactery',
-    'aegisBurst', 'chainDetonate', 'catchReset'
+    'aegisBurst', 'chainDetonate', 'catchReset',
+    'echoSwap', 'echoBlast', 'trueEcho',
+    'wellCrush', 'collapsar', 'eventHorizon',
+    'harpoonRip', 'barbedChain', 'deadWeight'
   ];
 
   const TREES = {};
@@ -175,7 +182,7 @@
     w('root', 'Frame Uplink', 'Boots the armour. +4% damage from every source.', mult('damage', 1.04)),
     [
       arch('bulwark', 'Bulwark', '#6ec6ff',
-        'Bulwark makes the shield the weapon. Overshield detonates the field for 140 damage the moment it breaks, and Siege Mode cuts incoming damage 25% for as long as it holds. Siege costs 15% move speed, so Bulwark holds ground rather than taking it.',
+        'Bulwark makes the shield the weapon. The Aegis raises itself 0.4s after you stop firing, Hardlight takes its block from 85% to 92%, and Aegis Burst turns every drop of the shield into a 150-damage shockwave. It only pays while you are off the trigger, so Bulwark trades rate of fire for cover.',
         { difficulty: 'Low', damage: 'Low', defense: 'High', range: 'Medium', speed: 'Low' }),
       arch('retribution', 'Retribution', '#ff5c6e',
         'Retribution charges attackers for touching you: Spikes returns a share of their own max HP on contact, and Pain Engine adds up to 40% damage as your health drops. It only pays out while you are hurt, so it works against the healing and shielding the rest of the class wants.',
@@ -190,7 +197,7 @@
       w('coolant', 'Coolant Loop', 'Your shield starts recharging 0.6s sooner and regenerates 5 more per second.', add('shieldRecharge', 1)),
       y('hardlight', 'Hardlight Weave', 'The Aegis blocks 92% of frontal damage instead of 85%, and +30 shield capacity.', add('aegisPower', 0.07), add('shield', 30)),
       w('deflect', 'Deflector', '7% damage reduction.', add('armor', 0.07)),
-      r('overshield', 'Aegis Burst', 'Lowering the Aegis releases a 150-damage shockwave in a 170-unit radius. Your shield also detonates for 140 when it breaks.', flag('aegisBurst'), flag('shieldBurst')),
+      r('overshield', 'Aegis Burst', 'Firing after holding the Aegis for 1.2s releases a 150-damage shockwave in a 170-unit radius. Your shield also detonates for 140 when it breaks.', flag('aegisBurst'), flag('shieldBurst')),
       w('capacitor', 'Capacitor', '+35 shield capacity.', add('shield', 35)),
       y('secondskin', 'Second Skin', 'Shield recharge starts 0.6s sooner, regenerates 5 more per second, and gains 25 capacity.', add('shieldRecharge', 1), add('shield', 25)),
       r('immovable', 'IMMOVABLE', 'The Aegis blocks 97% of frontal damage, damage is reduced 25% while any shield remains, and you gain 15% damage reduction at all times.', add('aegisPower', 0.12), flag('fortress'), add('armor', 0.15))
@@ -221,7 +228,7 @@
       y('reactive', 'Reactive Plating', '+30 shield capacity, and enemies that touch you take 10% of their own max HP.', add('shield', 30), add('thorns', 0.10)),
       r('thornfield', 'Thornfield', 'While any shield remains, incoming damage is reduced 25%. Enemies that touch you take a further 20% of their own max HP.', flag('fortress'), add('thorns', 0.20)),
       y('counterfield', 'Counterfield', '+40 shield capacity and +10% damage.', add('shield', 40), mult('damage', 1.10)),
-      r('doctrine', 'FORTRESS DOCTRINE', 'Lowering the Aegis releases a 150-damage shockwave, enemies that touch you take 30% of their own max HP, and damage is reduced 25% while any shield remains.', flag('aegisBurst'), add('thorns', 0.30), flag('fortress'))
+      r('doctrine', 'FORTRESS DOCTRINE', 'Dropping a 1.2s Aegis releases a 150-damage shockwave, enemies that touch you take 30% of their own max HP, and damage is reduced 25% while any shield remains.', flag('aegisBurst'), add('thorns', 0.30), flag('fortress'))
     ],
     retribution_suppression: [
       y('spite', 'Suppressive Spite', '+10% fire rate, and enemies that touch you take 10% of their own max HP.', mult('fireRate', 1.10), add('thorns', 0.10)),
@@ -544,7 +551,7 @@
         'Fabrication is drone count and drone rate. Assembly Line adds units, Rapid Servos cuts their fire interval by 15% a step, and Hive Mind takes both to the ceiling. Drone shots run the same modifiers your own do, so multishot and pierce are multiplied across the whole escort.',
         { difficulty: 'Low', damage: 'High', defense: 'Low', range: 'High', speed: 'Low' }),
       arch('command', 'Command', '#9dff5c',
-        'Command is about the FOCUS order. Target Uplink extends it from 4s to 7s and Priority Fire raises focused damage from +40% to +90%, turning the escort into a single-target execution squad. Off cooldown it does nothing at all, so it rewards picking the right target.',
+        'Command is about the focus mark your own fire paints. Target Uplink extends it from 4s to 7s and Priority Fire raises focused damage from +40% to +90%, turning the escort into a single-target execution squad. It does nothing while you hold fire on nothing, so it rewards picking the right target.',
         { difficulty: 'High', damage: 'High', defense: 'Medium', range: 'High', speed: 'Medium' }),
       arch('ordnance', 'Ordnance', '#ff8a3d',
         'Ordnance arms the escort. Warheads make every drone round explode for 46 in a blast, Cluster Munitions splits each explosion into 3 bomblets, and Saturation makes the bomblets split again. Friendly explosions cannot hurt you, but the screen noise is the price.',
@@ -562,15 +569,15 @@
       r('hivemind', 'HIVE MIND', '+2 drones and drones fire 40% faster.', add('droneCount', 2), mult('droneRate', 0.60))
     ],
     command: [
-      w('uplink', 'Target Uplink', 'FOCUS lasts 1s longer (4s to 5s).', add('focusTime', 1)),
+      w('uplink', 'Target Uplink', 'The focus mark lasts 1s longer (4s to 5s).', add('focusTime', 1)),
       w('priority', 'Priority Fire', 'Focused drones deal +55% instead of +40%.', add('focusPower', 0.15)),
-      w('relay', 'Command Relay', 'FOCUS lasts 1s longer.', add('focusTime', 1)),
-      y('designator', 'Designator', 'Focused drones deal +70% instead of +40%, and FOCUS lasts 1s longer.', add('focusPower', 0.30), add('focusTime', 1)),
+      w('relay', 'Command Relay', 'The focus mark lasts 1s longer.', add('focusTime', 1)),
+      y('designator', 'Designator', 'Focused drones deal +70% instead of +40%, and the focus mark lasts 1s longer.', add('focusPower', 0.30), add('focusTime', 1)),
       w('repair', 'Repair Bots', 'Each drone repairs you for 1.2 HP per second.', add('droneRepair', 1.2)),
       r('killorder', 'Kill Order', 'Focused drones deal +90% instead of +40%, and every fifth hit brands a target for 50% extra damage.', add('focusPower', 0.50), flag('deathMark')),
       w('shielding', 'Shield Generator', 'Each drone grants you 20 shield.', flag('droneShield')),
-      y('overwatch', 'Overwatch', 'FOCUS lasts 2s longer and focused drones deal +55% instead of +40%.', add('focusTime', 2), add('focusPower', 0.15)),
-      r('warmachine', 'WAR MACHINE', 'Focused drones deal +140% instead of +40%, FOCUS lasts 7s, and every kill heals you for 6.', add('focusPower', 1.0), add('focusTime', 3), add('killHealAmount', 6))
+      y('overwatch', 'Overwatch', 'The focus mark lasts 2s longer and focused drones deal +55% instead of +40%.', add('focusTime', 2), add('focusPower', 0.15)),
+      r('warmachine', 'WAR MACHINE', 'Focused drones deal +140% instead of +40%, the focus mark lasts 7s, and every kill heals you for 6.', add('focusPower', 1.0), add('focusTime', 3), add('killHealAmount', 6))
     ],
     ordnance: [
       w('payload', 'Payload', '+7% damage.', mult('damage', 1.07)),
@@ -584,15 +591,15 @@
       r('bombardment', 'BOMBARDMENT', 'Drone rounds explode for 46, every explosion throws 3 bomblets, and explosions are 40% larger.', flag('droneBoom'), add('clusterCount', 3), mult('explosionSize', 1.40))
     ],
     fabrication_command: [
-      y('taskforce', 'Task Force', '+1 drone and FOCUS lasts 1s longer.', add('droneCount', 1), add('focusTime', 1)),
+      y('taskforce', 'Task Force', '+1 drone and the focus mark lasts 1s longer.', add('droneCount', 1), add('focusTime', 1)),
       r('strikewing', 'Strike Wing', '+2 drones and focused drones deal +70% instead of +40%.', add('droneCount', 2), add('focusPower', 0.30)),
-      y('tightbeam', 'Tight Beam', 'Drones fire 15% faster and FOCUS lasts 2s longer.', mult('droneRate', 0.85), add('focusTime', 2)),
-      r('deathsquad', 'DEATH SQUAD', '+3 drones firing 25% faster, focused drones deal +90% instead of +40%, and FOCUS lasts 6s.', add('droneCount', 3), mult('droneRate', 0.75), add('focusPower', 0.50), add('focusTime', 2))
+      y('tightbeam', 'Tight Beam', 'Drones fire 15% faster and the focus mark lasts 2s longer.', mult('droneRate', 0.85), add('focusTime', 2)),
+      r('deathsquad', 'DEATH SQUAD', '+3 drones firing 25% faster, focused drones deal +90% instead of +40%, and the focus mark lasts 6s.', add('droneCount', 3), mult('droneRate', 0.75), add('focusPower', 0.50), add('focusTime', 2))
     ],
     command_ordnance: [
       y('markedtarget', 'Marked Target', 'Focused drones deal +55% instead of +40%, and explosions are 15% larger.', add('focusPower', 0.15), mult('explosionSize', 1.15)),
       r('callinstrike', 'Called Strike', 'Drone rounds explode for 46 and focused drones deal +70% instead of +40%.', flag('droneBoom'), add('focusPower', 0.30)),
-      y('firemission', 'Fire Mission', 'Explosions deal 25% more damage and FOCUS lasts 2s longer.', mult('explosionDamage', 1.25), add('focusTime', 2)),
+      y('firemission', 'Fire Mission', 'Explosions deal 25% more damage and the focus mark lasts 2s longer.', mult('explosionDamage', 1.25), add('focusTime', 2)),
       r('orbitalsupport', 'ORBITAL SUPPORT', 'Drone rounds explode for 46, every explosion throws 3 bomblets, and focused drones deal +90% instead of +40%.', flag('droneBoom'), add('clusterCount', 3), add('focusPower', 0.50))
     ]
   });
@@ -629,7 +636,7 @@
       y('clusterpack', 'Cluster Pack', 'Explosions throw 2 more bomblets and deal 20% more damage.', add('clusterCount', 2), mult('explosionDamage', 1.20)),
       w('spread', 'Wide Pattern', 'Explosions are 15% larger.', mult('explosionSize', 1.15)),
       r('carpet', 'Carpet Bombing', 'Bomblets throw bomblets of their own, one layer deeper. Capped at 80 live bomblets.', flag('carpet')),
-      w('filler', 'Daisy Chain', 'DETONATE sets charges off in sequence 0.06s apart instead of all at once, so each blast catches what the last one threw.', flag('chainDetonate')),
+      w('filler', 'Daisy Chain', 'Releasing the trigger sets charges off in sequence 0.06s apart instead of all at once, so each blast catches what the last one threw.', flag('chainDetonate')),
       y('saturation', 'Saturation', 'Explosions throw 3 more bomblets.', add('clusterCount', 3)),
       r('steelrain', 'STEEL RAIN', 'Explosions throw 4 more bomblets, bomblets split again, and explosions deal 40% more damage.', add('clusterCount', 4), flag('carpet'), mult('explosionDamage', 1.40))
     ],
@@ -738,7 +745,7 @@
       w('angle', 'Angle Optics', 'Shots crossing a prism split at +45% damage instead of +25%.', add('prismPower', 0.20)),
       w('carom', 'Carom', 'Shots bounce off walls 1 more time.', add('bounces', 1)),
       y('refract', 'Refraction', 'Shots bounce 1 more time and gain 30% damage per bounce instead of losing it.', add('bounces', 1), flag('amplify')),
-      w('polish', 'Polished Core', '+1 prism you can have placed (2 to 3).', add('prismCount', 1)),
+      w('polish', 'Polished Core', '+1 prism standing at once (2 to 3).', add('prismCount', 1)),
       r('splitbeam', 'Split Beam', 'Every bounce splits the shot into 2, each dealing 60% of the parent. Capped at 180 live projectiles.', flag('bounceSplit')),
       w('mirror', 'Mirror Finish', 'Shots bounce off walls 1 more time.', add('bounces', 1)),
       y('resonant', 'Resonant Cavity', 'Shots bounce 2 more times, gain 30% damage per bounce, and prism splits deal +45% instead of +25%.', add('bounces', 2), flag('amplify'), add('prismPower', 0.20)),
@@ -791,7 +798,7 @@
         'Bond makes the few thralls you have survive. Soul Link heals you for 25% of everything they deal, Reinforced Husk raises their health, and Phylactery returns any thrall an enemy kills after 6 seconds. It adds no thralls at all, so the damage ceiling is lower than Legion.',
         { difficulty: 'Medium', damage: 'Medium', defense: 'High', range: 'Low', speed: 'Low' }),
       arch('consumption', 'Consumption', '#ff6b9d',
-        'Consumption treats thralls as ammunition. CONSUME detonates the nearest one for 120 and heals you 25, Unstable Thralls makes any death a 90-damage blast, and Greedy Rite refunds the essence to bind the next. Spending your army is the damage, so Consumption is always one bad trade from standing alone.',
+        'Consumption treats thralls as ammunition. Dashing through one detonates it for 120 and heals you 25, Unstable Thralls makes any death a 90-damage blast, and Greedy Rite refunds the essence to bind the next. Spending your army is the damage, so Consumption is always one bad trade from standing alone.',
         { difficulty: 'High', damage: 'High', defense: 'Low', range: 'Medium', speed: 'Medium' })
     ], {
     legion: [
@@ -817,15 +824,15 @@
       r('eternalbond', 'ETERNAL BOND', 'Thralls have 60 more health and deal 20 more damage per strike, and you heal for 25% of everything they deal.', add('minionHealth', 60), add('minionDamage', 20), flag('soulLink'))
     ],
     consumption: [
-      w('volatile', 'Volatile Remains', 'CONSUME detonates for 40 more damage (120 to 160).', add('consumePower', 40)),
-      w('siphon', 'Siphon', 'CONSUME heals 15 more (25 to 40).', add('consumeHeal', 15)),
+      w('volatile', 'Volatile Remains', 'Dashing through a thrall detonates it for 40 more damage (120 to 160).', add('consumePower', 40)),
+      w('siphon', 'Siphon', 'Eating a thrall heals 15 more (25 to 40).', add('consumeHeal', 15)),
       w('greedy', 'Greedy Rite', 'Each kill returns 6 more essence (12 to 18).', add('essenceOnKill', 6)),
-      y('cannibal', 'Cannibal Rite', 'CONSUME detonates for 60 more damage and heals 15 more.', add('consumePower', 60), add('consumeHeal', 15)),
+      y('cannibal', 'Cannibal Rite', 'Eating a thrall detonates for 60 more damage and heals 15 more.', add('consumePower', 60), add('consumeHeal', 15)),
       w('echoing', 'Echoing Blast', 'Explosions are 15% larger.', mult('explosionSize', 1.15)),
       r('unstable', 'Unstable Thralls', 'Any thrall that dies detonates for 90 damage in a 110-unit radius, however it died.', flag('thrallBurst')),
       w('deepwells', 'Deep Wells', 'Essence regenerates 3 more per second.', add('essenceRegen', 3)),
-      y('warcry', 'War Cry', 'RALLY lasts 2s longer and thralls strike twice as fast during it, up from 50% faster.', add('rallyTime', 2), add('rallyPower', 0.5)),
-      r('masssacrifice', 'MASS SACRIFICE', 'CONSUME detonates for 160 more damage and returns 30 more essence, and any dying thrall detonates for 90.', add('consumePower', 160), add('consumeRefund', 30), flag('thrallBurst'))
+      y('warcry', 'War Cry', 'Thralls count as rallied 80 units further from your cursor (130 to 210) and strike twice as fast there, up from 50% faster.', add('rallyRange', 80), add('rallyPower', 0.5)),
+      r('masssacrifice', 'MASS SACRIFICE', 'Eating a thrall detonates for 160 more damage and returns 30 more essence, and any dying thrall detonates for 90.', add('consumePower', 160), add('consumeRefund', 30), flag('thrallBurst'))
     ],
     legion_bond: [
       y('gravehost', 'Grave Host', '+1 thrall, and thralls have 25 more health.', add('minionCount', 1), add('minionHealth', 25)),
@@ -834,10 +841,193 @@
       r('unending', 'UNENDING LEGION', '+2 thralls with 40 more health that return 6 seconds after an enemy kills them.', add('minionCount', 2), add('minionHealth', 40), flag('phylactery'))
     ],
     bond_consumption: [
-      y('bitterharvest', 'Bitter Harvest', 'CONSUME heals 15 more, and thralls have 20 more health.', add('consumeHeal', 15), add('minionHealth', 20)),
+      y('bitterharvest', 'Bitter Harvest', 'Eating a thrall heals 15 more, and thralls have 20 more health.', add('consumeHeal', 15), add('minionHealth', 20)),
       r('sacrificiallink', 'Sacrificial Link', 'You heal for 25% of all thrall damage, and any dying thrall detonates for 90.', flag('soulLink'), flag('thrallBurst')),
-      y('reclamation', 'Reclamation', 'CONSUME returns 20 more essence and heals 15 more.', add('consumeRefund', 20), add('consumeHeal', 15)),
+      y('reclamation', 'Reclamation', 'Eating a thrall returns 20 more essence and heals 15 more.', add('consumeRefund', 20), add('consumeHeal', 15)),
       r('bloodengine', 'BLOOD ENGINE', 'Thralls deal 16 more damage and you heal for 25% of it; every thrall that dies detonates for 90 and returns 20 essence.', add('minionDamage', 16), flag('soulLink'), flag('thrallBurst'), add('consumeRefund', 20))
+    ]
+  });
+
+  /* ============================================================ ECHO ============================================================ */
+  TREES.echo = tree('echo', 'ECHO',
+    w('root', 'Split Signal', 'Anchors the ghost. +4% damage.', mult('damage', 1.04)),
+    [
+      arch('revenant', 'Revenant', '#a88fff',
+        'Revenant feeds the ghost. Louder Echo takes its shots from 65% of yours to 85%, Third Shadow adds a second ghost trailing 2.2s back, and TRUE REVENANT makes every copy hit for the full amount. It adds nothing to the gun in your own hands, so a Revenant build is weak for the first second of every fight.',
+        { difficulty: 'Medium', damage: 'High', defense: 'Low', range: 'Medium', speed: 'Medium' }),
+      arch('displace', 'Displacement', '#7ceaff',
+        'Displacement turns the ghost into an exit. Short Delay drags it to 0.7s behind you, Trade Places swaps you with it on every dash, and Vanishing Act adds dash charges and invulnerability. It buys no damage at all, so it lives or dies on whether you use the escape.',
+        { difficulty: 'High', damage: 'Low', defense: 'High', range: 'Low', speed: 'High' }),
+      arch('repeater', 'Repeater', '#ff8aff',
+        'Repeater is volume. Twin Barrel and Salvo add projectiles that the ghost copies a second later, Hair Trigger stacks fire rate, and Haunting Rounds makes every ghost shot explode for 40. Each added projectile lowers damage per shot, so Repeater wins on screen coverage rather than on any single hit.',
+        { difficulty: 'Low', damage: 'Medium', defense: 'Low', range: 'High', speed: 'Medium' })
+    ], {
+    revenant: [
+      w('louder', 'Louder Echo', 'Ghost shots deal 75% of yours instead of 65%.', add('echoPower', 0.10)),
+      w('clarity', 'Clarity', '+7% damage.', mult('damage', 1.07)),
+      w('resonance', 'Resonance', 'Ghost shots deal 75% of yours instead of 65%.', add('echoPower', 0.10)),
+      y('doubled', 'Doubled Voice', 'Ghost shots deal 85% of yours instead of 65%, and +8% damage.', add('echoPower', 0.20), mult('damage', 1.08)),
+      w('lingering', 'Lingering', '+6% damage.', mult('damage', 1.06)),
+      r('thirdshadow', 'Third Shadow', 'A second ghost walks 2.2s behind you and repeats your fire as well. Both copies still deal their reduced share.', add('echoCount', 1)),
+      w('carry', 'Carrying Voice', 'Ghost shots deal 75% of yours instead of 65%.', add('echoPower', 0.10)),
+      y('chorus', 'Chorus', 'Ghost shots deal 85% of yours instead of 65%, and +10% damage.', add('echoPower', 0.20), mult('damage', 1.10)),
+      r('truerevenant', 'TRUE REVENANT', 'Every ghost shot deals the full damage of the shot it copies, and a second ghost walks 2.2s behind you.', flag('trueEcho'), add('echoCount', 1))
+    ],
+    displace: [
+      w('shortstep', 'Short Step', 'The ghost follows 0.15s closer (1.10s to 0.95s).', add('echoSpeed', 0.15)),
+      w('lightfoot', 'Light Foot', '+6% move speed.', mult('moveSpeed', 1.06)),
+      w('recharge', 'Recharge', 'Dash recharges 15% faster.', mult('dashCooldown', 0.85)),
+      y('shortdelay', 'Short Delay', 'The ghost follows 0.25s closer and +1 dash charge.', add('echoSpeed', 0.25), add('dashCharges', 1)),
+      w('slipstream', 'Slipstream', '+6% move speed.', mult('moveSpeed', 1.06)),
+      r('tradeplaces', 'Trade Places', 'Dashing puts you where your ghost is standing, 1.1s back along your own path, instead of moving you. It wipes the trail, so the ghost restarts beside you.', flag('echoSwap')),
+      w('phase', 'Phase Skin', 'Dash invulnerability lasts 0.35s longer.', flag('phaseDash')),
+      y('vanishing', 'Vanishing Act', '+1 dash charge and dash recharges 20% faster.', add('dashCharges', 1), mult('dashCooldown', 0.80)),
+      r('nowhere', 'NOWHERE AT ONCE', 'Dashing swaps you with your ghost, +2 dash charges, and dashes recharge 30% faster.', flag('echoSwap'), add('dashCharges', 2), mult('dashCooldown', 0.70))
+    ],
+    repeater: [
+      w('twin', 'Twin Barrel', '+1 projectile per shot.', add('projectiles', 1)),
+      w('hair', 'Hair Trigger', '+10% fire rate.', mult('fireRate', 1.10)),
+      w('tight', 'Tight Group', 'Shots pass through 1 more enemy.', add('pierce', 1)),
+      y('salvo', 'Salvo', '+1 projectile and +10% fire rate.', add('projectiles', 1), mult('fireRate', 1.10)),
+      w('cadence', 'Cadence', '+10% fire rate.', mult('fireRate', 1.10)),
+      r('haunting', 'Haunting Rounds', 'Every ghost shot explodes for 40 in a small radius. Your own shots do not.', flag('echoBlast')),
+      w('rifling', 'Rifling', 'Shots pass through 1 more enemy.', add('pierce', 1)),
+      y('fullauto', 'Full Auto', '+15% fire rate and +1 projectile.', mult('fireRate', 1.15), add('projectiles', 1)),
+      r('fusillade', 'FUSILLADE', '+3 projectiles that each deal 20% less damage, +15% fire rate, and shots pass through 2 more enemies.', add('projectiles', 3), mult('damage', 0.80), mult('fireRate', 1.15), add('pierce', 2))
+    ],
+    revenant_displace: [
+      y('closeshadow', 'Close Shadow', 'The ghost follows 0.2s closer and its shots deal 75% of yours instead of 65%.', add('echoSpeed', 0.20), add('echoPower', 0.10)),
+      r('doppel', 'Doppelganger', 'Dashing swaps you with your ghost, and a second ghost walks 2.2s behind you.', flag('echoSwap'), add('echoCount', 1)),
+      y('stepin', 'Step Inside', 'Ghost shots deal 85% of yours instead of 65%, and +1 dash charge.', add('echoPower', 0.20), add('dashCharges', 1)),
+      r('secondself', 'SECOND SELF', 'Ghost shots deal the full damage of what they copy, dashing swaps you with your ghost, and the ghost follows 0.3s closer.', flag('trueEcho'), flag('echoSwap'), add('echoSpeed', 0.30))
+    ],
+    displace_repeater: [
+      y('scatterstep', 'Scatter Step', '+1 projectile and +8% move speed.', add('projectiles', 1), mult('moveSpeed', 1.08)),
+      r('runandgun', 'Run and Gun', '+15% fire rate, +10% move speed, and +1 dash charge.', mult('fireRate', 1.15), mult('moveSpeed', 1.10), add('dashCharges', 1)),
+      y('afterburn', 'Afterburn', 'Ghost shots explode for 40 and dash recharges 20% faster.', flag('echoBlast'), mult('dashCooldown', 0.80)),
+      r('ghostbarrage', 'GHOST BARRAGE', '+2 projectiles, +20% fire rate, ghost shots explode for 40, and dashing swaps you with your ghost.', add('projectiles', 2), mult('fireRate', 1.20), flag('echoBlast'), flag('echoSwap'))
+    ]
+  });
+
+  /* ============================================================ VOID ============================================================ */
+  TREES.void = tree('void', 'VOID',
+    w('root', 'Event Seed', 'Tunes the cannon. Implosions deal 20 more damage (80 to 100).', add('wellPower', 20)),
+    [
+      arch('gravity', 'Gravity', '#8ad8ff',
+        'Gravity is about the drag, not the bang. Heavier Draw takes the pull from 210 to 450 per second, the lane takes well radius from 120 to 285, and EVENT HORIZON slows everything inside a well by 50% so it cannot walk back out. It adds almost no implosion damage, so on its own a Gravity build gathers a crowd it cannot finish.',
+        { difficulty: 'Medium', damage: 'Low', defense: 'Medium', range: 'High', speed: 'Low' }),
+      arch('collapse', 'Collapse', '#e08bff',
+        'Collapse is the payload. The whole lane takes the implosion from 80 to 420, Mass Effect raises the crowd bonus from 25% to 55% per extra body caught, and SUPERMASSIVE ends every well in a blast that throws 3 bomblets. It does nothing to help you catch anything, so it needs Gravity to feed it.',
+        { difficulty: 'Low', damage: 'High', defense: 'Low', range: 'Low', speed: 'Medium' }),
+      arch('horizon', 'Horizon', '#ff6b9d',
+        'Horizon is about how many wells are open and how long they stay. Third Aperture and Rift raise the cap to 6, Long Fall holds each one open 0.5s longer, and Collapsar reopens a well where the last one closed. Longer wells delay every kill, so Horizon is the slowest archetype to actually finish anything.',
+        { difficulty: 'High', damage: 'Medium', defense: 'Medium', range: 'Medium', speed: 'High' })
+    ], {
+    gravity: [
+      w('draw', 'Heavier Draw', 'Wells pull 60 units per second faster (210 to 270).', add('wellPull', 60)),
+      w('bore', 'Wide Bore', 'Wells reach 25 units further (120 to 145).', add('wellRadius', 25)),
+      w('grip', 'Deep Grip', 'Wells pull 60 units per second faster.', add('wellPull', 60)),
+      y('tidal', 'Tidal Force', 'Wells pull 80 per second faster and reach 20 units further.', add('wellPull', 80), add('wellRadius', 20)),
+      w('reach', 'Long Reach', 'Wells reach 25 units further.', add('wellRadius', 25)),
+      r('crush', 'Crush Depth', 'Anything inside a well takes 12 damage per second while it is being pulled, on top of the implosion.', flag('wellCrush')),
+      w('anchor', 'Anchor Field', 'Wells pull 60 units per second faster.', add('wellPull', 60)),
+      y('spaghetti', 'Tidal Shear', 'Wells reach 35 units further and pull 60 per second faster.', add('wellRadius', 35), add('wellPull', 60)),
+      r('eventhorizon', 'EVENT HORIZON', 'Everything inside a well is slowed 50%, takes 12 damage per second, and wells reach 60 units further.', flag('eventHorizon'), flag('wellCrush'), add('wellRadius', 60))
+    ],
+    collapse: [
+      w('dense', 'Dense Core', 'Implosions deal 30 more damage (100 to 130 with the root taken).', add('wellPower', 30)),
+      w('compress', 'Compression', 'Implosions deal 30 more damage.', add('wellPower', 30)),
+      w('crowd', 'Crowd Pressure', 'Each extra enemy caught adds 35% instead of 25% to the implosion.', add('wellCrowd', 0.10)),
+      y('heavy', 'Heavy Collapse', 'Implosions deal 50 more damage and explosions are 15% larger.', add('wellPower', 50), mult('explosionSize', 1.15)),
+      w('fracture', 'Fracture', 'Explosions deal 15% more damage.', mult('explosionDamage', 1.15)),
+      r('masseffect', 'Mass Effect', 'Each extra enemy caught adds 55% instead of 25% to the implosion, so a well that catches five hits for more than double.', add('wellCrowd', 0.30)),
+      w('shockfront', 'Shock Front', 'Implosions deal 30 more damage.', add('wellPower', 30)),
+      y('singularity', 'Singularity Core', 'Implosions deal 60 more damage and explosions are 20% larger.', add('wellPower', 60), mult('explosionSize', 1.20)),
+      r('supermassive', 'SUPERMASSIVE', 'Implosions deal 120 more damage, each extra body caught adds 45% instead of 25%, and every explosion throws 3 bomblets.', add('wellPower', 120), add('wellCrowd', 0.20), add('clusterCount', 3))
+    ],
+    horizon: [
+      w('aperture', 'Third Aperture', '+1 well open at once (3 to 4).', add('wellCount', 1)),
+      w('longfall', 'Long Fall', 'Wells stay open 0.25s longer (1.0s to 1.25s).', add('wellDuration', 0.25)),
+      w('feed', 'Fast Feed', '+12% fire rate.', mult('fireRate', 1.12)),
+      y('rift', 'Rift', '+1 well open at once and wells stay open 0.25s longer.', add('wellCount', 1), add('wellDuration', 0.25)),
+      w('quickseed', 'Quick Seed', '+12% fire rate.', mult('fireRate', 1.12)),
+      r('collapsar', 'Collapsar', 'Every well that implodes opens 1 fresh well in the same place, which collapses on its own 1 second later. The second well does not reopen again.', flag('collapsar')),
+      w('aperture2', 'Fourth Aperture', '+1 well open at once.', add('wellCount', 1)),
+      y('stretch', 'Stretched Time', 'Wells stay open 0.4s longer and +12% fire rate.', add('wellDuration', 0.40), mult('fireRate', 1.12)),
+      r('cascade', 'CASCADE', '+2 wells open at once, every well reopens once where it closed, and +20% fire rate.', add('wellCount', 2), flag('collapsar'), mult('fireRate', 1.20))
+    ],
+    gravity_collapse: [
+      y('compactor', 'Compactor', 'Wells reach 25 units further and implosions deal 40 more damage.', add('wellRadius', 25), add('wellPower', 40)),
+      r('crushdepth', 'Crushing Weight', 'Anything inside a well takes 12 damage per second, and implosions deal 70 more damage.', flag('wellCrush'), add('wellPower', 70)),
+      y('pullapart', 'Pull Apart', 'Wells pull 70 per second faster and each extra body caught adds 35% instead of 25%.', add('wellPull', 70), add('wellCrowd', 0.10)),
+      r('gravitywell', 'GRAVE OF STARS', 'Wells reach 50 units further, pull 80 per second faster, deal 12 per second inside, and implode for 130 more.', add('wellRadius', 50), add('wellPull', 80), flag('wellCrush'), add('wellPower', 130))
+    ],
+    collapse_horizon: [
+      y('chainseed', 'Chain Seed', '+1 well open at once and implosions deal 40 more damage.', add('wellCount', 1), add('wellPower', 40)),
+      r('repeater', 'Repeating Collapse', 'Every well reopens once where it closed, and implosions deal 60 more damage.', flag('collapsar'), add('wellPower', 60)),
+      y('shortfuse', 'Short Fuse', 'Wells close 0.25s sooner and implode for 50 more damage.', add('wellDuration', -0.25), add('wellPower', 50)),
+      r('heatdeath', 'HEAT DEATH', '+2 wells, every well reopens once, implosions deal 110 more damage and throw 3 bomblets.', add('wellCount', 2), flag('collapsar'), add('wellPower', 110), add('clusterCount', 3))
+    ]
+  });
+
+  /* ============================================================ HARROW ============================================================ */
+  TREES.harrow = tree('harrow', 'HARROW',
+    w('root', 'Set the Hook', 'Sharpens the head. The harpoon hits for 10 more on contact (45 to 55).', add('harpoonHit', 10)),
+    [
+      arch('barbs', 'Barbs', '#ff6b4a',
+        'Barbs punishes the one thing on your line. The lane takes the hooked bleed from 44 to 104 per second, Barbed Chain makes that enemy take 30% more from every source you own, and RENDING ends with a yank for 510. It gives nothing to the crowd, so Barbs is a single-target hunter that can be swarmed.',
+        { difficulty: 'Medium', damage: 'High', defense: 'Low', range: 'Medium', speed: 'Medium' }),
+      arch('chain', 'Chain', '#ffc857',
+        'Chain makes the line itself the weapon. The lane takes the sweep from 46 to 146 per second across everything it lies over, and Dead Weight turns the body you are dragging into a 40-per-second battering ram. It only pays while the line is long and full of bodies, so it is worthless on an empty floor.',
+        { difficulty: 'High', damage: 'High', defense: 'Low', range: 'High', speed: 'Low' }),
+      arch('winch', 'Winch', '#b8c6d8',
+        'Winch is about getting them here and staying alive once they arrive. Heavy Motor reels at 330 per second, Long Cable throws 260 units further, and Anchor Plate adds armour and health for the fight you just dragged onto yourself. Nothing here raises damage at all.',
+        { difficulty: 'Low', damage: 'Low', defense: 'High', range: 'High', speed: 'Medium' })
+    ], {
+    barbs: [
+      w('serrated', 'Serrated Head', 'The hooked enemy bleeds for 10 more per second (44 to 54).', add('barbDamage', 10)),
+      w('point', 'Hardened Point', 'The harpoon hits for 15 more on contact.', add('harpoonHit', 15)),
+      w('twist', 'Twist', 'The hooked enemy bleeds for 10 more per second.', add('barbDamage', 10)),
+      y('gutting', 'Gutting Hook', 'The hooked enemy bleeds for 15 more per second and the yank deals 60 more.', add('barbDamage', 15), add('yankDamage', 60)),
+      w('hooked', 'Deep Hook', 'The harpoon hits for 20 more on contact.', add('harpoonHit', 20)),
+      r('barbedchain', 'Barbed Chain', 'The hooked enemy takes 30% more damage from every source you own, including drones, blasts and burn ticks.', flag('barbedChain')),
+      w('grind', 'Grinding Teeth', 'The hooked enemy bleeds for 10 more per second.', add('barbDamage', 10)),
+      y('eviscerate', 'Eviscerate', 'The yank deals 120 more and the hooked enemy bleeds for 15 more per second.', add('yankDamage', 120), add('barbDamage', 15)),
+      r('rending', 'RENDING', 'The yank deals 320 more damage and explodes for 110, and the hooked enemy takes 30% more from everything.', add('yankDamage', 320), flag('harpoonRip'), flag('barbedChain'))
+    ],
+    chain: [
+      w('links', 'Razor Links', 'The chain cuts for 10 more per second (46 to 56).', add('lineDamage', 10)),
+      w('taut', 'Taut Line', 'The chain cuts for 10 more per second.', add('lineDamage', 10)),
+      w('weighted', 'Weighted Links', '+7% damage.', mult('damage', 1.07)),
+      y('flense', 'Flensing Chain', 'The chain cuts for 15 more per second and the yank deals 60 more.', add('lineDamage', 15), add('yankDamage', 60)),
+      w('honed', 'Honed Edge', 'The chain cuts for 10 more per second.', add('lineDamage', 10)),
+      r('deadweight', 'Dead Weight', 'The body you are dragging deals 40 damage per second to every enemy it is pulled through.', flag('deadWeight')),
+      w('sweep', 'Wide Sweep', 'The chain cuts for 10 more per second.', add('lineDamage', 10)),
+      y('meatgrinder', 'Meat Grinder', 'The chain cuts for 15 more per second and the dragged body deals 40 per second.', add('lineDamage', 15), flag('deadWeight')),
+      r('harvester', 'HARVESTER', 'The chain cuts for 30 more per second, the dragged body deals 40 per second, and every kill detonates for 55.', add('lineDamage', 30), flag('deadWeight'), add('onKillBlast', 55))
+    ],
+    winch: [
+      w('motor', 'Winch Motor', 'The line reels 40 units per second faster (150 to 190).', add('reelSpeed', 40)),
+      w('cable', 'Long Cable', 'The harpoon throws 90 units further (620 to 710).', add('tetherRange', 90)),
+      w('plate', 'Anchor Plate', '+25 max HP.', add('maxHp', 25)),
+      y('heavymotor', 'Heavy Motor', 'The line reels 60 per second faster and +25 max HP.', add('reelSpeed', 60), add('maxHp', 25)),
+      w('brace', 'Brace', '7% damage reduction.', add('armor', 0.07)),
+      r('bulk', 'Ballast', '+60 max HP, 10% damage reduction, and enemies that touch you take 12% of their own max HP.', add('maxHp', 60), add('armor', 0.10), add('thorns', 0.12)),
+      w('spool', 'Fast Spool', 'The line reels 40 per second faster.', add('reelSpeed', 40)),
+      y('longline', 'Long Line', 'The harpoon throws 170 units further and reels 40 per second faster.', add('tetherRange', 170), add('reelSpeed', 40)),
+      r('capstan', 'CAPSTAN', 'The line reels 150 per second faster, throws 260 units further, and you gain 60 max HP with 10% damage reduction.', add('reelSpeed', 150), add('tetherRange', 260), add('maxHp', 60), add('armor', 0.10))
+    ],
+    barbs_chain: [
+      y('hookline', 'Hook and Line', 'The hooked enemy bleeds for 12 more per second and the chain cuts for 12 more.', add('barbDamage', 12), add('lineDamage', 12)),
+      r('butchery', 'Butchery', 'The hooked enemy takes 30% more damage from everything, and the dragged body deals 40 per second.', flag('barbedChain'), flag('deadWeight')),
+      y('ripcurrent', 'Rip Current', 'The yank deals 110 more and the chain cuts for 15 more per second.', add('yankDamage', 110), add('lineDamage', 15)),
+      r('leviathan', 'LEVIATHAN', 'The hooked enemy takes 30% more from everything and bleeds for 30 more per second, the chain cuts for 25 more, and the yank explodes for 110.', flag('barbedChain'), add('barbDamage', 30), add('lineDamage', 25), flag('harpoonRip'))
+    ],
+    chain_winch: [
+      y('dragnet', 'Dragnet', 'The line reels 60 per second faster and the chain cuts for 12 more per second.', add('reelSpeed', 60), add('lineDamage', 12)),
+      r('keelhaul', 'Keelhaul', 'The dragged body deals 40 per second, the line reels 80 per second faster, and +30 max HP.', flag('deadWeight'), add('reelSpeed', 80), add('maxHp', 30)),
+      y('trawl', 'Trawl', 'The harpoon throws 150 units further and the chain cuts for 15 more per second.', add('tetherRange', 150), add('lineDamage', 15)),
+      r('theharrowing', 'THE HARROWING', 'The line reels 180 per second faster and throws 200 units further, the chain cuts for 30 more, and the dragged body deals 40 per second.', add('reelSpeed', 180), add('tetherRange', 200), add('lineDamage', 30), flag('deadWeight'))
     ]
   });
 

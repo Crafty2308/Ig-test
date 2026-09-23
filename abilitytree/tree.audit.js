@@ -20,7 +20,10 @@ const WEAPON = {
   boom:     { projectile: true, explosive: true, sticky: true, canStandStill: true },
   mourn:    { projectile: true, returning: true, canStandStill: true },
   iris:     { projectile: true, bouncy: true, prisms: true, canStandStill: true },
-  vessel:   { summon: true, canStandStill: true }
+  vessel:   { summon: true, canStandStill: true },
+  echo:     { projectile: true, echo: true, canStandStill: true },
+  void:     { projectile: true, wells: true, canStandStill: true },
+  harrow:   { tether: true, canStandStill: true }
 };
 
 /* stat -> what the class must have for the stat to do anything */
@@ -32,11 +35,16 @@ const STAT_NEEDS = {
   minionCount: 'summon', minionDamage: 'summon', minionHealth: 'summon',
   minionSpeed: 'summon', minionRate: 'summon', essenceRegen: 'summon',
   summonCost: 'summon', essenceOnKill: 'summon', consumePower: 'summon',
-  consumeHeal: 'summon', consumeRefund: 'summon', rallyPower: 'summon', rallyTime: 'summon',
+  consumeHeal: 'summon', consumeRefund: 'summon', rallyPower: 'summon', rallyRange: 'summon',
   bounces: 'projectile', homingStrength: 'projectile',
   fireDamage: 'groundFire', fireDuration: 'groundFire', fireSize: 'groundFire',
   stickyCount: 'sticky', prismCount: 'prisms', prismPower: 'prisms',
-  aegisPower: 'aegis', aegisReflect: 'aegis', catchHeal: 'returning'
+  aegisPower: 'aegis', aegisReflect: 'aegis', catchHeal: 'returning',
+  echoPower: 'echo', echoCount: 'echo', echoSpeed: 'echo',
+  wellPower: 'wells', wellRadius: 'wells', wellPull: 'wells',
+  wellDuration: 'wells', wellCount: 'wells', wellCrowd: 'wells',
+  barbDamage: 'tether', lineDamage: 'tether', yankDamage: 'tether',
+  harpoonHit: 'tether', reelSpeed: 'tether', tetherRange: 'tether'
 };
 
 /* flag -> what the class must have */
@@ -46,7 +54,10 @@ const FLAG_NEEDS = {
   megaShell: 'projectile', noFalloff: 'shootsThings', critPierce: 'shootsThings',
   droneBoom: 'drones', droneShield: 'drones',
   soulLink: 'summon', thrallBurst: 'summon', phylactery: 'summon',
-  aegisBurst: 'aegis', chainDetonate: 'sticky', catchReset: 'returning'
+  aegisBurst: 'aegis', chainDetonate: 'sticky', catchReset: 'returning',
+  echoSwap: 'echo', echoBlast: 'echo', trueEcho: 'echo',
+  wellCrush: 'wells', collapsar: 'wells', eventHorizon: 'wells',
+  harpoonRip: 'tether', barbedChain: 'tether', deadWeight: 'tether'
 };
 
 /* description <-> effect consistency. Each rule pulls a number out of the text
