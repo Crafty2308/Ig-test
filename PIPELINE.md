@@ -24,7 +24,7 @@ Sources pass **base** damage only; nothing applies its own multipliers.
 | `thorns` | contact damage returned to an attacker |
 | `echo` | a shot repeated by ECHO's ghost |
 | `tether` | HARROW's harpoon: the hook, the bleed, the chain sweep and the yank |
-| `thread` | LOOM's net, one tick per thread per frame |
+| `thread` | LOOM's net, and IRIS's Prism Net, one tick per line per frame |
 | `onkill` | an on-death detonation |
 
 VOID's wells do not have a source of their own: the implosion is an ordinary
@@ -36,13 +36,23 @@ they carry every modifier they already had plus two more multipliers.
 
 ## Where modifiers come from
 
-Three places, and all three write the same player fields, so nothing has a
+Four places, and all four write the same player fields, so nothing has a
 private path into damage:
 
 1. **Upgrade cards**, one pick per level.
-2. **Augments**, one pick every fifth wave cleared, gated to what the operative
-   can use.
-3. **Gear**, four worn slots resolved once by `applyGear()` at the start of a run.
+2. **Augments**, one pick every third wave cleared. Most belong to a single
+   operative and change how its mechanic works — ROOK's shield covers a
+   different shape, MOURN's scythe stops coming back, VOID's wells push
+   instead of pull. A shared pool fills the rest of the draft.
+3. **Gear stats**, four worn slots resolved once by `applyGear()` at the start
+   of a run, each stat rolled 0-100% of its own range.
+4. **Major identifications**, printed on a gear name from Epic upward and never
+   rolled. They set the same fields everything else does.
+
+A signature augment that needs behaviour the engine did not have gets a named
+field and one hook in the system it belongs to — `aegisArc` in `aegisCovers`,
+`threadFull` in `updateThreads`, `releaseNova` in `releaseField`. None of them
+touch `dealDamage`, so none of them is a second damage path.
 
 ## What every source receives
 

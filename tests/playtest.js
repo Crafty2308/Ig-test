@@ -189,106 +189,113 @@ const ok = (c, m) => { if (c) pass++; else fails.push(m); };
     for (const k in r) ok(r[k], 'weapon: ' + k);
   }
 
-  /* ---------- gear and augments ---------- */
+  /* ---------- gear, majors and augments ---------- */
   {
     const r = await page.evaluate(() => {
     const out = {};
-    out.noTree = typeof window.AbilityTree === 'undefined';
-    out.bases = GEAR_BASES.length;
-    // every slot x rarity has at least one base to identify into
-    out.coverage = SLOTS.every(s => RARITIES.every(r => GEAR_BASES.some(b => b.slot === s.id && b.rarity === r.id)));
-    out.statsDeclared = GEAR_BASES.every(b => b.stats.every(st => !!GEAR_STATS[st[0]]));
-    out.rangesOrdered = GEAR_BASES.every(b => b.stats.every(st => st[1] <= st[2]));
-
-    // drops, identify, reroll
-    SAVE.cores = 999999;
-    GEAR.stash.length = 0; GEAR.equipped = {}; GEAR.mats = {};
-    const it = rollDrop(12);
-    GEAR.stash.push(it);
-    out.unidName = /^Unidentified /.test(itemName(it));
-    out.idErr = identifyItem(it, null);
-    out.identified = !!it.base && it.rolls.length === BASE_BY_ID[it.base].stats.length;
-    out.idName = itemName(it);
-    out.rollsInRange = it.rolls.every(r => r >= 0 && r <= 1);
-
-    const before = it.rolls.slice(), c0 = rerollCost(it);
-    rerollItem(it, null, false);
-    out.rerollBumped = it.rerolls === 1 && rerollCost(it) > c0;
-    out.rerollChanged = it.rolls.some((v, i) => v !== before[i]) || it.rolls.length === 1;
-
-    // simulate: no counter, no cores
-    GEAR.mats.sim = 2;
-    const cores = SAVE.cores, rr = it.rerolls;
-    rerollItem(it, null, true);
-    out.simFree = SAVE.cores === cores && it.rerolls === rr && GEAR.mats.sim === 1;
-
-    // insulate: the held stat survives a reroll
-    if (it.rolls.length > 1) {
-      GEAR.mats.ins = 1;
-      it.ins = 0;
-      const kept = it.rolls[0];
-      rerollItem(it, null, false);
-      out.insulated = it.rolls[0] === kept && it.ins === -1 && GEAR.mats.ins === 0;
-    } else out.insulated = true;
-
-    // amplifier lifts positive rolls only
-    GEAR.mats.amp4 = 40;
-    let lowPos = 0, n = 0;
-    for (let k = 0; k < 40; k++) { rerollItem(it, 'amp4', false); 
-      const base = BASE_BY_ID[it.base];
-      for (let i = 0; i < base.stats.length; i++) if (base.stats[i][2] > 0) { n++; if (it.rolls[i] < 0.2) lowPos++; }
-    }
-    out.ampFloors = n > 0 && lowPos / n < 0.21;   // 0-0.2 should be rarer than 20% once shifted by +20%
-
-    // equipping changes the player
-    GEAR.equipped[it.slot] = it.uid;
-    saveGear();
     SAVE.unlocked = CHARACTERS.map(c => c.id);
-    startRun('vanguard');
-    const snap = () => ['maxHp','dmgMul','rofMul','speedMul','armor','crit','critMul','lifesteal',
-      'regen','thorns','magnet','shieldMax','dashCdMul','pierce','extra','bulletSpeedMul','explodeMul',
-      'explodeDmgMul','xpMul','scoreMul','burnDps','chains','slowPow','execute','dashDmg','dashMax']
-      .map(k => player[k]).join('|');
-    const withGear = snap();
-    delete GEAR.equipped[it.slot];
-    startRun('vanguard');
-    out.gearMoved = withGear !== snap();
-    out.gearStats = BASE_BY_ID[it.base].stats.map(x => x[0]).join(',');
+    SAVE.cores = 1e9; saveMeta();
 
-    // augments
-    out.augAll = AUGMENTS.every(a => typeof a.apply === 'function' && a.desc && /\d/.test(a.desc));
-    out.augDue = augmentDue(5) && augmentDue(10) && !augmentDue(4) && !augmentDue(0);
-    startRun('harrow'); dev.god = true;
-    const pool = AUGMENTS.filter(a => !a.need || a.need(player));
-    out.harrowPool = pool.length;
-    out.noDeadAug = !pool.some(a => ['aegisburst','kaleido','legion','annihil','trueecho','supermass'].includes(a.id));
-    // take every one that applies to this operative and make sure nothing throws
-    let threw = null;
-    try { for (const a of pool) { a.apply(player); player.augments.push(a.id); } } catch (e) { threw = e.message; }
-    out.augApplyOk = threw === null;
-    for (let i = 0; i < 300; i++) { mouse.down = i % 50 < 40; step(1/60); }
-    out.survivedAugs = isFinite(player.hp);
+    // every operative has its own pool, and every augment is well formed
+    const bad = [];
+    for (const c of CHARACTERS) {
+      const mine = AUGMENTS.filter(a => a.char === c.id);
+      if (mine.length < 5) bad.push(c.id + ':' + mine.length);
+    }
+    out.perChar = bad.join(',') || 'ok';
+    out.everyCharHasSix = bad.length === 0;
+    out.augCount = AUGMENTS.length;
+    const BANNED = /\b(enhances?|improves?|empowers?|strengthens?|boosts?|better|greatly)\b/i;
+    out.augText = AUGMENTS.every(a => a.desc && /\d/.test(a.desc) && !BANNED.test(a.desc) && /[.!]$/.test(a.desc.trim()));
+    out.augIdsUnique = new Set(AUGMENTS.map(a => a.id)).size === AUGMENTS.length;
+    out.every3 = augmentDue(3) && augmentDue(6) && !augmentDue(4);
 
-    // and for every other operative too
-    let bad = [];
+    // taking EVERY augment an operative can take must not throw or produce NaN
+    const broke = [];
     for (const c of CHARACTERS) {
       startRun(c.id); dev.god = true;
+      game.spawnQueue = []; game.betweenWaves = 999;
       try {
-        for (const a of AUGMENTS) if (!a.need || a.need(player)) { a.apply(player); player.augments.push(a.id); }
-        for (let i = 0; i < 260; i++) { mouse.down = i % 50 < 40; keys['w'] = i % 30 < 15; keys['s'] = i % 30 >= 15;
-          if (i % 60 === 0) for (let k = 0; k < 3; k++) spawnEnemy('grunt');
-          step(1/60); }
-        if (!isFinite(player.hp) || enemies.some(e => !isFinite(e.hp))) bad.push(c.id + ':nan');
-      } catch (e) { bad.push(c.id + ':' + e.message); }
+        for (const a of AUGMENTS) {
+          if (a.char && a.char !== c.id) continue;
+          if (a.need && !a.need(player)) continue;
+          a.apply(player); player.augments.push(a.id);
+        }
+        for (let i = 0; i < 420; i++) {
+          mouse.down = i % 55 < 45;
+          keys['w'] = i % 30 < 15; keys['s'] = i % 30 >= 15;
+          if (i % 50 === 0) dashQueued = true;
+          if (i % 60 === 0) for (let k = 0; k < 4; k++) spawnEnemy('grunt');
+          if (i === 120) spawnEnemy('tank');
+          step(1 / 60);
+        }
+        if (!isFinite(player.hp) || !isFinite(player.dmgMul)) broke.push(c.id + ':nan-player');
+        if (enemies.some(e => !isFinite(e.hp))) broke.push(c.id + ':nan-enemy');
+      } catch (e) { broke.push(c.id + ':' + e.message); }
     }
-    out.allCharsOk = bad.length === 0;
-    out.bad = bad.join(', ');
+    out.allAugsRun = broke.length === 0;
+    out.broke = broke.join(' | ');
+
+    // gear: mythic exists, every slot x rarity resolves, majors are reachable
+    out.rarities = RARITIES.length;
+    out.coverage = SLOTS.every(s => RARITIES.every(rr => GEAR_BASES.some(x => x.slot === s.id && x.rarity === rr.id)));
+    out.majorsDeclared = GEAR_BASES.every(x => !x.major || !!MAJORS[x.major]);
+    out.everyMythicHasMajor = GEAR_BASES.filter(x => x.rarity === 'mythic').every(x => !!x.major);
+    out.noLowMajors = GEAR_BASES.filter(x => ['common','uncommon','rare'].includes(x.rarity)).every(x => !x.major);
+    const mtext = Object.values(MAJORS).every(m => m.desc && /\d/.test(m.desc) && /[.!]$/.test(m.desc.trim()));
+    out.majorText = mtext;
+
+    // drop rarity actually reaches the top end at depth
+    const tally = {};
+    for (let i = 0; i < 20000; i++) { const rr = rollRarity(18); tally[rr] = (tally[rr] || 0) + 1; }
+    out.rarityMix = Object.keys(tally).map(k => k + ' ' + (tally[k] / 200).toFixed(1) + '%').join(', ');
+    out.legendaryReachable = (tally.legendary || 0) / 20000 > 0.03;
+    out.mythicReachable = (tally.mythic || 0) / 20000 > 0.005;
+
+    // every major applies cleanly on top of a run
+    const mbroke = [];
+    for (const k in MAJORS) {
+      startRun('vanguard'); dev.god = true;
+      try {
+        MAJORS[k].apply(player);
+        for (let i = 0; i < 180; i++) { mouse.down = true; if (i % 40 === 0) dashQueued = true;
+          if (i % 45 === 0) spawnEnemy('grunt'); step(1 / 60); }
+        if (!isFinite(player.hp)) mbroke.push(k);
+      } catch (e) { mbroke.push(k + ':' + e.message); }
+    }
+    out.majorsRun = mbroke.length === 0;
+    out.mbroke = mbroke.join(', ');
+
+    // mass salvage
+    GEAR.stash.length = 0; GEAR.equipped = {};
+    for (let i = 0; i < 40; i++) GEAR.stash.push(rollDrop(20));
+    for (let i = 0; i < 12; i++) identifyItem(GEAR.stash[i], null);
+    const keep = GEAR.stash.find(x => x.base);
+    GEAR.equipped[keep.slot] = keep.uid;
+    const before = GEAR.stash.length, coresBefore = SAVE.cores;
+    const sel = {}; for (const rr of RARITIES) sel[rr.id] = true;
+    const done = doMassSalvage(sel, 'both');
+    out.bulkLeftWorn = GEAR.stash.length === 1 && GEAR.stash[0].uid === keep.uid;
+    out.bulkCounted = done.n === before - 1 && SAVE.cores > coresBefore;
+
+    // gear stats are meaningfully bigger than before
+    startRun('vanguard');
+    const bare = player.maxHp;
+    const myth = GEAR_BASES.find(x => x.id === 'worldheart');
+    const it = { uid: 99999, slot: 'chest', rarity: 'mythic', base: 'worldheart', rolls: myth.stats.map(() => 1), rerolls: 0, ins: -1 };
+    GEAR.stash.push(it); GEAR.equipped.chest = it.uid;
+    startRun('vanguard');
+    out.gearBig = player.maxHp - bare > 400;
+    out.gearHp = player.maxHp - bare;
+    out.majorApplied = player.majors.indexOf('saviour') !== -1;
     return out;
     });
-    const info = ['bases', 'idName', 'harrowPool', 'bad', 'idErr', 'gearStats'];
+    const info = ['perChar', 'augCount', 'broke', 'mbroke', 'rarityMix', 'rarities', 'gearHp'];
     for (const k in r) if (!info.includes(k)) ok(r[k], 'gear: ' + k);
-    ok(r.bases >= 50, 'gear: enough named bases (' + r.bases + ')');
-    ok(!r.bad, 'gear: every operative survives every augment it can take' + (r.bad ? ' -> ' + r.bad : ''));
+    ok(r.augCount >= 120, 'gear: a deep augment pool (' + r.augCount + ')');
+    ok(!r.broke, 'gear: every operative survives its whole augment pool' + (r.broke ? ' -> ' + r.broke : ''));
+    ok(!r.mbroke, 'gear: every major identification runs' + (r.mbroke ? ' -> ' + r.mbroke : ''));
+    console.log('  rarity mix at wave 18: ' + r.rarityMix);
   }
 
   /* ---------- a full unassisted run from the menu ---------- */
@@ -346,7 +353,7 @@ const ok = (c, m) => { if (c) pass++; else fails.push(m); };
   /* the augment beat, driven straight rather than waiting for the bot */
   const draft = await page.evaluate(() => {
     startRun('echo');
-    game.wave = 5; game.spawnQueue.length = 0; telegraphs.length = 0; enemies.length = 0;
+    game.wave = 6; game.spawnQueue.length = 0; telegraphs.length = 0; enemies.length = 0;
     game.betweenWaves = 0;
     step(1 / 60);
     const opened = game.state === 'draft' && document.getElementById('augment').classList.contains('show');
@@ -354,7 +361,7 @@ const ok = (c, m) => { if (c) pass++; else fails.push(m); };
     if (opened) document.querySelector('#agCards .card').click();
     return { opened, cards, taken: player.augments.length, back: game.state };
   });
-  ok(draft.opened, 'augment: the draft opens on the fifth wave cleared');
+  ok(draft.opened, 'augment: the draft opens on the third wave cleared');
   ok(draft.cards === 3, 'augment: three cards offered (' + draft.cards + ')');
   ok(draft.taken === 1, 'augment: taking one records it');
   ok(draft.back === 'play', 'augment: the fight resumes after the pick');

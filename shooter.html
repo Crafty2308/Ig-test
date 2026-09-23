@@ -160,7 +160,7 @@ h2{margin:0 0 14px; font-size:clamp(20px,4.5vw,30px); letter-spacing:.08em; colo
 .slot .sn{font-size:11.5px; color:#8fa9c8; letter-spacing:.06em;}
 .slot .sv{font-size:12.5px; font-weight:700; color:#eaf6ff; line-height:1.25;}
 .stash{display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:6px;
-  max-height:330px; overflow:auto; padding-right:4px;}
+  max-height:430px; overflow:auto; padding-right:4px;}
 .gitem{padding:7px 9px; border-radius:8px; cursor:pointer; border:1px solid rgba(120,150,190,.22);
   background:rgba(255,255,255,.025); font-size:12px; line-height:1.3;}
 .gitem:hover{border-color:#40e0ff;}
@@ -192,7 +192,7 @@ h2{margin:0 0 14px; font-size:clamp(20px,4.5vw,30px); letter-spacing:.08em; colo
 .mat b{color:#ffc857;}
 .gnote{margin-top:8px; min-height:15px; font-size:11.5px; color:#9dff5c;}
 .gempty{font-size:12px; color:#5f7ba3; padding:14px 2px;}
-@media (max-width:820px){ .forge{flex-direction:column;} .stash{max-height:200px;} }
+@media (max-width:820px){ .forge{flex-direction:column;} .stash{max-height:230px;} }
 </style>
 </head>
 <body>
@@ -230,7 +230,7 @@ h2{margin:0 0 14px; font-size:clamp(20px,4.5vw,30px); letter-spacing:.08em; colo
       <div><b>Aim &amp; Fire</b> Mouse + Hold Left Click</div>
       <div><b>Dash</b> Space / Right Click <span style="color:#5f7ba3">(brief invulnerability)</span></div>
       <div><b>Pause</b> Esc or P</div>
-      <div style="margin-top:10px; color:#7e9bc4">Pick an upgrade every level, an augment every fifth wave cleared, and take whatever gear drops to the Forge.</div>
+      <div style="margin-top:10px; color:#7e9bc4">Pick an upgrade every level, an augment every third wave cleared, and take whatever gear drops to the Forge.</div>
     </div>
   </div>
 </div>
@@ -524,7 +524,7 @@ const game = {
   time: 0,
   wave: 0,
   waveTimer: 0,
-  betweenWaves: 0, drops: 0, mats: 0, stallT: 0, stallWarned: false,
+  betweenWaves: 0, drops: 0, mats: 0, stallT: 0, stallWarned: false, waveTime: 0,
   score: 0,
   kills: 0,
   best: store('neon-overrun-best') || 0,
@@ -585,7 +585,8 @@ function makePlayer(charId) {
 function playerFireInterval() {
   const w = WEAPONS[player.weapon];
   const frenzy = player.frenzyT > 0 ? 1 + player.killFrenzy : 1;
-  return Math.max(0.035, w.rof / (player.rofMul * frenzy));
+  const pilot = (player.pilotLight > 0 && player.pilotOn) ? 1.45 : 1;   // CINDER standing in its own fire
+  return Math.max(0.035, w.rof / (player.rofMul * frenzy * pilot));
 }
 
 /* ============================================================
@@ -656,12 +657,28 @@ function shoot() {
     base *= 1 + player.charge * player.chargePower;
     player.charge = 0;
   }
+  if (player.retortT > 0) { base *= player.retort; player.retortT = 0;   // ROOK: the answer to a raised shield
+    floatText(player.x, player.y - 30, 'RETORT', '#6ec6ff', 16); }
+  if (player.moveDmg > 0) base *= 1 + player.moveDmg * clamp(player.moveFire, 0, 1);
   if (player.mode === 'discharge') {         // ARC: spends the shared meter
     if (player.meter < player.meterCost) { setArcMode('charge'); return; }
     player.meter -= player.meterCost;
     base *= player.dischargePower;
   }
 
+  // Split Lock: a round for each target the rifle is holding
+  if (player.lockMulti > 1 && player.lockList && player.lockList.length > 1) {
+    for (let i = 1; i < player.lockList.length; i++) {
+      const t = player.lockList[i];
+      if (!t || t.dead) continue;
+      const a = Math.atan2(t.y - by, t.x - bx);
+      const extra = emitProjectiles({
+        x: bx, y: by, angle: a, base: base, count: w.count, spread: w.spread, speed: w.speed,
+        size: w.size, pierce: w.pierce, color: w.color, trail: true, source: 'shot'
+      });
+      for (const e of extra) if (player.snipeChain > 0) { e.snipe = base; e.snipeLeft = 3; }
+    }
+  }
   const made = emitProjectiles({
     x: bx, y: by, angle: player.angle, base: base, count: w.count,
     spread: w.spread, speed: w.speed, size: w.size, life: w.life,
@@ -671,12 +688,24 @@ function shoot() {
   });
 
   if (w.echo) queueEcho({ base: base, angle: player.angle, count: w.count, spread: w.spread, speed: w.speed, size: w.size });
+  if (player.sorcery > 0 && player.shotCount % player.sorcery === 0) {     // Sorcery
+    emitProjectiles({ x: bx, y: by, angle: player.angle, base: base * 0.7, count: 2, spread: 0.18,
+                      speed: w.speed || 900, size: w.size, color: '#d8c8ff', source: 'shot' });
+  }
   for (const b of made) {
+    if (player.snipeChain > 0 && player.chargeMax > 0) { b.snipe = base; b.snipeLeft = 3; }
     if (w.well) b.well = 1;
     if (w.thread) b.thread = 1;
     if (w.groundFire) b.ground = 1;
     if (w.sticky) { b.sticky = 1; b.explode = 0; }
-    if (w.returning) { b.returning = 1; b.phase = 'out'; b.outT = 0.42; player.scytheOut = b; }
+    if (w.returning) {
+      b.returning = 1; b.phase = 'out'; b.outT = 0.42 * player.scytheReach; b.cuts = 0;
+      b.x0 = player.x; b.y0 = player.y;
+      if (player.scytheOrbit > 0) { b.orbit = 1; b.oa = Math.atan2(b.vy, b.vx); }
+      player.scytheOut = b;
+      player.scytheList.push(b);
+      while (player.scytheList.length > player.scytheCount) player.scytheList.shift();
+    }
   }
   if (player.ammo !== Infinity) player.ammo--;
   player.recoil = Math.min(10, w.kick);
@@ -693,7 +722,34 @@ function swapWeapon(key) {
 function damagePlayer(amount, srcX, srcY) {
   if (dev.god) return;
   if (player.invuln > 0 || game.state !== 'play') return;
+  if (player.retaliate > 0) {                 // Saviour's Sacrifice
+    for (const e of enemies) {
+      if (!e.dead && !e.spawnT && len(e.x - player.x, e.y - player.y) < 220 + e.r) {
+        dealDamage(e, amount * player.retaliate, 'thorns', { fromX: player.x, fromY: player.y, silent: true });
+      }
+    }
+    particles.push({ x: player.x, y: player.y, vx: 0, vy: 0, life: 0.3, max: 0.3, color: '#ff6b9d', size: 220, glow: true, ring: true });
+  }
+  if (player.thrallGuard > 0 && minions.length) {   // Bound Pain
+    let best = null, bd = 1e9;
+    for (const m of minions) { const d = len(m.x - player.x, m.y - player.y); if (d < bd) { bd = d; best = m; } }
+    if (best) { damageMinion(best, amount * player.thrallGuard, null); amount *= 1 - player.thrallGuard; }
+  }
+  if (player.riposte > 0 && player.riposteReady) {  // SEVER's parry
+    player.riposteReady = 0;
+    player.invuln = 0.6;
+    for (const e of enemies) {
+      if (!e.dead && !e.spawnT && len(e.x - player.x, e.y - player.y) < 150 + e.r) {
+        dealDamage(e, player.riposte, 'blade', { fromX: player.x, fromY: player.y });
+      }
+    }
+    floatText(player.x, player.y - 34, 'RIPOSTE', '#ff6b4a', 17);
+    particles.push({ x: player.x, y: player.y, vx: 0, vy: 0, life: 0.3, max: 0.3, color: '#ff6b4a', size: 150, glow: true, ring: true });
+    return;
+  }
+  if (player.fragile > 0) amount *= 1 + player.fragile;
   if (player.aegisOn && srcX !== undefined && aegisCovers(srcX, srcY)) {
+    if (player.aegisBankMul > 0) player.aegisBank += amount * player.aegisBlock * player.aegisBankMul;
     amount *= 1 - player.aegisBlock;
     if (amount < 1) {
       burst(player.x + Math.cos(player.angle) * 22, player.y + Math.sin(player.angle) * 22, 6, '#6ec6ff', 160, 2);
@@ -723,8 +779,8 @@ function damagePlayer(amount, srcX, srcY) {
   }
   if (player.hp <= 0) {
     if (player.secondWind > 0 && !player.secondUsed) {
-      player.secondUsed = true;
-      player.hp = 25;
+      player.secondUsed = player.secondWind < 2;          // Second Heart resets each wave
+      player.hp = player.secondWind >= 2 ? Math.round(player.maxHp * 0.35) : 25;
       player.invuln = 1.6;
       camera.flash = 0.6; camera.flashColor = '#d08bff';
       burst(player.x, player.y, 40, '#d08bff', 340, 3.5);
@@ -819,19 +875,26 @@ function updateBeam(dt, firing) {
   }
 
   // ramp: holding on the same target builds heat, switching targets bleeds it
-  if (primary && primary === player.beamTarget) {
-    player.beamHeat = Math.min(w.rampTime, player.beamHeat + dt);
+  const rampTime = player.beamRampTime > 0 ? player.beamRampTime : w.rampTime;
+  if (primary && (primary === player.beamTarget || player.beamHold > 0)) {
+    player.beamTarget = primary;
+    player.beamHeat = Math.min(rampTime, player.beamHeat + dt);
   } else if (primary) {
     player.beamTarget = primary;
     player.beamHeat = Math.max(0, player.beamHeat - dt * 0.8);
   } else {
-    player.beamHeat = Math.max(0, player.beamHeat - dt * 1.6);
+    player.beamHeat = Math.max(0, player.beamHeat - dt * (player.beamHold > 0 ? 0.2 * rampTime : 1.6));
   }
 
-  const ramp = 1 + (player.beamHeat / w.rampTime) * (w.rampMax - 1 + player.beamRamp);
+  const ramp = 1 + (player.beamHeat / rampTime) * (w.rampMax - 1 + player.beamRamp);
   const dps = (w.dps + player.beamPower) * ramp;
   for (const ray of hits) {
-    for (const e of ray.targets) dealDamage(e, dps * dt, 'beam', { silent: true });
+    for (const e of ray.targets) {
+      const res = dealDamage(e, dps * dt, 'beam', { silent: true });
+      if (player.beamShield > 0 && player.shieldMax > 0) {
+        player.shield = Math.min(player.shieldMax, player.shield + res.dmg * player.beamShield);
+      }
+    }
   }
   player.beamHits = hits;
   player.beamRampShown = ramp;
@@ -872,6 +935,13 @@ function raiseAegis() {
 function lowerAegis() {
   const held = player.aegisHeld;
   player.aegisOn = false; player.aegisIdle = 0; player.aegisHeld = 0;
+  player.retortT = player.retort > 1 ? 0.5 : 0;
+  // Live Wire: everything the shield ate comes back out at once
+  if (player.aegisBank > 0) {
+    explode(player.x, player.y, 200 * player.explodeMul, Math.min(800, player.aegisBank), true);
+    floatText(player.x, player.y - 30, 'DISCHARGE', '#6ec6ff', 16);
+    player.aegisBank = 0;
+  }
   // the burst only pays out for a shield that was actually braced
   if (player.aegisBurst > 0 && held >= 1.2) {
     explode(player.x, player.y, 170 * player.explodeMul, player.aegisBurst, true);
@@ -885,7 +955,13 @@ function updateAegis(dt, firing) {
     if (player.aegisOn) lowerAegis();
     return;
   }
-  if (player.aegisOn) { player.aegisHeld += dt; return; }
+  if (player.aegisOn) {
+    player.aegisHeld += dt;
+    if (player.aegisRegen > 0 && player.shieldMax > 0) {
+      player.shield = Math.min(player.shieldMax, player.shield + player.aegisRegen * dt);
+    }
+    return;
+  }
   player.aegisIdle += dt;
   if (player.aegisIdle >= player.aegisRaise) raiseAegis();
 }
@@ -895,13 +971,29 @@ function aegisCovers(fromX, fromY) {
   if (!player.aegisOn) return false;
   const a = Math.atan2(fromY - player.y, fromX - player.x);
   let d = ((a - player.angle + Math.PI) % TAU + TAU) % TAU - Math.PI;
-  return Math.abs(d) < 1.15;                    // a 132 degree face
+  return Math.abs(d) < player.aegisArc;         // a 132 degree face, unless Omniplate widened it
 }
 
 /* ARC - two firing modes on one meter. Charge shots fill it, Discharge spends
    it. Running it dry drops you back to Charge. */
 function setArcMode(mode) {
   if (player.meterMax <= 0) return;
+  if (mode === 'discharge' && player.mode !== 'discharge' && player.meterBurst > 0) {
+    // Overload Dump: flipping over throws the first volley for you
+    const seen = [];
+    for (let k = 0; k < 6; k++) {
+      let best = null, bd = 620;
+      for (const e of enemies) {
+        if (e.dead || e.spawnT > 0 || seen.indexOf(e) !== -1) continue;
+        const d = len(e.x - player.x, e.y - player.y);
+        if (d < bd) { bd = d; best = e; }
+      }
+      if (!best) break;
+      seen.push(best);
+      arcs.push({ x1: player.x, y1: player.y, x2: best.x, y2: best.y, life: 0.16, max: 0.16 });
+      dealDamage(best, player.meterBurst, 'chain', { fromX: player.x, fromY: player.y });
+    }
+  }
   player.mode = mode;
   player.fireCd = Math.max(player.fireCd, 0.12);
   game.banner = { text: mode === 'discharge' ? 'DISCHARGE' : 'CHARGE', t: 0.8,
@@ -918,9 +1010,9 @@ function updateWeapon(dt, firing) {
   // Discharge; running it dry drops you back to Charge. Nothing to press.
   if (player.meterMax > 0) {
     if (player.mode === 'discharge') {
-      player.meter = Math.max(0, player.meter - dt * 2);
+      player.meter = Math.max(0, player.meter - dt * player.meterBleed);
       if (player.meter < player.meterCost) setArcMode('charge');
-    } else if (player.meter >= player.meterMax - 0.01) {
+    } else if (player.meter >= player.meterMax * player.meterTrigger - 0.01) {
       setArcMode('discharge');
     }
   }
@@ -937,7 +1029,7 @@ function updateWeapon(dt, firing) {
   if (w.autoMove) {
     // NYX - no trigger at all. The guns fire from your own movement and aim themselves.
     const spd = len(player.vx, player.vy) / Math.max(1, player.speed * player.speedMul);
-    player.moveFire = clamp(spd, 0, 1.5);
+    player.moveFire = Math.max(player.moveFloor, clamp(spd, 0, 1.5));
     if (player.moveFire > 0.18) {
       let best = null, bestD = 780;
       for (const e of enemies) {
@@ -963,12 +1055,17 @@ function updateWeapon(dt, firing) {
 
   if (w.autoAim) {
     // VEX - the rifle finds the target; you decide when to let go
-    let best = null, bestD = w.lockRange;
+    const range = w.lockRange + player.lockBonus;
+    const found = [];
     for (const e of enemies) {
       if (e.dead || e.spawnT > 0) continue;
       const d = len(e.x - player.x, e.y - player.y);
-      if (d < bestD && lineOfSight(player.x, player.y, e.x, e.y)) { bestD = d; best = e; }
+      if (d < range && lineOfSight(player.x, player.y, e.x, e.y)) found.push({ e: e, d: d });
     }
+    found.sort((a, b) => a.d - b.d);
+    player.lockList = found.slice(0, player.lockMulti).map(x => x.e);
+    const best = found.length ? found[0].e : null;
+    const bestD = found.length ? found[0].d : range;
     player.lockTarget = best;
     if (best) {
       const lead = (len(best.vx, best.vy) > 20) ? bestD / (w.speed * player.bulletSpeedMul) : 0;
@@ -1020,8 +1117,10 @@ function updateWeapon(dt, firing) {
   }
 
   if (w.returning) {
-    // MOURN - one scythe. Throw it, and it comes back to your hand.
-    if (player.scytheOut && !player.scytheOut.gone) return;
+    // MOURN - one scythe unless something says otherwise. Throw it, and it comes back.
+    let live = 0;
+    for (const b of bullets) if (b.returning && !b.gone) live++;
+    if (live >= player.scytheCount) return;
     if (firing && player.fireCd <= 0) shoot();
     return;
   }
@@ -1029,7 +1128,7 @@ function updateWeapon(dt, firing) {
   if (w.chargeUp) {
     // VEX - hold to wind up, release to fire. Damage scales with the wind-up.
     if (firing) {
-      player.charge = Math.min(1, player.charge + dt * player.chargeRate);
+      player.charge = Math.min(player.chargeCap, player.charge + dt * player.chargeRate);
       player.heldFire = true;
     } else if (player.heldFire) {
       player.heldFire = false;
@@ -1057,13 +1156,30 @@ function layFire(x, y) {
     if (len(f.x - x, f.y - y) < f.r * 0.6) { f.life = Math.max(f.life, player.fireLife); return; }
   }
   if (fires.length > 44) fires.shift();
-  fires.push({ x: x, y: y, r: 34 * player.fireSize, life: player.fireLife, max: player.fireLife, tick: 0 });
+  fires.push({ x: x, y: y, r0: 34 * player.fireSize, r: 34 * player.fireSize,
+               life: player.fireLife, max: player.fireLife, tick: 0 });
 }
 
 function updateFires(dt) {
+  let pulse = false;
+  if (player.firePulse > 0) {
+    player.firePulseT += dt;
+    if (player.firePulseT >= 6) { player.firePulseT = 0; pulse = true; }
+  }
+  player.pilotOn = 0;
   for (let i = fires.length - 1; i >= 0; i--) {
     const f = fires[i];
-    f.life -= dt;
+    // Scorched Earth holds a patch open while you stand near it
+    if (!(player.fireRefresh > 0 && len(f.x - player.x, f.y - player.y) < player.fireRefresh)) f.life -= dt;
+    if (player.fireGrow > 1) f.r = f.r0 * (1 + (player.fireGrow - 1) * (1 - clamp(f.life / f.max, 0, 1)));
+    if (len(f.x - player.x, f.y - player.y) < f.r) player.pilotOn = 1;
+    if (pulse) {
+      particles.push({ x: f.x, y: f.y, vx: 0, vy: 0, life: 0.3, max: 0.3, color: '#ff8a3d', size: f.r * 2, glow: true, ring: true });
+      for (const e of enemies) {
+        if (e.dead || e.spawnT > 0) continue;
+        if (len(e.x - f.x, e.y - f.y) < f.r * 2 + e.r) dealDamage(e, player.firePulse, 'ground', { fromX: f.x, fromY: f.y });
+      }
+    }
     if (f.life <= 0) { fires.splice(i, 1); continue; }
     f.tick += dt;
     if (f.tick < 0.25) continue;
@@ -1083,8 +1199,15 @@ function updateFires(dt) {
 
 /* BOOM - charges stick where they land and wait for you to pull the trigger. */
 function stickCharge(x, y, host, dmg, radius) {
+  if (player.stickySplit > 0 && !arguments[5]) {       // Cluster Charge
+    for (let i = 0; i < player.stickySplit; i++) {
+      stickCharge(x + rand(-34, 34), y + rand(-34, 34), i === 0 ? host : null,
+                  dmg * 0.45, radius * 0.8, true);
+    }
+    return;
+  }
   if (stickies.length >= player.stickyCap) blowCharge(stickies.shift());
-  stickies.push({ x: x, y: y, host: host || null, dmg: dmg, r: radius, life: 9 });
+  stickies.push({ x: x, y: y, host: host || null, dmg: dmg, r: radius, life: player.stickyLife });
 }
 
 function blowCharge(c) {
@@ -1098,7 +1221,9 @@ function detonateCharges() {
   const list = stickies.slice();
   stickies.length = 0;
   list.forEach((c, i) => {
-    if (player.chainDetonate) fuses.push({ x: c.x, y: c.y, t: 0.06 * i, dmg: c.dmg, radius: c.r * player.explodeMul, depth: 0 });
+    // Sympathetic Detonation makes the chain build as it runs
+    const ramp = player.chainDetonate ? Math.pow(1 + player.stickyRamp, i) : 1;
+    if (player.chainDetonate) fuses.push({ x: c.x, y: c.y, t: 0.06 * i, dmg: c.dmg * ramp, radius: c.r * player.explodeMul, depth: 0 });
     else blowCharge(c);
   });
   camera.shake = Math.min(14, camera.shake + 4);
@@ -1112,6 +1237,14 @@ function updateStickies(dt) {
       if (c.host.dead) c.host = null;              // it falls off the corpse
       else { c.x = c.host.x; c.y = c.host.y; }
     }
+    if (player.stickyProx > 0 && !c.gone) {                 // Proximity Fuse
+      for (const e of enemies) {
+        if (e.dead || e.spawnT > 0) continue;
+        if (len(e.x - c.x, e.y - c.y) > player.stickyProx + e.r) continue;
+        stickies.splice(i, 1); blowCharge(c); c.life = -1; break;
+      }
+      if (c.life < 0) continue;
+    }
     if (c.life <= 0) { stickies.splice(i, 1); blowCharge(c); }
   }
 }
@@ -1120,7 +1253,7 @@ function updateStickies(dt) {
 function placePrism(x, y) {
   if (player.prismCap <= 0) return;
   if (prisms.length >= player.prismCap) prisms.shift();
-  prisms.push({ x: x, y: y, life: 14, spin: 0 });
+  prisms.push({ x: x, y: y, life: player.prismLife, spin: 0 });
   particles.push({ x: x, y: y, vx: 0, vy: 0, life: 0.4, max: 0.4, color: '#7cffe0', size: 50, glow: true, ring: true });
   floatText(x, y - 20, 'PRISM', '#7cffe0', 14);
 }
@@ -1136,14 +1269,19 @@ function updatePrisms(dt) {
 
 /* called from the bullet loop: a shot crossing a prism becomes three */
 function prismSplit(b) {
-  if (!prisms.length || !b.friendly || b.prismed) return;
+  if (!prisms.length || !b.friendly) return;
   for (const p of prisms) {
+    if (b.prismed === p) continue;
+    if (player.prismChain <= 0 && b.prismed) return;   // one split per shot, unless Hall of Mirrors
     if (len(b.x - p.x, b.y - p.y) > 26) continue;
     b.prismed = p;
     const a = Math.atan2(b.vy, b.vx), sp = len(b.vx, b.vy);
     b.base *= 1 + player.prismPower;
+    if (player.prismHoming > 0) b.homing = Math.max(b.homing, player.prismHoming);
+    const extra = Math.max(0, player.prismSplitN - 1);
     if (bullets.length < 240) {
-      for (const off of [-0.34, 0.34]) {
+      for (let k = 1; k <= extra; k++) {
+        const off = (k % 2 ? 1 : -1) * 0.34 * Math.ceil(k / 2);
         const c = Object.assign({}, b, { hit: null, prismed: p });
         c.vx = Math.cos(a + off) * sp; c.vy = Math.sin(a + off) * sp;
         bullets.push(c);
@@ -1151,6 +1289,15 @@ function prismSplit(b) {
     }
     burst(p.x, p.y, 5, '#7cffe0', 160, 2);
     return;
+  }
+}
+
+/* Prism Net: every prism is strung to the next with a cutting beam */
+function updatePrismLinks(dt) {
+  if (player.prismLink <= 0 || prisms.length < 2) return;
+  for (let i = 0; i < prisms.length - 1; i++) {
+    damageAlongLine(prisms[i].x, prisms[i].y, prisms[i + 1].x, prisms[i + 1].y,
+                    player.prismLink * dt, 'thread', null, true);
   }
 }
 
@@ -1291,7 +1438,10 @@ function updateEcho(dt) {
   player.echoGhosts.length = 0;
   for (let n = 1; n <= player.echoCount; n++) {
     const g = echoSample(game.time - player.echoDelay * n);
-    if (g) player.echoGhosts.push(g);
+    if (!g) continue;
+    // Mirror Self reflects the ghost through you instead of trailing it
+    if (player.echoMirror > 0) player.echoGhosts.push({ x: 2 * player.x - g.x, y: 2 * player.y - g.y, a: g.a + Math.PI });
+    else player.echoGhosts.push(g);
   }
 
   for (let i = player.echoQueue.length - 1; i >= 0; i--) {
@@ -1347,10 +1497,10 @@ function collapseWell(wl, depth) {
   wl.gone = true;
   let caught = 0;
   for (const e of enemies) {
-    if (!e.dead && len(e.x - wl.x, e.y - wl.y) < player.wellRadius + e.r) caught++;
+    if (!e.dead && len(e.x - wl.x, e.y - wl.y) < player.wellRadius + (wl.grow || 0) + e.r) caught++;
   }
   const dmg = player.wellPower * (1 + Math.min(4, Math.max(0, caught - 1)) * player.wellCrowd);
-  explode(wl.x, wl.y, player.wellRadius * player.explodeMul, dmg, true);
+  explode(wl.x, wl.y, (player.wellRadius + (wl.grow || 0)) * player.explodeMul, dmg, true);
   if (player.wellChain > 0 && (depth || 0) < 1) {
     wells.push({ x: wl.x, y: wl.y, t: player.wellDelay, max: player.wellDelay, spin: 0, gone: false, echo: 1 });
   }
@@ -1361,12 +1511,13 @@ function updateWells(dt) {
     const wl = wells[i];
     wl.t -= dt;
     wl.spin += dt * 5;
+    if (player.wellGrow > 0) { wl.grow = (wl.grow || 0) + player.wellGrow * dt * 4; }
     for (const e of enemies) {
       if (e.dead || e.spawnT > 0) continue;
       const dx = wl.x - e.x, dy = wl.y - e.y, d = len(dx, dy);
-      if (d > player.wellRadius + e.r || d < 6) continue;
+      if (d > player.wellRadius + (wl.grow || 0) + e.r || d < 6) continue;
       const grip = e.boss ? 0.18 : (e.type === 'tank' ? 0.45 : 1);
-      const pull = player.wellPull * grip * dt;
+      const pull = player.wellPull * grip * dt * (player.wellPush > 0 ? -1 : 1);
       e.x += (dx / d) * pull; e.y += (dy / d) * pull;
       if (player.wellCrush > 0) dealDamage(e, player.wellCrush * dt, 'ground', { silent: true });
       if (player.wellSlow > 0) applySlow(e, player.wellSlow, 0.4);
@@ -1456,12 +1607,28 @@ function updateTether(dt) {
     for (const e of enemies) {
       if (e.dead || e.spawnT > 0) continue;
       if (len(e.x - th.x, e.y - th.y) > e.r + 14) continue;
+      if (player.harpoonPierce > 0) {                  // Whaling Line drives straight through
+        if (!th.pierced) th.pierced = [];
+        if (th.pierced.indexOf(e) !== -1) continue;
+        th.pierced.push(e);
+        dealDamage(e, player.harpoonPierce, 'tether', { fromX: px, fromY: py });
+        th.last = e;
+        continue;
+      }
       th.target = e; th.state = 'hooked';
       dealDamage(e, player.harpoonHit, 'tether', { fromX: px, fromY: py });
       burst(e.x, e.y, 12, '#ffc857', 240, 2.8);
       break;
     }
-    if (th.state === 'out' && (th.t * 1500 > player.tetherRange || pointInWall(th.x, th.y))) player.tether = null;
+    if (th.state === 'out' && (th.t * 1500 > player.tetherRange || pointInWall(th.x, th.y))) {
+      if (player.harpoonPierce > 0 && th.last && !th.last.dead) {   // it buries in the last body it passed
+        th.target = th.last; th.state = 'hooked';
+        dealDamage(th.last, player.harpoonHit, 'tether', { fromX: player.x, fromY: player.y });
+        burst(th.last.x, th.last.y, 12, '#ffc857', 240, 2.8);
+        return;
+      }
+      player.tether = null;
+    }
     return;
   }
 
@@ -1473,6 +1640,7 @@ function updateTether(dt) {
   damageAlongLine(player.x, player.y, e.x, e.y, player.chainDps * dt, 'tether', e, true);
   dealDamage(e, player.barbDps * dt, 'tether', { silent: true });
   if (player.tetherSlow > 0) applySlow(e, player.tetherSlow, 0.4);
+  if (player.tetherHold > 0) { e.vx = 0; e.vy = 0; applySlow(e, 0.95, 0.3); }
 
   const d = len(player.x - e.x, player.y - e.y);
   if (d > player.tetherRange * 1.5) { player.tether = null; return; }
@@ -1484,9 +1652,15 @@ function updateTether(dt) {
   } else th.close = 0;
   const a = Math.atan2(player.y - e.y, player.x - e.x);
   const grip = e.boss ? 0.22 : (e.type === 'tank' ? 0.5 : 1);
-  if (d > player.r + e.r + 14) {
-    e.x += Math.cos(a) * player.reelSpeed * grip * dt;
-    e.y += Math.sin(a) * player.reelSpeed * grip * dt;
+  if (d > player.r + e.r + 14 && !player.tetherHold) {
+    if (player.reelSelf > 0) {                    // you go to it instead
+      player.x -= Math.cos(a) * 420 * dt;
+      player.y -= Math.sin(a) * 420 * dt;
+      collideWorld(player);
+    } else {
+      e.x += Math.cos(a) * player.reelSpeed * grip * dt;
+      e.y += Math.sin(a) * player.reelSpeed * grip * dt;
+    }
     // a body dragged through the pack is itself a weapon
     if (player.dragDmg > 0) {
       for (const o of enemies) {
@@ -1576,6 +1750,12 @@ function swingBlade() {
     if (player.bladeBleed > 0) applyBurn(e, player.bladeBleed, 2);
   }
 
+  if (player.bladeWave > 0) {                      // Crescent: the swing leaves the blade
+    emitProjectiles({ x: player.x, y: player.y, angle: player.angle, base: dmg * player.bladeWave,
+                      count: 1, spread: 0.02, speed: 900, size: 12, life: 0.48, pierce: 9,
+                      color: '#ff6b4a', source: 'blade' });
+  }
+  player.riposteReady = 0;
   if (whirl) {
     player.momentum = 0;
     camera.shake = Math.min(16, camera.shake + 6);
@@ -1593,6 +1773,7 @@ function updateBlade(dt) {
     player.swing.t -= dt;
     if (player.swing.t <= 0) player.swing = null;
   }
+  if (player.riposte > 0 && player.fireCd < -0.6) player.riposteReady = 1;
   if (player.momentumT > 0) {
     player.momentumT -= dt;
   } else if (player.momentum > 0 && player.momentum < player.momentumMax) {
@@ -1635,9 +1816,24 @@ function updateThreads(dt) {
     if (anchors[i].life <= 0) anchors.splice(i, 1);
   }
   if (anchors.length < 2) return;
-  for (let i = 0; i < anchors.length - 1; i++) {
-    damageAlongLine(anchors[i].x, anchors[i].y, anchors[i + 1].x, anchors[i + 1].y,
-                    player.threadDps * dt, 'thread', null, true);
+  const pairs = [];
+  if (player.threadFull > 0) {                       // Cat's Cradle strings everything to everything
+    for (let i = 0; i < anchors.length; i++) for (let j = i + 1; j < anchors.length; j++) pairs.push([anchors[i], anchors[j]]);
+  } else {
+    for (let i = 0; i < anchors.length - 1; i++) pairs.push([anchors[i], anchors[i + 1]]);
+  }
+  for (const pr of pairs) {
+    damageAlongLine(pr[0].x, pr[0].y, pr[1].x, pr[1].y, player.threadDps * dt, 'thread', null, true);
+  }
+  if (player.threadPull > 0) {                       // Garrote drags them onto the knots
+    for (const e of enemies) {
+      if (e.dead || e.spawnT > 0) continue;
+      let near = null, nd = 90;
+      for (const a of anchors) { const d = len(a.x - e.x, a.y - e.y); if (d < nd) { nd = d; near = a; } }
+      if (!near || nd < 8) continue;
+      e.x += ((near.x - e.x) / nd) * player.threadPull * dt;
+      e.y += ((near.y - e.y) / nd) * player.threadPull * dt;
+    }
   }
   // a closed net cuts harder: the last anchor also reaches back to the first
   if (player.threadWeb > 0 && anchors.length >= 3) {
@@ -1655,6 +1851,13 @@ function drawThreads(ox, oy) {
     const a = anchors[i], b = anchors[i + 1];
     ctx.globalAlpha = 0.25 + 0.4 * clamp(Math.min(a.life, b.life) / player.threadLife, 0, 1);
     ctx.beginPath(); ctx.moveTo(a.x - ox, a.y - oy); ctx.lineTo(b.x - ox, b.y - oy); ctx.stroke();
+  }
+  if (player.threadFull > 0) {
+    ctx.globalAlpha = 0.18;
+    for (let i = 0; i < anchors.length; i++) for (let j = i + 2; j < anchors.length; j++) {
+      ctx.beginPath(); ctx.moveTo(anchors[i].x - ox, anchors[i].y - oy);
+      ctx.lineTo(anchors[j].x - ox, anchors[j].y - oy); ctx.stroke();
+    }
   }
   if (player.threadWeb > 0 && anchors.length >= 3) {
     const a = anchors[0], b = anchors[anchors.length - 1];
@@ -1691,11 +1894,16 @@ function releaseField(f) {
   if (!f || f.gone) return;
   f.gone = true;
   let n = 0;
+  let idx = 0, total = 0;
+  for (const b of bullets) if (b.frozen === f) total++;
   for (const b of bullets) {
     if (b.frozen !== f) continue;
     b.frozen = null;
+    if (!b.friendly) {                              // Reversal: it leaves as yours
+      b.friendly = true; b.source = 'shot'; b.base = b.dmg * 2; b.hit = null;
+    }
     const sp = len(b.fvx, b.fvy) * player.releaseSpeed;
-    const a = Math.atan2(b.fvy, b.fvx);
+    const a = player.releaseNova > 0 ? (idx++ / Math.max(1, total)) * TAU : Math.atan2(b.fvy, b.fvx);
     b.vx = Math.cos(a) * sp; b.vy = Math.sin(a) * sp;
     b.base *= player.releasePower;
     b.r *= 1.3;
@@ -1727,7 +1935,8 @@ function updateFields(dt) {
 
 /* called from the bullet loop: your own rounds stop dead in a field */
 function freezeInField(b) {
-  if (b.frozen || !b.friendly || b.noFreeze) return false;
+  if (b.frozen || b.noFreeze) return false;
+  if (!b.friendly && !player.fieldSteal) return false;
   const f = fieldAt(b.x, b.y);
   if (!f) return false;
   b.frozen = f;
@@ -1785,6 +1994,23 @@ function updateMinions(dt) {
   }
 
   for (let i = minions.length - 1; i >= 0; i--) if (minions[i].dead) minions.splice(i, 1);
+  if (player.minionLife > 0) {                       // Endless Rite: free, but brief
+    for (const m of minions) if (m.life > player.minionLife && !m.dead) killMinion(m, false);
+  }
+  if (player.rallyPulse > 0 && minions.length) {     // Ritual Circle
+    player.rallyPulseT += dt;
+    if (player.rallyPulseT >= 1) {
+      player.rallyPulseT = 0;
+      for (const m of minions) {
+        if (!m.onRally) continue;
+        particles.push({ x: m.x, y: m.y, vx: 0, vy: 0, life: 0.3, max: 0.3, color: '#b58cff', size: 130, glow: true, ring: true });
+        for (const e of enemies) {
+          if (e.dead || e.spawnT > 0) continue;
+          if (len(e.x - m.x, e.y - m.y) < 130 + e.r) dealDamage(e, player.rallyPulse, 'minion', { fromX: m.x, fromY: m.y });
+        }
+      }
+    }
+  }
 
   const rallying = player.rallyT > 0;
   for (const m of minions) {
@@ -1824,6 +2050,7 @@ function updateMinions(dt) {
     if (best && m.atkCd <= 0 && len(best.x - m.x, best.y - m.y) < best.r + m.r + 8) {
       m.atkCd = player.minionRate / (m.onRally ? 1 + player.rallyPower : 1);
       const res = dealDamage(best, player.minionDmg, 'minion', { fromX: m.x, fromY: m.y });
+      if (player.minionChain > 0) chainFrom(best, player.minionDmg * player.chainDmg, player.minionChain, [best]);
       if (player.soulLink > 0 && res.dmg > 0) healPlayer(res.dmg * player.soulLink);
       burst(m.x + Math.cos(m.angle) * m.r, m.y + Math.sin(m.angle) * m.r, 4, '#d8b8ff', 160, 2);
     }
@@ -1901,11 +2128,29 @@ function muzzleFlash(x, y, a, color, kick) {
     spawnParticle(x, y, Math.cos(sa) * s, Math.sin(sa) * s, rand(0.06, 0.16), color, rand(2, 4), true);
   }
 }
+let shardBlast = false;
 function explode(x, y, radius, dmg, friendly, depth) {
+  if (shardBlast && friendly) { /* a shard blast still hurts, it just cannot seed more */ }
   camera.shake = Math.min(12, camera.shake + Math.min(3, radius / 70));   // explosions stay readable
   burst(x, y, 22, '#ff9a3d', 320, 3.4);
   burst(x, y, 10, '#ffe6a0', 180, 2.2);
   particles.push({ x, y, vx: 0, vy: 0, life: 0.3, max: 0.3, color: '#ffb45c', size: radius, glow: true, ring: true });
+  if (friendly && player.blastShards > 0 && !shardBlast) {               // Shrapnel
+    shardBlast = true;                     // a shard's own blast never throws more shards
+    const shards = emitProjectiles({ x: x, y: y, angle: rand(0, TAU), base: 45, count: player.blastShards,
+                      spread: Math.PI, speed: 760, size: 3.4, life: 0.42, color: '#ffb45c', source: 'blast' });
+    for (const sh of shards) { sh.explode = 0; sh.shard = 1; }
+    shardBlast = false;
+  }
+  if (friendly && player.blastPull > 0) {                                // major: Gravity
+    for (const e of enemies) {
+      if (e.dead || e.spawnT > 0) continue;
+      const d = len(e.x - x, e.y - y);
+      if (d > player.blastPull || d < 6) continue;
+      e.x += ((x - e.x) / d) * Math.min(120, player.blastPull - d) * 0.5;
+      e.y += ((y - e.y) / d) * Math.min(120, player.blastPull - d) * 0.5;
+    }
+  }
   if (friendly) {
     dmg *= player.explodeDmgMul;
     for (const e of enemies) {
@@ -1993,6 +2238,8 @@ function dealDamage(target, base, source, opts) {
   if (player.burnBonus > 0 && target.burnT > 0) dmg *= 1 + player.burnBonus;
   if (player.markBonus > 0 && target.markT > 0) dmg *= 1 + player.markBonus;
   if (player.tetherVuln > 0 && player.tether && player.tether.target === target) dmg *= 1 + player.tetherVuln;
+  if (player.entropy > 0) dmg *= 1 + player.entropy * Math.min(90, game.waveTime || 0);
+  if (player.dashRageT > 0) dmg *= 1 + player.dashRage;
 
   /* 2. crit - available to every source, including ticks and minions */
   let crit = false;
@@ -2016,9 +2263,12 @@ function dealDamage(target, base, source, opts) {
   }
   burst(target.x, target.y, 3, target.color, 130, 2.2);
   if (player.lifesteal > 0) healPlayer(dmg * player.lifesteal);
-  if (player.meterMax > 0 && player.mode !== 'discharge') {
-    player.meter = Math.min(player.meterMax, player.meter + player.meterGain);
+  if (player.meterMax > 0) {
+    const gain = player.mode === 'discharge' ? player.meterInDischarge : player.meterGain;
+    if (gain > 0) player.meter = Math.min(player.meterMax, player.meter + gain);
   }
+  if (player.tauntBonus > 0 && player.taunt > 0 &&
+      len(target.x - player.x, target.y - player.y) < player.taunt) dmg *= 1 + player.tauntBonus;
 
   /* 4. on-hit riders. Throttled per target so a 60Hz beam or a 4Hz burn tick
         cannot machine-gun them, but no source is excluded. */
@@ -2057,6 +2307,9 @@ function killEnemy(e, noKillEffects) {
   game.kills++;
   game.score += Math.round(e.score * (player.scoreMul || 1));
   if (!noKillEffects) onEnemyKilled(e);
+  if (player.nearKillHeal > 0 && len(e.x - player.x, e.y - player.y) < 280) {
+    healPlayer(player.maxHp * player.nearKillHeal);
+  }
   burst(e.x, e.y, e.boss ? 60 : 14, e.color, e.boss ? 420 : 240, e.boss ? 4 : 3);
   camera.shake = Math.min(30, camera.shake + (e.boss ? 26 : 2.5));
 
@@ -2081,13 +2334,15 @@ function killEnemy(e, noKillEffects) {
     dropPickup(e.x + 46, e.y, 'health');
     dropPickup(e.x - 30, e.y - 20, 'gear');
     dropPickup(e.x + 30, e.y - 20, 'gear');
-    dropPickup(e.x, e.y + 30, 'mat');
+    dropPickup(e.x, e.y - 40, 'gear');
+    dropPickup(e.x - 20, e.y + 30, 'mat');
+    dropPickup(e.x + 20, e.y + 30, 'mat');
     game.banner = { text: 'TARGET ELIMINATED', t: 2.2, color: '#9dff5c' };
   } else {
     if (Math.random() < 0.12 * player.dropMul) dropPickup(e.x, e.y, 'health');
     // gear is the thing you keep, so it falls steadily rather than rarely
-    if (Math.random() < (0.016 + game.wave * 0.0009) * player.dropMul) dropPickup(e.x, e.y, 'gear');
-    else if (Math.random() < 0.012 * player.dropMul) dropPickup(e.x, e.y, 'mat');
+    if (Math.random() < (0.032 + game.wave * 0.0018) * player.dropMul) dropPickup(e.x, e.y, 'gear');
+    else if (Math.random() < 0.022 * player.dropMul) dropPickup(e.x, e.y, 'mat');
   }
 }
 
@@ -2103,6 +2358,15 @@ function onEnemyKilled(e) {
     }
   }
   if (player.emberHeal > 0 && e.burnT > 0) healPlayer(player.emberHeal);
+  if (player.fireOnKill > 0 && e.burnT > 0) layFire(e.x, e.y);
+  if (player.killSpeed > 0) player.killSpeedStack = Math.min(0.6, player.killSpeedStack + player.killSpeed);
+  if (player.plague > 0 && (e.burnT > 0 || e.slowT > 0)) {
+    for (const o of enemies) {
+      if (o.dead || o === e || len(o.x - e.x, o.y - e.y) > 200) continue;
+      if (e.burnT > 0) applyBurn(o, Math.max(player.burnDps, 8), Math.max(player.burnDur, 2));
+      if (e.slowT > 0) applySlow(o, Math.max(player.slowPow, 0.3), Math.max(player.slowDur, 1.2));
+    }
+  }
   if (player.killHeal > 0) healPlayer(player.killHeal);
   if (player.killFrenzy > 0) player.frenzyT = 1;
   if (player.adrenaline > 0) player.adrenalT = 2;
@@ -2119,6 +2383,7 @@ function dropPickup(x, y, type) {
 /* Enemies chase whatever is closest and threatening: a thrall inside its taunt
    radius, otherwise the player. This is what makes a summoner a summoner. */
 function enemyTarget(e) {
+  if (player.taunt > 0 && len(player.x - e.x, player.y - e.y) < player.taunt) return player;
   let best = null, bd = 300;
   for (const m of minions) {
     if (m.dead || m.spawnT > 0) continue;
@@ -2283,7 +2548,12 @@ function spawnPointAwayFromPlayer() {
 
 function startWave(n) {
   game.wave = n;
-  if (player) player.secondUsed = false;
+  game.waveTime = 0;
+  if (player) {
+    player.secondUsed = false;
+    player.killSpeedStack = 0;
+    if (player.waveShield > 0) player.shield = player.shieldMax;
+  }
   game.betweenWaves = 0;
   game.spawnQueue = [];
   buildArena(n);
@@ -2643,11 +2913,19 @@ function updateBullets(dt) {
     if (b.fade) b.r = (b.size0 || (b.size0 = b.r)) * (0.75 + 0.9 * (1 - clamp(b.life / b.maxLife, 0, 1)));
 
     if (b.returning) {
-      if (b.phase === 'out') {
+      if (b.orbit) {
+        // Eternal Orbit: it never comes back, it just keeps cutting
+        b.oa += dt * 2.6;
+        b.x = player.x + Math.cos(b.oa) * 150;
+        b.y = player.y + Math.sin(b.oa) * 150;
+        b.vx = 0; b.vy = 0;
+        b.life = 9;
+        if (b.hit && b.hit.length > 6) b.hit.length = 0;
+      } else if (b.phase === 'out') {
         b.outT -= dt;
         if (b.outT <= 0) { b.phase = 'back'; if (b.hit) b.hit.length = 0; }
       } else {
-        const a = Math.atan2(player.y - b.y, player.x - b.x), sp = len(b.vx, b.vy);
+        const a = Math.atan2(player.y - b.y, player.x - b.x), sp = len(b.vx, b.vy) * (1 + (player.scytheReach - 1) * 0.35);
         const na = angleLerp(Math.atan2(b.vy, b.vx), a, Math.min(1, dt * 7));
         b.vx = Math.cos(na) * sp; b.vy = Math.sin(na) * sp;
         if (len(player.x - b.x, player.y - b.y) < 34) {         // caught
@@ -2655,6 +2933,11 @@ function updateBullets(dt) {
           player.scytheOut = null;
           player.fireCd = player.catchReset ? 0 : Math.min(player.fireCd, 0.12);
           if (player.catchHeal > 0) healPlayer(player.catchHeal);
+          if (player.catchWave > 0) {
+            damageAlongLine(player.x, player.y, b.x0 !== undefined ? b.x0 : player.x,
+                            b.y0 !== undefined ? b.y0 : player.y, player.catchWave, 'blade');
+            particles.push({ x: player.x, y: player.y, vx: 0, vy: 0, life: 0.35, max: 0.35, color: '#d08bff', size: 220, glow: true, ring: true });
+          }
           burst(player.x, player.y, 8, b.color, 180, 2.4);
           bullets.splice(i, 1);
           continue;
@@ -2664,7 +2947,7 @@ function updateBullets(dt) {
     }
     if (b.friendly && prisms.length) prismSplit(b);
     if (b.frozen) { if (b.frozen.gone) b.frozen = null; else { b.life += dt; continue; } }
-    if (fields.length && b.friendly && freezeInField(b)) continue;
+    if (fields.length && (b.friendly || player.fieldSteal) && freezeInField(b)) continue;
 
     const px = b.x, py = b.y;
     b.x += b.vx * dt;
@@ -2696,20 +2979,44 @@ function updateBullets(dt) {
         if (b.hit && b.hit.indexOf(e) !== -1) continue;
         if (b.well) { done = true; break; }
         dealDamage(e, b.base, b.source || 'shot', { fromX: px, fromY: py });
+        if (b.snipe && e.dead && b.snipeLeft > 0 && player.snipeChain > 0) {
+          let nx = null, nd = 700;
+          for (const o of enemies) {
+            if (o.dead || o === e || o.spawnT > 0) continue;
+            const d = len(o.x - e.x, o.y - e.y);
+            if (d < nd) { nd = d; nx = o; }
+          }
+          if (nx) {
+            const c = emitProjectiles({ x: e.x, y: e.y, angle: Math.atan2(nx.y - e.y, nx.x - e.x),
+              base: b.snipe * player.snipeChain, count: 1, speed: 1800, size: b.r, color: '#ffd77a',
+              trail: true, source: 'shot' });
+            for (const q of c) { q.snipe = b.snipe * player.snipeChain; q.snipeLeft = b.snipeLeft - 1; }
+          }
+        }
         if (b.sticky && !b.stuck) {
           b.stuck = 1;
           stickCharge(e.x, e.y, e, b.base * player.stickyPower, 92);
           done = true; break;
         }
-        if (b.explode) { explode(b.x, b.y, b.explode, b.base * 0.7, true); done = true; break; }
+        if (b.explode && !b.shard) { explode(b.x, b.y, b.explode, b.base * 0.7, true); done = true; break; }
+        if (b.returning) {
+          b.cuts = (b.cuts || 0) + 1;
+          if (player.scytheStack > 0) b.base *= 1 + player.scytheStack;
+          if (player.scytheHeal > 0) healPlayer(player.scytheHeal);
+        }
         if (b.pierce > 0) {
           b.pierce--;
           (b.hit || (b.hit = [])).push(e);
-          if (!player.noFalloff) b.base *= 0.82;
+          if (!player.noFalloff && !b.returning) b.base *= 0.82;
         } else { done = true; }
         break;
       }
     } else if (!done && !b.friendly) {
+      if (player.bulletEater > 0 && len(b.x - player.x, b.y - player.y) < player.bulletEater) {
+        burst(b.x, b.y, 4, '#c8b4ff', 130, 2);
+        bullets.splice(i, 1);
+        continue;
+      }
       if (player.aegisOn && aegisCovers(b.x, b.y)) {
         const rr = player.r + b.r + 14;
         if ((player.x - b.x) ** 2 + (player.y - b.y) ** 2 < rr * rr) {
@@ -2720,6 +3027,16 @@ function updateBullets(dt) {
           b.vx = -b.vx; b.vy = -b.vy;
           b.color = '#7ceaff';
           b.hit = null;
+          b.homing = player.homing;
+          if (player.aegisSplit > 1 && bullets.length < 200) {   // Mirror Array
+            const a0 = Math.atan2(b.vy, b.vx), sp = len(b.vx, b.vy);
+            for (let k = 1; k < player.aegisSplit; k++) {
+              const c = Object.assign({}, b, { hit: null });
+              const off = (k % 2 ? 1 : -1) * 0.28 * Math.ceil(k / 2);
+              c.vx = Math.cos(a0 + off) * sp; c.vy = Math.sin(a0 + off) * sp;
+              bullets.push(c);
+            }
+          }
           burst(b.x, b.y, 6, '#7ceaff', 190, 2.2);
           continue;
         }
@@ -3614,6 +3931,24 @@ function rogueStats() {
     prismCap: 0, prismPower: 0.25,
     aegisCap: 0, aegisOn: false, aegisBlock: 0.85, aegisReflect: 1, aegisBurst: 0,
     aegisRaise: 0.4, aegisIdle: 0, aegisHeld: 0, aegisSlow: 0.78, focusScan: 0, dashAte: null,
+    aegisArc: 1.15, aegisRegen: 0, aegisBank: 0, aegisBankMul: 0, aegisSplit: 0, retort: 1, retortT: 0,
+    fireGrow: 1, pilotLight: 0, pilotOn: 0, fireRefresh: 0, fireOnKill: 0, firePulse: 0, firePulseT: 0,
+    beamHold: 0, beamShield: 0, beamRampTime: 0,
+    meterBleed: 2, meterTrigger: 1, meterInDischarge: 0, meterBurst: 0,
+    chargeCap: 1, lockMulti: 1, snipeChain: 0, lockBonus: 0,
+    moveDmg: 0, moveFloor: 0, dashVolley: 0, killSpeed: 0, killSpeedStack: 0,
+    droneAnchor: 0, droneAnchorX: 0, droneAnchorY: 0, droneDive: 0,
+    stickySplit: 0, stickyProx: 0, stickyRamp: 0, stickyLife: 9, blastShards: 0,
+    scytheOrbit: 0, scytheCount: 1, scytheStack: 0, scytheReach: 1, catchWave: 0, scytheHeal: 0,
+    scytheList: [], thrallGuard: 0, rallyPulse: 0, rallyPulseT: 0, minionChain: 0, minionLife: 0,
+    prismLink: 0, prismChain: 0, prismSplitN: 3, prismLife: 14, prismHoming: 0,
+    echoMirror: 0, wellPush: 0, wellGrow: 0,
+    harpoonPierce: 0, reelSelf: 0, tetherHold: 0,
+    bladeWave: 0, riposte: 0, riposteReady: 0, threadPull: 0, threadFull: 0,
+    fieldSteal: 0, releaseNova: 0,
+    // major identifications
+    majors: [], blastPull: 0, nearKillHeal: 0, fragile: 0, retaliate: 0, dashRage: 0, dashRageT: 0,
+    plague: 0, taunt: 0, tauntBonus: 0, entropy: 0, bulletEater: 0, waveShield: 0, sorcery: 0,
     lockTarget: null, scytheOut: null, catchHeal: 0, catchReset: 0,
     // ECHO - the ghost that repeats your fire
     echoDelay: 0, echoPower: 0.65, echoCount: 1, echoBlast: 0, echoSwap: 0,
@@ -3787,25 +4122,38 @@ function updateOrbit(dt) {
 /* ---------------- drones ---------------- */
 function updateDrones(dt) {
   const list = player.droneList;
-  while (list.length < player.drones) list.push({ a: rand(0, TAU), x: player.x, y: player.y, cd: rand(0, 0.5), fire: 0 });
+  while (list.length < player.drones) list.push({ a: rand(0, TAU), x: player.x, y: player.y, cd: rand(0, 0.5), fire: 0, down: 0 });
   while (list.length > player.drones) list.pop();
   if (!list.length) return;
 
   if (player.droneHeal > 0 && player.hp < player.maxHp) {
     player.hp = Math.min(player.maxHp, player.hp + player.droneHeal * list.length * dt);
   }
+  if (player.droneAnchor > 0 && player.stillT > 0.25) { player.droneAnchorX = player.x; player.droneAnchorY = player.y; }
+  const hx = player.droneAnchor > 0 ? player.droneAnchorX : player.x;
+  const hy = player.droneAnchor > 0 ? player.droneAnchorY : player.y;
   for (let i = 0; i < list.length; i++) {
     const d = list[i];
+    if (d.down > 0) { d.down -= dt; continue; }
     const want = player.orbitRot * 0.35 + (i / list.length) * TAU;
-    const tx = player.x + Math.cos(want) * 52;
-    const ty = player.y + Math.sin(want) * 52;
+    let tx = hx + Math.cos(want) * 52;
+    let ty = hy + Math.sin(want) * 52;
+    // Kamikaze: dive the mark, detonate, rebuild
+    if (player.droneDive > 0 && player.droneFocus && !player.droneFocus.dead && player.droneFocusT > 0) {
+      tx = player.droneFocus.x; ty = player.droneFocus.y;
+      if (len(d.x - tx, d.y - ty) < 26) {
+        explode(d.x, d.y, 120 * player.explodeMul, player.droneDive, true);
+        d.down = 4; d.x = hx; d.y = hy;
+        continue;
+      }
+    }
     d.x = lerp(d.x, tx, Math.min(1, dt * 5));
     d.y = lerp(d.y, ty, Math.min(1, dt * 5));
     d.fire = Math.max(0, d.fire - dt);
     d.cd -= dt;
     if (d.cd > 0) continue;
 
-    let best = null, bestD = 460;
+    let best = null, bestD = player.droneAnchor > 0 ? 920 : 460;
     if (player.droneFocus && !player.droneFocus.dead && player.droneFocusT > 0) {
       best = player.droneFocus;                     // a focus order overrides line of sight
     } else {
@@ -3860,6 +4208,12 @@ function onDashStart() {
   // IRIS leaves a prism standing where the dash began; HALT leaves a bubble
   if (player.prismCap > 0) placePrism(player.x, player.y);
   if (player.fieldCap > 0) placeField(player.x, player.y);
+  if (player.dashRage > 0) player.dashRageT = 2.5;
+  if (player.dashVolley > 0) {                 // NYX leaves a fan behind the dash
+    emitProjectiles({ x: player.x, y: player.y, angle: Math.atan2(-player.dashDirY, -player.dashDirX),
+      base: WEAPONS[player.weapon].dmg, count: player.dashVolley, spread: 0.9, speed: 1000,
+      size: 4, color: '#9dff5c', source: 'shot' });
+  }
   // ECHO trades places with its ghost instead of moving
   if (player.echoSwap > 0 && player.echoGhosts.length) {
     const g = player.echoGhosts[0];
@@ -3939,7 +4293,7 @@ function updateRogue(dt) {
   if (player.minionCap > 0 || minions.length) updateMinions(dt);
   if (fires.length) updateFires(dt);
   if (stickies.length) updateStickies(dt);
-  if (prisms.length) updatePrisms(dt);
+  if (prisms.length) { updatePrisms(dt); updatePrismLinks(dt); }
   if (player.echoDelay > 0) updateEcho(dt);
   if (wells.length) updateWells(dt);
   if (player.tether) updateTether(dt);
@@ -3953,6 +4307,8 @@ function updateRogue(dt) {
   updateDashDamage(dt);
   updateFuses(dt);
 
+  game.waveTime += dt;
+  player.dashRageT = Math.max(0, player.dashRageT - dt);
   player.adrenalT = Math.max(0, player.adrenalT - dt);
   player.frenzyT = Math.max(0, player.frenzyT - dt);
   if (len(player.vx, player.vy) < 12) player.stillT += dt; else player.stillT = 0;
@@ -3970,6 +4326,7 @@ function rogueSpeedMul() {
   let m = 1;
   if (player.adrenalT > 0) m += player.adrenaline;
   if (player.desperateSpeed > 0 && player.hp / player.maxHp < 0.4) m += player.desperateSpeed;
+  m += player.killSpeedStack;
   return m;
 }
 
@@ -4225,109 +4582,404 @@ function rebuildPlayer(p) {
 
 /* ============================================================
    AUGMENTS - the roguelite layer
-   Every fifth wave cleared offers three build-defining picks, filtered to
-   what your operative can actually use. Level-ups are the small, frequent
-   decision; augments are the rare one that changes how the run plays.
+   Every third wave cleared offers three picks. Most of them belong to one
+   operative and change how its mechanic works rather than what its numbers
+   say: ROOK's shield covers a different shape, MOURN's scythe stops coming
+   back, VOID's wells push instead of pull. A short shared pool fills in
+   behind them so no draft is ever empty.
    ============================================================ */
-const has = {
-  aegis:  p => p.aegisCap > 0,
-  sticky: p => p.stickyCap > 0,
-  prism:  p => p.prismCap > 0,
-  thrall: p => p.minionCap > 0,
-  drone:  p => p.drones > 0,
-  meter:  p => p.meterMax > 0,
-  charge: p => p.chargeMax > 0,
-  beam:   p => !!WEAPONS[p.sigWeapon].beam,
-  ghost:  p => p.echoDelay > 0,
-  well:   p => p.wellCap > 0,
-  line:   p => p.tetherCap > 0,
-  blade:  p => p.meleeCap > 0,
-  net:    p => p.threadCap > 0,
-  field:  p => p.fieldCap > 0,
-  fire:   p => !!WEAPONS[p.sigWeapon].groundFire,
-  shoots: p => !WEAPONS[p.sigWeapon].beam && !WEAPONS[p.sigWeapon].summon && !WEAPONS[p.sigWeapon].harpoon
-};
+const AUGMENTS = [];
+const sig = (char, id, ico, name, desc, apply) => AUGMENTS.push({ id: char + '_' + id, char, ico, name, desc, apply });
+const uni = (id, ico, name, desc, apply, need) => AUGMENTS.push({ id: 'all_' + id, ico, name, desc, apply, need });
 
-const AUGMENTS = [
-  /* --- open to everyone --- */
-  { id: 'volatile',  ico: '💥', name: 'Volatile Rounds',  desc: 'Every projectile you own detonates on impact for 52, drones and ghosts included.', need: has.shoots, apply: p => { p.explodeAll = 1; } },
-  { id: 'carpet',    ico: '🧨', name: 'Carpet Bombing',   desc: 'Every explosion throws 3 bomblets, and those bomblets can throw their own.', apply: p => { p.cluster += 3; p.clusterDepth = 1; } },
-  { id: 'bladestorm',ico: '🌀', name: 'Bladestorm',       desc: '+3 blades orbiting you at 26 damage a pass.', apply: p => { p.orbit += 3; p.orbitDmg = Math.max(p.orbitDmg, 26); } },
-  { id: 'megashell', ico: '🟡', name: 'Mega Shell',       desc: 'Every sixth shot is triple size for triple damage and a 95-radius blast.', need: has.shoots, apply: p => { p.megaEvery = 6; } },
-  { id: 'deathmark', ico: '🎯', name: 'Death Mark',       desc: 'Every fifth hit brands a target, which then takes 50% more from every source.', apply: p => { p.markEvery = 5; p.markBonus += 0.5; } },
-  { id: 'executor',  ico: '☠', name: 'Executioner',      desc: 'Instantly kills anything under 18% health. Bosses are immune below half.', apply: p => { p.execute += 0.18; } },
-  { id: 'frenzy',    ico: '🔥', name: 'Killing Frenzy',   desc: 'Every kill grants +25% fire rate for 1 second, refreshed on the next kill.', apply: p => { p.killFrenzy = Math.max(p.killFrenzy, 0.25); } },
-  { id: 'overkill',  ico: '💀', name: 'Mass Grave',       desc: 'Every kill detonates for 70 in an 80-unit radius.', apply: p => { p.onKillBoom += 70; } },
-  { id: 'static',    ico: '⚡', name: 'Static Field',     desc: 'Everything within 140 units takes 18 damage per second, with no aiming at all.', apply: p => { p.staticAura += 18; p.staticR = Math.max(p.staticR, 140); } },
-  { id: 'immolate',  ico: '🔥', name: 'Immolation',       desc: 'Everything within 70 units burns for 14 damage per second.', apply: p => { p.burnAura += 14; p.burnAuraR = Math.max(p.burnAuraR, 70); p.burnDps = Math.max(p.burnDps, 8); p.burnDur = Math.max(p.burnDur, 2); } },
-  { id: 'chillaura', ico: '❄', name: 'Cold Front',       desc: 'Everything within 150 units is slowed 30%, and slowed targets take 25% more damage.', apply: p => { p.chillAura = Math.max(p.chillAura, 150); p.slowPow = Math.max(p.slowPow, 0.30); p.slowDur = Math.max(p.slowDur, 1.2); p.shatter += 0.25; } },
-  { id: 'arcshot',   ico: '🔗', name: 'Arc Conduit',      desc: 'Hits arc to 2 more enemies, and arcs hit as hard as the shot that caused them.', apply: p => { p.chains += 2; p.chainDmg = Math.max(p.chainDmg, 1); } },
-  { id: 'chainstun', ico: '🧊', name: 'Conductor',        desc: 'Arcs slow what they touch by 60% for 0.8 seconds.', need: p => p.chains > 0, apply: p => { p.chainStun = 1; p.chains += 1; } },
-  { id: 'inferno',   ico: '🌋', name: 'Inferno',          desc: 'Burning enemies take 45% more damage from everything, and burns spread 110 units on death.', need: p => p.burnDps > 0, apply: p => { p.burnBonus += 0.45; p.burnSpread = Math.max(p.burnSpread, 110); } },
-  { id: 'dashblast', ico: '💨', name: 'Detonator',        desc: 'Every dash ends in a 100-damage blast and deals 60 on contact.', apply: p => { p.dashBlast += 100; p.dashDmg += 60; } },
-  { id: 'phase',     ico: '👻', name: 'Phase Dash',       desc: '+2 dash charges and 0.35s more invulnerability on each one.', apply: p => { p.dashMax += 2; p.dashCharge += 2; p.dashInvuln += 0.35; } },
-  { id: 'dashrefund',ico: '♻', name: 'Chain Rush',       desc: 'Every kill returns a dash charge, and dashes recharge 30% faster.', apply: p => { p.dashRefund = 1; p.dashCdMul *= 0.7; } },
-  { id: 'fortress',  ico: '🛡', name: 'Fortress',         desc: 'Damage is reduced 25% while any shield remains, and your shield detonates for 140 when it breaks. +60 shield.', apply: p => { p.shieldDR += 0.25; p.shieldBoom = Math.max(p.shieldBoom, 140); p.shieldMax += 60; p.shield += 60; } },
-  { id: 'secondwind',ico: '💗', name: 'Second Wind',      desc: 'The first hit that would kill you leaves you at 1 HP instead, once per run.', apply: p => { p.secondWind = 1; } },
-  { id: 'thornmail', ico: '🦔', name: 'Thornmail',        desc: 'Enemies that touch you take 25% of their own max health.', apply: p => { p.thorns += 0.25; } },
-  { id: 'berserk',   ico: '😤', name: 'Pain Engine',      desc: '+6% damage for every 10% of your health that is missing, so it is worth 54% at 10% HP.', apply: p => { p.berserk += 0.06; } },
-  { id: 'desperate', ico: '🏃', name: 'Last Legs',        desc: '+25% move speed below 40% health, and kills grant +30% for 2 seconds.', apply: p => { p.desperateSpeed += 0.25; p.adrenaline += 0.30; } },
-  { id: 'soulfeed',  ico: '🩸', name: 'Blood Tithe',      desc: 'Heal 6% of all damage you deal, from every source including burn ticks.', apply: p => { p.lifesteal += 0.06; } },
-  { id: 'critboom',  ico: '✷', name: 'Critical Mass',    desc: 'Critical hits explode for 80, and +15% critical hit chance.', apply: p => { p.critBoom += 80; p.crit += 0.15; } },
-  { id: 'nofall',    ico: '➶', name: 'Full Metal',       desc: 'Shots pass through 3 more enemies at full damage instead of losing 18% a body.', need: has.shoots, apply: p => { p.pierce += 3; p.noFalloff = 1; } },
-  { id: 'homing',    ico: '🧭', name: 'Smart Rounds',     desc: 'Shots curve toward the nearest enemy within 460 units and bounce off walls once more.', need: has.shoots, apply: p => { p.homing += 4.4; p.bounce += 1; } },
-  { id: 'split',     ico: '🔷', name: 'Split Beam',       desc: 'Every wall bounce splits the shot in two, each at 60% damage. Capped at 180 live projectiles.', need: has.shoots, apply: p => { p.bounce += 1; p.bounceSplit = 1; } },
-  { id: 'amplify',   ico: '📈', name: 'Amplifier',        desc: 'Shots gain 30% damage per wall bounce instead of losing it, and bounce 2 more times.', need: has.shoots, apply: p => { p.bounceGain += 0.3; p.bounce += 2; } },
-  { id: 'salvo',     ico: '⋔', name: 'Salvo',            desc: '+2 projectiles per shot, each dealing 18% less damage.', need: has.shoots, apply: p => { p.extra += 2; p.dmgMul *= 0.82; } },
+/* ---------------- ROOK - the Aegis is a stance ---------------- */
+sig('vanguard', 'snap', '⚡', 'Snap Guard',
+  'The Aegis raises the instant you stop firing instead of 0.4s later, but blocks 62% of frontal damage instead of 85%.',
+  p => { p.aegisRaise = 0; p.aegisBlock = 0.62; });
+sig('vanguard', 'omni', '⭕', 'Omniplate',
+  'The Aegis covers all 360 degrees instead of a 132-degree face, and blocks 70% instead of 85%.',
+  p => { p.aegisArc = Math.PI; p.aegisBlock = Math.min(p.aegisBlock, 0.70); });
+sig('vanguard', 'anchor', '⚓', 'Anchor Stance',
+  'You cannot move at all while the Aegis is up, but it blocks 99% and rebuilds 30 shield a second.',
+  p => { p.aegisSlow = 0; p.aegisBlock = 0.99; p.aegisRegen += 30; });
+sig('vanguard', 'livewire', '⚡', 'Live Wire',
+  'Every point the Aegis blocks is banked. Dropping it spends the bank as a shockwave, up to 800 damage in 200 units.',
+  p => { p.aegisBankMul += 1; });
+sig('vanguard', 'retort', '💥', 'Retort',
+  'The first shot you fire within 0.5s of dropping the Aegis deals 5x damage.',
+  p => { p.retort += 4; });
+sig('vanguard', 'mirror', '🪞', 'Mirror Array',
+  'Shots the Aegis reflects split into 3, home onto whatever is nearest, and deal 150% more.',
+  p => { p.aegisSplit = 3; p.aegisReflect += 1.5; p.homing = Math.max(p.homing, 3.5); });
 
-  /* --- operative-specific: the picks that only exist for one weapon --- */
-  { id: 'aegisburst',ico: '🛡', name: 'Aegis Burst',      desc: 'Dropping the Aegis after holding it 1.2s releases a 150-damage shockwave.', need: has.aegis, apply: p => { p.aegisBurst = Math.max(p.aegisBurst, 150); } },
-  { id: 'hardlight', ico: '🔵', name: 'Hardlight Weave',  desc: 'The Aegis blocks 96% of frontal damage instead of 85%, and reflected shots deal 150% more.', need: has.aegis, apply: p => { p.aegisBlock = Math.min(0.97, p.aegisBlock + 0.11); p.aegisReflect += 1.5; } },
-  { id: 'daisy',     ico: '💣', name: 'Daisy Chain',      desc: 'Charges go off 0.06s apart instead of together, and you can hold 4 more.', need: has.sticky, apply: p => { p.chainDetonate = 1; p.stickyCap += 4; } },
-  { id: 'shaped',    ico: '🧨', name: 'Shaped Charges',   desc: 'Stuck charges detonate for 80% more, and blasts are 30% larger.', need: has.sticky, apply: p => { p.stickyPower += 0.8; p.explodeMul *= 1.3; } },
-  { id: 'kaleido',   ico: '🔺', name: 'Kaleidoscope',     desc: '+2 prisms standing at once, and shots crossing one split at +75% damage instead of +25%.', need: has.prism, apply: p => { p.prismCap += 2; p.prismPower += 0.5; } },
-  { id: 'legion',    ico: '🕯', name: 'Unending Legion',  desc: '+3 thralls with 40 more health, and any thrall an enemy kills returns after 6 seconds.', need: has.thrall, apply: p => { p.minionCap += 3; p.minionHp += 40; p.phylactery = Math.max(p.phylactery, 6); } },
-  { id: 'soullink',  ico: '💜', name: 'Soul Link',        desc: 'You heal for 25% of everything your thralls deal, and they hit for 16 more.', need: has.thrall, apply: p => { p.soulLink = Math.max(p.soulLink, 0.25); p.minionDmg += 16; } },
-  { id: 'unstable',  ico: '☢', name: 'Unstable Thralls', desc: 'Any thrall that dies detonates for 90, however it died, and eating one heals 25 more.', need: has.thrall, apply: p => { p.thrallBurst = Math.max(p.thrallBurst, 90); p.consumeHeal += 25; } },
-  { id: 'deathsquad',ico: '🤖', name: 'Death Squad',      desc: '+3 drones firing 25% faster, and focused drones deal +90% instead of +40%.', need: has.drone, apply: p => { p.drones += 3; p.droneRof *= 0.75; p.focusPower += 0.5; } },
-  { id: 'droneboom', ico: '🛩', name: 'Orbital Support',  desc: 'Drone rounds explode for 46 and the focus mark lasts 4 seconds longer.', need: has.drone, apply: p => { p.droneBoom = Math.max(p.droneBoom, 46); p.focusTime += 4; } },
-  { id: 'annihil',   ico: '⚡', name: 'Annihilator',      desc: 'Discharge shots deal 5.4x instead of 3.2x and arc to 2 more enemies.', need: has.meter, apply: p => { p.dischargePower += 2.2; p.dischargeChain += 2; } },
-  { id: 'perpetual', ico: '🔄', name: 'Perpetual Cycle',  desc: 'Charge mode adds 4 more meter per hit, so Discharge comes around roughly twice as often.', need: has.meter, apply: p => { p.meterGain += 4; } },
-  { id: 'longshot',  ico: '🎯', name: 'Overdraw',         desc: 'A full wind-up deals 5.0x instead of 3.2x, and it winds up 40% faster.', need: has.charge, apply: p => { p.chargePower += 1.8; p.chargeRate += 0.44; } },
-  { id: 'coldfocus', ico: '❄', name: 'Absolute Zero',    desc: 'The beam deals 26 more damage per second, ramps to 4.2x instead of 2.8x, and reaches 140 further.', need: has.beam, apply: p => { p.beamPower += 26; p.beamRamp += 1.4; p.beamRange += 140; } },
-  { id: 'wildfire',  ico: '🔥', name: 'Wildfire',         desc: 'Burning ground deals 22 more per second, lasts 2s longer and covers 40% more floor.', need: has.fire, apply: p => { p.fireDps += 22; p.fireLife += 2; p.fireSize *= 1.4; } },
-  { id: 'trueecho',  ico: '👁', name: 'True Revenant',    desc: 'Ghost shots deal the full damage of what they copy, and a second ghost walks 2.2s behind you.', need: has.ghost, apply: p => { p.echoPower = Math.max(p.echoPower, 1); p.echoCount += 1; } },
-  { id: 'echoswap',  ico: '🔀', name: 'Trade Places',     desc: 'Dashing puts you where your ghost is standing, 1.1s back along your own path, and ghost shots explode for 40.', need: has.ghost, apply: p => { p.echoSwap = 1; p.echoBlast = Math.max(p.echoBlast, 40); } },
-  { id: 'eventhoriz',ico: '🕳', name: 'Event Horizon',    desc: 'Everything inside a well is slowed 50% and takes 12 damage per second while it is pulled.', need: has.well, apply: p => { p.wellSlow = Math.max(p.wellSlow, 0.5); p.wellCrush = Math.max(p.wellCrush, 12); } },
-  { id: 'supermass', ico: '🌑', name: 'Supermassive',     desc: 'Implosions deal 120 more damage and each extra body caught adds 45% instead of 25%.', need: has.well, apply: p => { p.wellPower += 120; p.wellCrowd += 0.20; } },
-  { id: 'collapsar', ico: '♾', name: 'Collapsar',        desc: '+2 wells open at once, and every well reopens once where it closed.', need: has.well, apply: p => { p.wellCap += 2; p.wellChain = 1; } },
-  { id: 'barbed',    ico: '⚓', name: 'Barbed Chain',     desc: 'The hooked enemy takes 30% more damage from every source, and bleeds for 30 more per second.', need: has.line, apply: p => { p.tetherVuln = Math.max(p.tetherVuln, 0.30); p.barbDps += 30; } },
-  { id: 'deadweight',ico: '🪝', name: 'Dead Weight',      desc: 'The body you are dragging deals 40 per second to everything it is pulled through, and the chain cuts for 30 more.', need: has.line, apply: p => { p.dragDmg = Math.max(p.dragDmg, 40); p.chainDps += 30; } },
-  { id: 'whirlwind', ico: '🌪', name: 'Perpetual Whirl',  desc: 'Momentum fills at double rate and a whirl deals 3.4x instead of 2.4x.', need: has.blade, apply: p => { p.momentumMax = Math.max(4, p.momentumMax - 5); p.whirlPower += 1; } },
-  { id: 'bloodblade',ico: '🩸', name: 'Drinking Edge',    desc: 'Every enemy a swing connects with heals you for 9, and swings bleed for 14 a second.', need: has.blade, apply: p => { p.bladeHeal += 9; p.bladeBleed += 14; } },
-  { id: 'reach',     ico: '📏', name: 'Long Meridian',    desc: 'The arc reaches 60 units further and lunges you 90 further into it.', need: has.blade, apply: p => { p.bladeReach += 60; p.lunge += 90; } },
-  { id: 'web',       ico: '🕸', name: 'Closed Web',       desc: 'The last anchor also strings back to the first, and threads cut for 30 more per second.', need: has.net, apply: p => { p.threadWeb = 1; p.threadDps += 30; } },
-  { id: 'tapestry',  ico: '🧵', name: 'Tapestry',         desc: '+3 anchors held at once and each one lasts 3 seconds longer.', need: has.net, apply: p => { p.threadCap += 3; p.threadLife += 3; } },
-  { id: 'garrote',   ico: '✂', name: 'Garrote',          desc: 'Threads cut for 55 more per second, and anything crossing one is slowed 35%.', need: has.net, apply: p => { p.threadDps += 55; p.slowPow = Math.max(p.slowPow, 0.35); p.slowDur = Math.max(p.slowDur, 1.2); } },
-  { id: 'longhold',  ico: '⏳', name: 'Long Hold',        desc: 'Stasis fields last 3 seconds longer and reach 60 units further, so you can bank far more.', need: has.field, apply: p => { p.fieldLife += 3; p.fieldRadius += 60; } },
-  { id: 'overclock', ico: '⏱', name: 'Overclock',        desc: 'Released rounds deal 3.2x instead of 2x and leave at 3.6x speed.', need: has.field, apply: p => { p.releasePower += 1.2; p.releaseSpeed += 1.2; } },
-  { id: 'thirdfield',ico: '🌀', name: 'Third Aperture',   desc: '+2 stasis fields open at once, and dashes recharge 30% faster.', need: has.field, apply: p => { p.fieldCap += 2; p.dashCdMul *= 0.7; } },
-  { id: 'rending',   ico: '🩸', name: 'Rending',          desc: 'Tearing the hook out deals 320 more and explodes for 110.', need: has.line, apply: p => { p.yankPower += 320; p.harpoonRip = Math.max(p.harpoonRip, 110); } }
-];
+/* ---------------- CINDER - the ground is the weapon ---------------- */
+sig('cinder', 'spread', '🌊', 'Spreading Flame',
+  'Every patch of burning ground grows to 2.4x its radius over its life instead of holding still.',
+  p => { p.fireGrow += 1.4; });
+sig('cinder', 'pilot', '🔥', 'Pilot Light',
+  'Standing in your own fire gives +45% fire rate and 14 health a second.',
+  p => { p.pilotLight = 1; });
+sig('cinder', 'scorched', '🌋', 'Scorched Earth',
+  'Patches never burn out while you are within 280 units of them.',
+  p => { p.fireRefresh = Math.max(p.fireRefresh, 280); });
+sig('cinder', 'chain', '♻', 'Chain Ignition',
+  'A burning enemy that dies lays a fresh patch of ground fire where it fell, burning at the full 26 a second.',
+  p => { p.fireOnKill = 1; });
+sig('cinder', 'storm', '🌪', 'Firestorm',
+  'Every 6 seconds every patch you own pulses for 190 damage in double its radius.',
+  p => { p.firePulse += 190; });
+sig('cinder', 'lance', '🔦', 'Cindershot',
+  'The sprayer becomes a single lance: one third the rate of fire, 4x the damage, and 80% more range.',
+  p => { p.rofMul *= 0.34; p.dmgMul *= 4; p.bulletSpeedMul *= 1.8; });
+
+/* ---------------- HALCYON - contact time ---------------- */
+sig('halcyon', 'hold', '🧊', 'Persistence',
+  'The beam ramp no longer resets when you switch targets; it bleeds 20% a second instead.',
+  p => { p.beamHold = 1; });
+sig('halcyon', 'split', '🔱', 'Prismatic Split',
+  'The beam becomes 3 rays spread 22 degrees, each dealing 62% of the original.',
+  p => { p.extra += 2; p.dmgMul *= 0.62; });
+sig('halcyon', 'zero', '❄', 'Absolute Zero',
+  'Beam hits slow by 70% instead of 30%, and slowed targets take 40% more damage from everything.',
+  p => { p.slowPow = Math.max(p.slowPow, 0.70); p.shatter += 0.40; });
+sig('halcyon', 'subl', '🛡', 'Sublimation',
+  'The beam converts 10% of the damage it deals into shield, up to your maximum.',
+  p => { p.beamShield += 0.10; p.shieldMax += 40; p.shield += 40; });
+sig('halcyon', 'overburn', '🔥', 'Overburn',
+  'The ramp reaches full in 1.0s instead of 2.6s, but tops out at 2.2x instead of 2.8x.',
+  p => { p.beamRampTime = 1.0; p.beamRamp -= 0.6; });
+sig('halcyon', 'lance', '🌀', 'Cryo Lance',
+  'The beam reaches 900 instead of 430 and passes through 9 more bodies, for 35% less damage.',
+  p => { p.beamRange += 470; p.pierce += 9; p.dmgMul *= 0.65; });
+
+/* ---------------- ARC - one meter, two modes ---------------- */
+sig('arc', 'dump', '💥', 'Overload Dump',
+  'Flipping into Discharge fires 6 arcs at once for 110 each, before you pull the trigger.',
+  p => { p.meterBurst += 110; });
+sig('arc', 'supercap', '🔋', 'Supercapacitor',
+  'The meter holds 220 instead of 100, and Discharge bleeds 1 a second instead of 2.',
+  p => { p.meterMax += 120; p.meterBleed = 1; });
+sig('arc', 'hair', '⚡', 'Hair Trigger Coil',
+  'Discharge starts at 40% meter instead of full, but each shot costs 24 instead of 14.',
+  p => { p.meterTrigger = 0.4; p.meterCost += 10; });
+sig('arc', 'perpetual', '🔄', 'Perpetual Arc',
+  'Hits add 2 meter even while you are in Discharge, so a good stream never drops out.',
+  p => { p.meterInDischarge += 2; });
+sig('arc', 'thunder', '🌩', 'Thunderhead',
+  'Arcs hit as hard as the shot that caused them, and every kill releases 3 more.',
+  p => { p.chainDmg = Math.max(p.chainDmg, 1); p.killChain += 3; p.chains += 1; });
+sig('arc', 'annihil', '☢', 'Annihilator',
+  'Discharge shots deal 5.6x instead of 3.2x and arc to 2 more enemies. Charge mode gains nothing.',
+  p => { p.dischargePower += 2.4; p.dischargeChain += 2; });
+
+/* ---------------- VEX - the rifle aims itself ---------------- */
+sig('vex', 'overdraw', '🏹', 'Overdraw',
+  'The wind-up keeps building past full to 2x, so a 1.8s hold is worth 5.4x instead of 3.2x.',
+  p => { p.chargeCap += 1; });
+sig('vex', 'splitlock', '🎯', 'Split Lock',
+  'The rifle holds the 2 nearest enemies at once and fires a round at each, both at full damage.',
+  p => { p.lockMulti += 1; });
+sig('vex', 'ricochet', '🔁', 'Chain Shot',
+  'A charged shot that kills fires again from the corpse at 70% damage, up to 3 times.',
+  p => { p.snipeChain += 0.7; });
+sig('vex', 'patience', '🧘', 'Patience',
+  'Standing still for 1.2s makes your next shot a guaranteed critical with +250% critical damage.',
+  p => { p.steady = 1; p.critMul += 2.5; });
+sig('vex', 'lens', '🔭', 'Long Lens',
+  'Lock range goes from 900 to 1600, and shots pass through 4 more enemies.',
+  p => { p.lockBonus += 700; p.pierce += 4; });
+sig('vex', 'hairpin', '⏱', 'Hairpin Trigger',
+  'The rifle winds up 2.2x faster but tops out at 2.0x instead of 3.2x.',
+  p => { p.chargeRate += 2.4; p.chargePower = Math.max(0.6, p.chargePower - 1.2); });
+
+/* ---------------- NYX - the guns follow your feet ---------------- */
+sig('nyx', 'momentum', '💨', 'Momentum',
+  'Damage scales with how fast you are moving, up to +70% at a full sprint.',
+  p => { p.moveDmg += 0.7; });
+sig('nyx', 'flurry', '🔪', 'Flurry',
+  'Standing still fires at 45% rate instead of not at all.',
+  p => { p.moveFloor = Math.max(p.moveFloor, 0.45); });
+sig('nyx', 'ricochet', '🔷', 'Ricochet Dance',
+  'Shots bounce off walls 2 more times and gain 30% damage per bounce instead of losing it.',
+  p => { p.bounce += 2; p.bounceGain += 0.3; });
+sig('nyx', 'slipstream', '🌪', 'Slipstream',
+  'Every dash throws 8 shots in a fan behind you at full damage.',
+  p => { p.dashVolley += 8; });
+sig('nyx', 'twinfang', '⚔', 'Twin Fang',
+  'Both pistols fire together instead of alternating, each at 70% damage.',
+  p => { p.extra += 1; p.dmgMul *= 0.7; });
+sig('nyx', 'bloodrush', '🩸', 'Bloodrush',
+  'Every kill adds 6% move speed for the rest of the wave, stacking to +60%.',
+  p => { p.killSpeed += 0.06; });
+
+/* ---------------- COG - the swarm is the weapon ---------------- */
+sig('cog', 'swarm', '🤖', 'Swarm Protocol',
+  '+4 drones, each dealing 60% of what they did before.',
+  p => { p.drones += 4; p.droneDmgMul *= 0.6; });
+sig('cog', 'platform', '📟', 'Gun Platform',
+  'Drones stop orbiting and hold station where you last stood still, firing out to 920 units instead of 460.',
+  p => { p.droneAnchor = 1; });
+sig('cog', 'kamikaze', '💣', 'Kamikaze Protocol',
+  'Drones dive whatever you are focusing and detonate for 190, rebuilding 4 seconds later.',
+  p => { p.droneDive += 190; });
+sig('cog', 'repair', '🔧', 'Repair Bay',
+  'Each drone heals you 3 health a second and carries 25 shield for you.',
+  p => { p.droneHeal += 3; p.droneShield += 25; });
+sig('cog', 'nails', '🔩', 'Overclocked Nails',
+  'The sidearm fires 3 nails at 2.2x the rate, each for 55% damage.',
+  p => { p.rofMul *= 2.2; p.extra += 2; p.dmgMul *= 0.55; });
+sig('cog', 'uplink', '📡', 'Targeting Uplink',
+  'The focus mark holds for 24 seconds and focused drones deal +140% instead of +40%.',
+  p => { p.focusPower += 1.0; p.focusTime += 20; });
+
+/* ---------------- BOOM - hold, then let go ---------------- */
+sig('boom', 'cluster', '🧱', 'Cluster Charge',
+  'Every charge splits into 3 smaller charges when it lands, each for 45% of the parent.',
+  p => { p.stickySplit += 3; });
+sig('boom', 'prox', '📡', 'Proximity Fuse',
+  'Charges go off on their own when anything comes within 70 units, without waiting for the release.',
+  p => { p.stickyProx = Math.max(p.stickyProx, 70); });
+sig('boom', 'sympathetic', '⛓', 'Sympathetic Detonation',
+  'Charges go off in sequence, and each blast adds 30% damage to the next one in the chain.',
+  p => { p.chainDetonate = 1; p.stickyRamp += 0.30; });
+sig('boom', 'bunker', '🎯', 'Bunker Buster',
+  'Charges hit 80% harder in blasts 60% larger, but you can only hold 3 at a time.',
+  p => { p.stickyPower += 0.8; p.explodeMul *= 1.6; p.stickyCap = Math.max(2, p.stickyCap - 3); });
+sig('boom', 'minefield', '🕳', 'Minefield',
+  '+8 charges held at once, and they sit for 25 seconds instead of 9.',
+  p => { p.stickyCap += 8; p.stickyLife = 25; });
+sig('boom', 'shrapnel', '💢', 'Shrapnel',
+  'Every blast you cause throws 8 shards that deal 45 each and travel 300 units.',
+  p => { p.blastShards += 8; });
+
+/* ---------------- MOURN - one scythe ---------------- */
+sig('mourn', 'orbit', '🌙', 'Eternal Orbit',
+  'The scythe stops returning. It circles you at 150 units and cuts everything it passes, for ever.',
+  p => { p.scytheOrbit = 1; });
+sig('mourn', 'twin', '⚔', 'Twin Scythe',
+  'You can have two scythes in the air at once, each at 80% damage.',
+  p => { p.scytheCount += 1; p.dmgMul *= 0.8; });
+sig('mourn', 'hunger', '🩸', 'Hungering Blade',
+  'The scythe gains 20% damage for every enemy it has already cut on this throw.',
+  p => { p.scytheStack += 0.20; });
+sig('mourn', 'longarc', '🌀', 'Long Arc',
+  'The scythe flies out 2.2x further before it turns, and comes back 40% faster.',
+  p => { p.scytheReach += 1.2; });
+sig('mourn', 'harvest', '💀', 'Soul Harvest',
+  'Catching the scythe releases a 300-damage wave along the line it travelled.',
+  p => { p.catchWave += 300; });
+sig('mourn', 'reaping', '🩹', 'Reaping',
+  'Every enemy the scythe passes through heals you 10, and catching it heals 45.',
+  p => { p.scytheHeal += 10; p.catchHeal += 45; });
+
+/* ---------------- VESSEL - the trigger binds ---------------- */
+sig('vessel', 'horde', '👻', 'Horde',
+  '+5 thralls, each with 45% of the health and damage they had.',
+  p => { p.minionCap += 5; p.minionHp *= 0.45; p.minionDmg *= 0.45; });
+sig('vessel', 'colossus', '🗿', 'Colossus',
+  'Your thralls become one: a single thrall with 5x the health and 4.5x the damage.',
+  p => { p.minionCap = 1; p.minionHp *= 5; p.minionDmg *= 4.5; });
+sig('vessel', 'guard', '🛡', 'Bound Pain',
+  '45% of every hit you take is taken by your nearest thrall instead.',
+  p => { p.thrallGuard += 0.45; });
+sig('vessel', 'circle', '⭕', 'Ritual Circle',
+  'Thralls standing on your cursor pulse for 70 damage in 130 units every second.',
+  p => { p.rallyPulse += 70; });
+sig('vessel', 'soulchain', '⛓', 'Soul Chain',
+  'Every thrall strike arcs to 2 more enemies at 60% damage.',
+  p => { p.minionChain += 2; p.chainDmg = Math.max(p.chainDmg, 0.6); });
+sig('vessel', 'endless', '🕯', 'Endless Rite',
+  'Thralls cost no essence at all, but they crumble 12 seconds after you bind them.',
+  p => { p.summonCost = 0; p.minionLife = 12; });
+
+/* ---------------- IRIS - geometry you set up first ---------------- */
+sig('iris', 'net', '🕸', 'Prism Net',
+  'Prisms link to each other with a beam that cuts for 80 a second.',
+  p => { p.prismLink += 80; });
+sig('iris', 'hall', '🔳', 'Hall of Mirrors',
+  '+4 prisms standing at once, and one shot can split again at every prism it crosses.',
+  p => { p.prismCap += 4; p.prismChain = 1; });
+sig('iris', 'bloom', '🌸', 'Refraction Bloom',
+  'A shot crossing a prism becomes 5 instead of 3.',
+  p => { p.prismSplitN += 2; });
+sig('iris', 'anchored', '📍', 'Anchored Light',
+  'You hold one prism only, but it never expires and its splits deal +100% instead of +25%.',
+  p => { p.prismCap = 1; p.prismLife = 9999; p.prismPower += 0.75; });
+sig('iris', 'kaleido', '🔷', 'Kaleidoscope',
+  'Shots bounce off walls 3 more times and split in two on every bounce.',
+  p => { p.bounce += 3; p.bounceSplit = 1; });
+sig('iris', 'focal', '🎯', 'Focal Point',
+  'Shots that cross a prism home hard onto the nearest enemy and deal +120% instead of +25%.',
+  p => { p.prismPower += 0.95; p.prismHoming = 6; });
+
+/* ---------------- ECHO - a second you, a second late ---------------- */
+sig('echo', 'chorus', '👁', 'Chorus',
+  '+2 ghosts, walking 2.2s and 3.3s behind you as well as the first.',
+  p => { p.echoCount += 2; });
+sig('echo', 'close', '⏩', 'Close Shadow',
+  'The ghost follows 0.35s behind instead of 1.1s, so both guns cover nearly the same line.',
+  p => { p.echoDelay = 0.35; });
+sig('echo', 'mirror', '🪞', 'Mirror Self',
+  'The ghost stands mirrored through you instead of trailing 1.1s behind, so it always covers the side you are not facing.',
+  p => { p.echoMirror = 1; });
+sig('echo', 'swap', '🔀', 'Trade Places',
+  'Dashing puts you where your ghost is standing, 1.1s back along your own path, instead of moving you.',
+  p => { p.echoSwap = 1; });
+sig('echo', 'polter', '💥', 'Poltergeist',
+  'Ghost shots explode for 60 and pass through 3 more enemies.',
+  p => { p.echoBlast = Math.max(p.echoBlast, 60); p.pierce += 3; });
+sig('echo', 'true', '👻', 'True Revenant',
+  'Ghost shots deal 100% of the shot they copy instead of 65%, and roll their own criticals.',
+  p => { p.echoPower = Math.max(p.echoPower, 1); });
+
+/* ---------------- VOID - the shape you pulled them into ---------------- */
+sig('void', 'repulsor', '💨', 'Repulsor',
+  'Wells push everything away instead of pulling it in, and implode for 120 more.',
+  p => { p.wellPush = 1; p.wellPower += 120; });
+sig('void', 'horizon', '🕳', 'Event Horizon',
+  'Everything inside a well is slowed 50% and takes 14 damage a second while it is held.',
+  p => { p.wellSlow = Math.max(p.wellSlow, 0.5); p.wellCrush = Math.max(p.wellCrush, 14); });
+sig('void', 'collapsar', '♾', 'Collapsar',
+  'Every well that implodes opens 1 more in the same place, which collapses on its own 1 second later.',
+  p => { p.wellChain = 1; });
+sig('void', 'hair', '⏱', 'Hair Trigger',
+  'Wells implode after 0.35s instead of 1.0s, for 55% of the damage.',
+  p => { p.wellDelay = 0.35; p.wellPower *= 0.55; });
+sig('void', 'accretion', '🌀', 'Accretion',
+  'A well grows 30 units wider every quarter second it stays open.',
+  p => { p.wellGrow += 30; });
+sig('void', 'singularity', '🌑', 'Singularity',
+  'One well at a time, but it holds for 4 seconds, pulls twice as hard and implodes for 420 more.',
+  p => { p.wellCap = 1; p.wellDelay = 4; p.wellPull *= 2; p.wellPower += 420; });
+
+/* ---------------- HARROW - one thing on the end of a chain ---------------- */
+sig('harrow', 'whaling', '🐋', 'Whaling Line',
+  'The harpoon passes through everything for 130 damage and hooks the last enemy in its path.',
+  p => { p.harpoonPierce += 130; });
+sig('harrow', 'deadweight', '🪝', 'Dead Weight',
+  'The body you are dragging deals 65 a second to everything it is pulled through.',
+  p => { p.dragDmg = Math.max(p.dragDmg, 65); });
+sig('harrow', 'barbed', '🩸', 'Barbed Chain',
+  'The hooked enemy takes 40% more damage from every source you own, drones and burns included.',
+  p => { p.tetherVuln = Math.max(p.tetherVuln, 0.40); });
+sig('harrow', 'reelself', '🧗', 'Reel Yourself',
+  'The line pulls you to the enemy at 420 a second instead of pulling them to you.',
+  p => { p.reelSelf = 1; });
+sig('harrow', 'rending', '🩸', 'Rending',
+  'Tearing the hook out deals 380 more and explodes for 160.',
+  p => { p.yankPower += 380; p.harpoonRip = Math.max(p.harpoonRip, 160); });
+sig('harrow', 'anchor', '⚓', 'Anchor Chain',
+  'The hooked enemy is pinned where it stands instead of dragged, and bleeds for 80 more a second.',
+  p => { p.tetherHold = 1; p.barbDps += 80; });
+
+/* ---------------- SEVER - the arc that moves you ---------------- */
+sig('sever', 'crescent', '🌙', 'Crescent',
+  'Every swing throws a crescent that flies 420 units and deals 60% of the swing.',
+  p => { p.bladeWave += 0.6; });
+sig('sever', 'whirl', '🌪', 'Perpetual Whirl',
+  'Momentum fills after 4 connections instead of 10, and a whirl deals 3.4x instead of 2.4x.',
+  p => { p.momentumMax = 4; p.whirlPower += 1; });
+sig('sever', 'riposte', '🛡', 'Riposte',
+  'Holding off the trigger for 0.6s sets a parry: the next hit on you is blocked and returns 320.',
+  p => { p.riposte += 320; });
+sig('sever', 'drink', '🩸', 'Drinking Edge',
+  'Every enemy a swing touches heals you 12.',
+  p => { p.bladeHeal += 12; });
+sig('sever', 'meridian', '📏', 'Long Meridian',
+  'The arc reaches 80 units further and lunges you 140 units further into it.',
+  p => { p.bladeReach += 80; p.lunge += 140; });
+sig('sever', 'exec', '☠', "Executioner's Arc",
+  'Swings instantly kill anything under 25% health.',
+  p => { p.execute += 0.25; });
+
+/* ---------------- LOOM - a net on the floor ---------------- */
+sig('loom', 'garrote', '🧵', 'Garrote',
+  'Threads drag anything touching them toward the nearest anchor at 190 a second.',
+  p => { p.threadPull += 190; });
+sig('loom', 'web', '🕸', 'Closed Web',
+  'The last anchor strings back to the first, closing the net, and threads cut 45 harder.',
+  p => { p.threadWeb = 1; p.threadDps += 45; });
+sig('loom', 'tapestry', '🧶', 'Tapestry',
+  '+5 anchors held at once, each lasting 5 seconds longer.',
+  p => { p.threadCap += 5; p.threadLife += 5; });
+sig('loom', 'cradle', '✨', "Cat's Cradle",
+  'Every anchor strings to every other anchor, so 5 anchors carry 10 cutting threads instead of 4.',
+  p => { p.threadFull = 1; });
+sig('loom', 'snare', '🕸', 'Snare',
+  'Anything crossing a thread is slowed 50% and takes 40% more damage from everything.',
+  p => { p.slowPow = Math.max(p.slowPow, 0.50); p.slowDur = Math.max(p.slowDur, 1.2); p.shatter += 0.40; });
+sig('loom', 'razor', '✂', 'Razor Wire',
+  'Threads cut for 95 more a second, but you hold only 3 anchors.',
+  p => { p.threadDps += 95; p.threadCap = 3; });
+
+/* ---------------- HALT - your own fire, banked ---------------- */
+sig('halt', 'overclock', '⏱', 'Overclock',
+  'Released rounds deal 3.6x instead of 2x and leave at 4x speed.',
+  p => { p.releasePower += 1.6; p.releaseSpeed += 1.6; });
+sig('halt', 'reversal', '🔄', 'Reversal',
+  'Enemy fire entering a field freezes too, and leaves as yours at 2x its original damage when the field goes.',
+  p => { p.fieldSteal = 1; });
+sig('halt', 'third', '🌀', 'Third Aperture',
+  '+2 fields open at once, and dashes recharge 30% faster.',
+  p => { p.fieldCap += 2; p.dashCdMul *= 0.7; });
+sig('halt', 'dilation', '🕐', 'Time Dilation',
+  'Enemies inside a field are slowed 95% and take 30% more damage from everything.',
+  p => { p.fieldSlow = 0.95; p.shatter += 0.30; });
+sig('halt', 'longhold', '⏳', 'Long Hold',
+  'Fields last 4 seconds longer and reach 70 units further.',
+  p => { p.fieldLife += 4; p.fieldRadius += 70; });
+sig('halt', 'nova', '✴', 'Chronoshift',
+  'A field that ends spreads its rounds evenly over 360 degrees instead of firing them all forward.',
+  p => { p.releaseNova = 1; });
+
+/* ---------------- shared, when a draft needs filling ---------------- */
+const shoots = p => !WEAPONS[p.sigWeapon].beam && !WEAPONS[p.sigWeapon].summon &&
+                    !WEAPONS[p.sigWeapon].harpoon && !WEAPONS[p.sigWeapon].melee;
+uni('volatile', '💥', 'Volatile Rounds', 'Every projectile you own detonates on impact for 52, drones and ghosts included.', p => { p.explodeAll = 1; }, shoots);
+uni('carpet', '🧨', 'Carpet Bombing', 'Every explosion throws 3 bomblets, and those bomblets can throw their own.', p => { p.cluster += 3; p.clusterDepth = 1; });
+uni('bladestorm', '🌀', 'Bladestorm', '+3 blades orbiting you at 28 damage a pass.', p => { p.orbit += 3; p.orbitDmg = Math.max(p.orbitDmg, 28); });
+uni('deathmark', '🎯', 'Death Mark', 'Every fifth hit brands a target, which then takes 50% more from every source.', p => { p.markEvery = 5; p.markBonus += 0.5; });
+uni('executor', '☠', 'Executioner', 'Instantly kills anything under 18% health.', p => { p.execute += 0.18; });
+uni('frenzy', '🔥', 'Killing Frenzy', 'Every kill grants +25% fire rate for a second, refreshed on the next kill.', p => { p.killFrenzy = Math.max(p.killFrenzy, 0.25); });
+uni('overkill', '💀', 'Mass Grave', 'Every kill detonates for 70 in an 80-unit radius.', p => { p.onKillBoom += 70; });
+uni('static', '⚡', 'Static Field', 'Everything within 140 units takes 18 damage a second, with no aiming at all.', p => { p.staticAura += 18; p.staticR = Math.max(p.staticR, 140); });
+uni('immolate', '🔥', 'Immolation', 'Everything within 70 units burns for 14 damage a second.', p => { p.burnAura += 14; p.burnAuraR = Math.max(p.burnAuraR, 70); p.burnDps = Math.max(p.burnDps, 8); p.burnDur = Math.max(p.burnDur, 2); });
+uni('chill', '❄', 'Cold Front', 'Everything within 150 units is slowed 30%, and slowed targets take 25% more.', p => { p.chillAura = Math.max(p.chillAura, 150); p.slowPow = Math.max(p.slowPow, 0.30); p.slowDur = Math.max(p.slowDur, 1.2); p.shatter += 0.25; });
+uni('arcshot', '🔗', 'Arc Conduit', 'Hits arc to 2 more enemies, and arcs hit as hard as the shot that caused them.', p => { p.chains += 2; p.chainDmg = Math.max(p.chainDmg, 1); });
+uni('dashblast', '💨', 'Detonator', 'Every dash ends in a 100-damage blast and deals 60 on contact.', p => { p.dashBlast += 100; p.dashDmg += 60; });
+uni('phase', '👻', 'Phase Dash', '+2 dash charges and 0.35s more invulnerability on each one.', p => { p.dashMax += 2; p.dashCharge += 2; p.dashInvuln += 0.35; });
+uni('refund', '♻', 'Chain Rush', 'Every kill returns a dash charge, and dashes recharge 30% faster.', p => { p.dashRefund = 1; p.dashCdMul *= 0.7; });
+uni('fortress', '🛡', 'Fortress', 'Damage is reduced 25% while any shield remains, your shield detonates for 140 when it breaks, and +60 shield.', p => { p.shieldDR += 0.25; p.shieldBoom = Math.max(p.shieldBoom, 140); p.shieldMax += 60; p.shield += 60; });
+uni('secondwind', '💗', 'Second Wind', 'The first hit that would kill you leaves you at 1 health instead, once per run.', p => { p.secondWind = Math.max(p.secondWind, 1); });
+uni('thornmail', '🦔', 'Thornmail', 'Enemies that touch you take 25% of their own maximum health.', p => { p.thorns += 0.25; });
+uni('berserk', '😤', 'Pain Engine', '+6% damage for every 10% of your health that is missing, so 54% at a tenth left.', p => { p.berserk += 0.06; });
+uni('desperate', '🏃', 'Last Legs', '+25% move speed below 40% health, and kills grant +30% for 2 seconds.', p => { p.desperateSpeed += 0.25; p.adrenaline += 0.30; });
+uni('soulfeed', '🩸', 'Blood Tithe', 'Heal 6% of all damage you deal, from every source including burn ticks.', p => { p.lifesteal += 0.06; });
+uni('critboom', '✷', 'Critical Mass', 'Critical hits explode for 80, and +15% critical hit chance.', p => { p.critBoom += 80; p.crit += 0.15; });
+uni('nofall', '➶', 'Full Metal', 'Shots pass through 3 more enemies at full damage instead of losing 18% a body.', p => { p.pierce += 3; p.noFalloff = 1; }, shoots);
+uni('homing', '🧭', 'Smart Rounds', 'Shots curve toward the nearest enemy within 460 units and bounce off walls once more.', p => { p.homing += 4.4; p.bounce += 1; }, shoots);
+uni('salvo', '⋔', 'Salvo', '+2 projectiles per shot, each dealing 18% less damage.', p => { p.extra += 2; p.dmgMul *= 0.82; }, shoots);
 
 const AUG_BY_ID = {};
 for (const a of AUGMENTS) AUG_BY_ID[a.id] = a;
 
-/* every fifth wave cleared */
-function augmentDue(wave) { return wave > 0 && wave % 5 === 0; }
+/* every third wave cleared */
+function augmentDue(wave) { return wave > 0 && wave % 3 === 0; }
 
 function openAugmentDraft() {
   if (!player) return;
-  const pool = AUGMENTS.filter(a => player.augments.indexOf(a.id) === -1 && (!a.need || a.need(player)));
-  if (!pool.length) return;
-  const roll = [];
-  while (roll.length < 3 && pool.length) roll.push(pool.splice((Math.random() * pool.length) | 0, 1)[0]);
+  const taken = player.augments;
+  const mine = AUGMENTS.filter(a => a.char === player.charId && taken.indexOf(a.id) === -1);
+  const rest = AUGMENTS.filter(a => !a.char && taken.indexOf(a.id) === -1 && (!a.need || a.need(player)));
+  if (!mine.length && !rest.length) return;
 
+  const roll = [];
+  const pull = pool => { if (pool.length) roll.push(pool.splice((Math.random() * pool.length) | 0, 1)[0]); };
+  pull(mine); pull(mine);            // the operative's own picks come first
+  while (roll.length < 3 && (mine.length || rest.length)) pull(rest.length ? rest : mine);
+  if (!roll.length) return;
+
+  const chr = CHAR_BY_ID[player.charId];
   document.getElementById('agSub').textContent =
     'Wave ' + game.wave + ' cleared — take one, and it is yours for the run';
   const box = document.getElementById('agCards');
@@ -4340,7 +4992,7 @@ function openAugmentDraft() {
       '<div class="ico">' + a.ico + '</div>' +
       '<div class="nm">' + a.name + '</div>' +
       '<div class="ds">' + a.desc + '</div>' +
-      (a.need && a.need !== has.shoots ? '<div class="rare">' + CHAR_BY_ID[player.charId].name + ' only</div>' : '');
+      (a.char ? '<div class="rare" style="color:' + chr.color + '">' + chr.name + '</div>' : '');
     const take = () => {
       a.apply(player);
       player.augments.push(a.id);
@@ -4361,11 +5013,11 @@ function openAugmentDraft() {
 
 /* ============================================================
    GEAR - four slots, and a long argument with the dice
-   An item drops unidentified: you know its rarity and its slot and nothing
-   else. Identifying it for cores picks its name, and the name decides which
-   stats it has and the range each one can land in. Every stat then rolls
-   from 0% to 100% of its own range, independently. Rerolling rolls them all
-   again and costs more each time.
+   An item drops sealed: you know its rarity and its slot and nothing else.
+   Identifying it for cores picks its name, and the name decides which stats
+   it carries, the range each one lands in, and - from Epic upward - whether
+   it carries a major identification: a named effect that changes how the run
+   plays rather than what the numbers say.
    ============================================================ */
 const GEAR_KEY = 'neon.gear';
 
@@ -4379,11 +5031,12 @@ const SLOT_BY_ID = {};
 for (const s of SLOTS) SLOT_BY_ID[s.id] = s;
 
 const RARITIES = [
-  { id: 'common',    name: 'Common',    color: '#b8c6d8', idCost: 20,   salvage: 8 },
-  { id: 'uncommon',  name: 'Uncommon',  color: '#9dff5c', idCost: 60,   salvage: 25 },
-  { id: 'rare',      name: 'Rare',      color: '#7ceaff', idCost: 170,  salvage: 70 },
-  { id: 'epic',      name: 'Epic',      color: '#d08bff', idCost: 450,  salvage: 190 },
-  { id: 'legendary', name: 'Legendary', color: '#ffc857', idCost: 1200, salvage: 520 }
+  { id: 'common',    name: 'Common',    color: '#b8c6d8', idCost: 15,   salvage: 6 },
+  { id: 'uncommon',  name: 'Uncommon',  color: '#9dff5c', idCost: 45,   salvage: 18 },
+  { id: 'rare',      name: 'Rare',      color: '#7ceaff', idCost: 120,  salvage: 50 },
+  { id: 'epic',      name: 'Epic',      color: '#d08bff', idCost: 300,  salvage: 130 },
+  { id: 'legendary', name: 'Legendary', color: '#ffc857', idCost: 700,  salvage: 320 },
+  { id: 'mythic',    name: 'Mythic',    color: '#ff5c8a', idCost: 1800, salvage: 900 }
 ];
 const RARITY_BY_ID = {};
 for (const r of RARITIES) RARITY_BY_ID[r.id] = r;
@@ -4394,11 +5047,11 @@ const GEAR_STATS = {
   rof:    { label: 'Attack Speed',      pct: true, apply: (p, v) => { p.rofMul *= 1 + v / 100; } },
   hp:     { label: 'Health',                       apply: (p, v) => { p.maxHp = Math.max(20, p.maxHp + v); p.hp += Math.max(0, v); } },
   spd:    { label: 'Walk Speed',        pct: true, apply: (p, v) => { p.speedMul *= 1 + v / 100; } },
-  def:    { label: 'Damage Reduction',  pct: true, apply: (p, v) => { p.armor = Math.min(0.7, p.armor + v / 100); } },
+  def:    { label: 'Damage Reduction',  pct: true, apply: (p, v) => { p.armor = Math.min(0.75, p.armor + v / 100); } },
   crit:   { label: 'Critical Chance',   pct: true, apply: (p, v) => { p.crit += v / 100; } },
   cdmg:   { label: 'Critical Damage',   pct: true, apply: (p, v) => { p.critMul += v / 100; } },
   steal:  { label: 'Life Steal',        pct: true, apply: (p, v) => { p.lifesteal += v / 100; } },
-  regen:  { label: 'Health Regen',      dp: 1,     apply: (p, v) => { p.regen += v; }, unit: '/s' },
+  regen:  { label: 'Health Regen',      dp: 1, unit: '/s', apply: (p, v) => { p.regen += v; } },
   thorns: { label: 'Thorns',            pct: true, apply: (p, v) => { p.thorns += v / 100; } },
   mag:    { label: 'Pickup Range',                 apply: (p, v) => { p.magnet += v; } },
   shield: { label: 'Shield',                       apply: (p, v) => { p.shieldMax += v; p.shield += v; } },
@@ -4415,88 +5068,140 @@ const GEAR_STATS = {
   slow:   { label: 'Slow Power',        pct: true, apply: (p, v) => { p.slowPow = Math.min(0.85, p.slowPow + v / 100); p.slowDur = Math.max(p.slowDur, 1.2); } },
   exec:   { label: 'Execute Threshold', pct: true, apply: (p, v) => { p.execute += v / 100; } },
   dashd:  { label: 'Dash Damage',                  apply: (p, v) => { p.dashDmg += v; } },
-  dashc:  { label: 'Dash Charges',                 apply: (p, v) => { p.dashMax += Math.round(v); p.dashCharge += Math.round(v); } }
+  dashc:  { label: 'Dash Charges',                 apply: (p, v) => { p.dashMax += Math.round(v); p.dashCharge += Math.round(v); } },
+  orbit:  { label: 'Orbit Blades',                 apply: (p, v) => { p.orbit += Math.round(v); p.orbitDmg = Math.max(p.orbitDmg, 24); } },
+  drone:  { label: 'Drones',                       apply: (p, v) => { p.drones += Math.round(v); p.droneDmg = Math.max(p.droneDmg, 11); } }
+};
+
+/* ---- major identifications ----
+   A major is printed on the name, never rolled, and always does something you
+   would build around. They start at Epic and every Mythic carries one. */
+const MAJORS = {
+  fissure:   { name: 'Fissure',            desc: 'Every explosion you cause throws 3 bomblets, and those bomblets can throw their own.',
+               apply: p => { p.cluster += 3; p.clusterDepth = 1; } },
+  cataclysm: { name: 'Cataclysm',          desc: 'Every sixth shot is triple size for triple damage with a 95-unit blast.',
+               apply: p => { p.megaEvery = 6; } },
+  gravity:   { name: 'Gravity',            desc: 'Every explosion drags everything within 240 units toward its centre and slows them 60%.',
+               apply: p => { p.blastPull = Math.max(p.blastPull, 240); p.blastSlow = Math.max(p.blastSlow, 0.6); } },
+  hearth:    { name: 'Hearthkeeper',       desc: 'Every enemy that dies within 280 units heals you for 3% of your maximum health.',
+               apply: p => { p.nearKillHeal += 0.03; } },
+  reckless:  { name: 'Reckless Abandon',   desc: 'You deal 50% more damage and take 30% more.',
+               apply: p => { p.dmgMul *= 1.5; p.fragile += 0.30; } },
+  secondhrt: { name: 'Second Heart',       desc: 'The first hit that would kill you in each wave leaves you at 35% health instead.',
+               apply: p => { p.secondWind = 2; } },
+  greed:     { name: 'Greed',              desc: '+60% score, so more cores banked, and pickups pull from 600 units further.',
+               apply: p => { p.scoreMul += 0.6; p.magnet += 600; } },
+  saviour:   { name: "Saviour's Sacrifice", desc: '35% of every hit you take is dealt straight back in a 220-unit ring.',
+               apply: p => { p.retaliate += 0.35; } },
+  lightfoot: { name: 'Lightweight',        desc: '+25% move speed, +2 dash charges and dashes recharge 45% faster.',
+               apply: p => { p.speedMul *= 1.25; p.dashMax += 2; p.dashCharge += 2; p.dashCdMul *= 0.55; } },
+  freerun:   { name: 'Freerunner',         desc: 'Every dash grants 2.5 seconds of +40% damage.',
+               apply: p => { p.dashRage += 0.40; } },
+  plague:    { name: 'Plague',             desc: 'When a burning, chilled or shocked enemy dies, everything within 200 units catches it.',
+               apply: p => { p.burnSpread = Math.max(p.burnSpread, 200); p.plague = 1; } },
+  taunt:     { name: 'Taunt',              desc: 'Enemies within 400 units come straight for you and take 25% more damage from everything.',
+               apply: p => { p.taunt = Math.max(p.taunt, 400); p.tauntBonus += 0.25; } },
+  entropy:   { name: 'Entropy',            desc: 'Your damage grows 1.2% for every second the current wave has been running.',
+               apply: p => { p.entropy += 0.012; } },
+  magnetic:  { name: 'Magnetic Field',     desc: 'Enemy shots that come within 130 units of you are pulled apart and destroyed.',
+               apply: p => { p.bulletEater = Math.max(p.bulletEater, 130); } },
+  guardian:  { name: 'Guardian',           desc: '+60 shield, and it refills completely every time a wave ends.',
+               apply: p => { p.shieldMax += 60; p.shield += 60; p.waveShield = 1; } },
+  sorcery:   { name: 'Sorcery',            desc: 'Every third shot costs nothing and fires an extra volley of 2 at 70% damage.',
+               apply: p => { p.sorcery = 3; } }
 };
 
 /* A base is a name bound to a slot and a rarity. Its stat list never changes;
    only the numbers inside each range do. Written [stat, at 0%, at 100%] - a
    negative stat is worst at 0% and least bad at 100%, like every other roll. */
 const GEAR_BASES = [];
-const gbase = (id, name, slot, rarity, stats) => GEAR_BASES.push({ id, name, slot, rarity, stats });
+const gbase = (id, name, slot, rarity, stats, major) => GEAR_BASES.push({ id, name, slot, rarity, stats, major });
 
 /* ---- helmets ---- */
-gbase('scrapcowl',  "Scrap Cowl",        'helmet', 'common',    [['hp', 4, 14], ['mag', 10, 40]]);
-gbase('visor',      "Cracked Visor",     'helmet', 'common',    [['crit', 1, 4], ['def', -3, -1]]);
-gbase('dustmask',   "Dust Mask",         'helmet', 'common',    [['xp', 2, 8]]);
-gbase('runaans',    "Runaan's Crown",    'helmet', 'uncommon',  [['rof', 2, 6], ['crit', 2, 6]]);
-gbase('sentinel',   "Sentinel Helm",     'helmet', 'uncommon',  [['hp', 12, 34], ['def', 2, 5]]);
-gbase('scryer',     "Scryer's Hood",     'helmet', 'uncommon',  [['xp', 6, 16], ['mag', 30, 80]]);
-gbase('targeting',  "Targeting Array",   'helmet', 'rare',      [['crit', 5, 13], ['cdmg', 10, 30], ['hp', -20, -6]]);
-gbase('bulkhead',   "Bulkhead Casque",   'helmet', 'rare',      [['hp', 30, 70], ['def', 4, 9], ['spd', -8, -3]]);
-gbase('conduit',    "Conduit Circlet",   'helmet', 'rare',      [['chain', 1, 1], ['dmg', 4, 11]]);
-gbase('oracle',     "Oracle Mask",       'helmet', 'epic',      [['crit', 8, 20], ['cdmg', 20, 55], ['xp', 8, 22]]);
-gbase('tyrant',     "Tyrant's Diadem",   'helmet', 'epic',      [['dmg', 8, 20], ['exec', 3, 8], ['hp', -40, -12]]);
-gbase('archon',     "Archon Helm",       'helmet', 'epic',      [['hp', 55, 120], ['shield', 20, 55], ['def', 5, 12]]);
-gbase('vantage',    "Vantage Point",     'helmet', 'legendary', [['crit', 14, 32], ['cdmg', 40, 95], ['pierce', 1, 2], ['spd', -12, -4]]);
-gbase('deadeye',    "Deadeye",           'helmet', 'legendary', [['dmg', 14, 32], ['exec', 6, 14], ['rof', 5, 14]]);
+gbase('scrapcowl',  "Scrap Cowl",        'helmet', 'common',    [['hp', 8, 26], ['mag', 20, 70]]);
+gbase('visor',      "Cracked Visor",     'helmet', 'common',    [['crit', 2, 7], ['def', -4, -1]]);
+gbase('dustmask',   "Dust Mask",         'helmet', 'common',    [['xp', 5, 14], ['spd', 1, 4]]);
+gbase('runaans',    "Runaan's Crown",    'helmet', 'uncommon',  [['rof', 5, 13], ['crit', 4, 11]]);
+gbase('sentinel',   "Sentinel Helm",     'helmet', 'uncommon',  [['hp', 26, 66], ['def', 3, 8]]);
+gbase('scryer',     "Scryer's Hood",     'helmet', 'uncommon',  [['xp', 12, 30], ['mag', 60, 150], ['core', 5, 14]]);
+gbase('targeting',  "Targeting Array",   'helmet', 'rare',      [['crit', 10, 24], ['cdmg', 25, 65], ['hp', -30, -8]]);
+gbase('bulkhead',   "Bulkhead Casque",   'helmet', 'rare',      [['hp', 60, 140], ['def', 7, 16], ['spd', -10, -3]]);
+gbase('conduit',    "Conduit Circlet",   'helmet', 'rare',      [['chain', 1, 2], ['dmg', 8, 20], ['bspd', 10, 26]]);
+gbase('oracle',     "Oracle Mask",       'helmet', 'epic',      [['crit', 16, 38], ['cdmg', 45, 110], ['xp', 16, 40]], 'cataclysm');
+gbase('tyrant',     "Tyrant's Diadem",   'helmet', 'epic',      [['dmg', 16, 38], ['exec', 6, 15], ['hp', -55, -15]], 'reckless');
+gbase('archon',     "Archon Helm",       'helmet', 'epic',      [['hp', 100, 230], ['shield', 40, 100], ['def', 8, 19]], 'guardian');
+gbase('vantage',    "Vantage Point",     'helmet', 'legendary', [['crit', 26, 55], ['cdmg', 80, 180], ['pierce', 2, 4], ['spd', -14, -4]], 'entropy');
+gbase('deadeye',    "Deadeye",           'helmet', 'legendary', [['dmg', 25, 55], ['exec', 10, 24], ['rof', 10, 26]], 'cataclysm');
+gbase('coronet',    "Ashen Coronet",     'helmet', 'legendary', [['burn', 14, 34], ['dmg', 18, 42], ['blast', 18, 42]], 'plague');
+gbase('apotheon',   "Apotheon",          'helmet', 'mythic',    [['dmg', 45, 95], ['crit', 30, 62], ['cdmg', 120, 260], ['rof', 18, 42], ['hp', -70, -20]], 'sorcery');
+gbase('warden',     "Warden's Eye",      'helmet', 'mythic',    [['hp', 180, 380], ['def', 14, 30], ['shield', 80, 170], ['regen', 3, 8]], 'saviour');
 
 /* ---- chestplates ---- */
-gbase('platedvest', "Plated Vest",       'chest',  'common',    [['hp', 8, 22], ['def', 1, 3]]);
-gbase('meshrig',    "Mesh Rig",          'chest',  'common',    [['def', 2, 5], ['spd', -4, -1]]);
-gbase('flakjacket', "Flak Jacket",       'chest',  'common',    [['hp', 10, 26]]);
-gbase('bastion',    "Bastion Plate",     'chest',  'uncommon',  [['hp', 18, 44], ['def', 3, 7]]);
-gbase('emberweave', "Emberweave",        'chest',  'uncommon',  [['burn', 3, 9], ['hp', 8, 22]]);
-gbase('leyharness', "Ley Harness",       'chest',  'uncommon',  [['shield', 12, 34], ['regen', 0.3, 1.0]]);
-gbase('ironsong',   "Ironsong Cuirass",  'chest',  'rare',      [['hp', 40, 95], ['thorns', 4, 11]]);
-gbase('bloodpact',  "Blood Pact",        'chest',  'rare',      [['steal', 2, 6], ['dmg', 5, 13], ['hp', -30, -10]]);
-gbase('warden',     "Warden's Aegis",    'chest',  'rare',      [['shield', 25, 62], ['def', 4, 10], ['rof', -7, -2]]);
-gbase('carapace',   "Void Carapace",     'chest',  'epic',      [['hp', 60, 140], ['def', 6, 14], ['regen', 0.8, 2.4]]);
-gbase('reaver',     "Reaver's Harness",  'chest',  'epic',      [['steal', 4, 10], ['dmg', 9, 22], ['rof', 4, 11]]);
-gbase('stormcoat',  "Stormcoat",         'chest',  'epic',      [['chain', 1, 2], ['slow', 8, 20], ['hp', 25, 60]]);
-gbase('immortal',   "Immortal Shell",    'chest',  'legendary', [['hp', 110, 240], ['def', 9, 20], ['shield', 40, 95], ['spd', -14, -5]]);
-gbase('sanguine',   "Sanguine Regalia",  'chest',  'legendary', [['steal', 7, 16], ['dmg', 13, 30], ['regen', 1.5, 4.0]]);
+gbase('platedvest', "Plated Vest",       'chest',  'common',    [['hp', 14, 40], ['def', 1, 4]]);
+gbase('meshrig',    "Mesh Rig",          'chest',  'common',    [['def', 3, 8], ['spd', -5, -1]]);
+gbase('flakjacket', "Flak Jacket",       'chest',  'common',    [['hp', 18, 48], ['thorns', 2, 6]]);
+gbase('bastion',    "Bastion Plate",     'chest',  'uncommon',  [['hp', 40, 96], ['def', 5, 12]]);
+gbase('emberweave', "Emberweave",        'chest',  'uncommon',  [['burn', 7, 18], ['hp', 18, 46]]);
+gbase('leyharness', "Ley Harness",       'chest',  'uncommon',  [['shield', 28, 70], ['regen', 0.8, 2.2]]);
+gbase('ironsong',   "Ironsong Cuirass",  'chest',  'rare',      [['hp', 85, 190], ['thorns', 9, 22]]);
+gbase('bloodpact',  "Blood Pact",        'chest',  'rare',      [['steal', 4, 11], ['dmg', 10, 25], ['hp', -40, -12]]);
+gbase('wardenc',    "Warden's Aegis",    'chest',  'rare',      [['shield', 55, 130], ['def', 7, 17], ['rof', -8, -2]]);
+gbase('carapace',   "Void Carapace",     'chest',  'epic',      [['hp', 130, 290], ['def', 11, 24], ['regen', 2, 5.5]], 'hearth');
+gbase('reaver',     "Reaver's Harness",  'chest',  'epic',      [['steal', 8, 19], ['dmg', 18, 42], ['rof', 9, 22]], 'freerun');
+gbase('stormcoat',  "Stormcoat",         'chest',  'epic',      [['chain', 2, 3], ['slow', 14, 32], ['hp', 55, 130]], 'gravity');
+gbase('immortal',   "Immortal Shell",    'chest',  'legendary', [['hp', 230, 470], ['def', 15, 32], ['shield', 90, 190], ['spd', -16, -5]], 'secondhrt');
+gbase('sanguine',   "Sanguine Regalia",  'chest',  'legendary', [['steal', 13, 28], ['dmg', 24, 52], ['regen', 3.5, 8]], 'hearth');
+gbase('thundercoat',"Thunderhead Coat",  'chest',  'legendary', [['chain', 3, 5], ['dmg', 20, 45], ['bspd', 20, 46]], 'plague');
+gbase('worldheart', "Worldheart",        'chest',  'mythic',    [['hp', 320, 640], ['def', 20, 40], ['steal', 12, 26], ['regen', 5, 12], ['spd', -18, -6]], 'saviour');
+gbase('nemesis',    "Nemesis",           'chest',  'mythic',    [['dmg', 50, 105], ['thorns', 25, 55], ['hp', 120, 260], ['def', -10, -3]], 'taunt');
 
 /* ---- leggings ---- */
-gbase('workpants',  "Work Greaves",      'legs',   'common',    [['hp', 6, 18], ['spd', 1, 4]]);
-gbase('kneeguard',  "Kneeguards",        'legs',   'common',    [['def', 1, 4]]);
-gbase('scoutlegs',  "Scout Legs",        'legs',   'common',    [['spd', 2, 6], ['hp', -8, -2]]);
-gbase('runaansl',   "Runaan's Leggings", 'legs',   'uncommon',  [['rof', 2, 5], ['hp', 10, 30]]);
-gbase('striders',   "Striders",          'legs',   'uncommon',  [['spd', 4, 10], ['dash', -12, -4]]);
-gbase('ashfall',    "Ashfall Tassets",   'legs',   'uncommon',  [['burn', 4, 11], ['def', 2, 5]]);
-gbase('galeplate',  "Galeplate",         'legs',   'rare',      [['spd', 7, 16], ['dashc', 1, 1], ['hp', -25, -8]]);
-gbase('ferrous',    "Ferrous Cuisses",   'legs',   'rare',      [['hp', 35, 80], ['def', 3, 8], ['thorns', 3, 8]]);
-gbase('scattershot',"Scattershot Belt",  'legs',   'rare',      [['proj', 1, 1], ['dmg', -9, -3]]);
-gbase('juggernaut', "Juggernaut Plates", 'legs',   'epic',      [['hp', 70, 160], ['def', 7, 16], ['thorns', 6, 15]]);
-gbase('quicksilver',"Quicksilver Legs",  'legs',   'epic',      [['spd', 10, 24], ['dashc', 1, 2], ['dash', -25, -10]]);
-gbase('warpgreaves',"Warp Greaves",      'legs',   'epic',      [['dashd', 40, 110], ['dashc', 1, 1], ['spd', 5, 13]]);
-gbase('titanfall',  "Titanfall",         'legs',   'legendary', [['hp', 130, 280], ['def', 10, 22], ['thorns', 10, 25], ['spd', -16, -6]]);
-gbase('tempest',    "Tempest Striders",  'legs',   'legendary', [['spd', 16, 34], ['dashc', 2, 3], ['dashd', 70, 170]]);
+gbase('workpants',  "Work Greaves",      'legs',   'common',    [['hp', 12, 32], ['spd', 2, 6]]);
+gbase('kneeguard',  "Kneeguards",        'legs',   'common',    [['def', 2, 6], ['thorns', 2, 5]]);
+gbase('scoutlegs',  "Scout Legs",        'legs',   'common',    [['spd', 4, 10], ['hp', -10, -3]]);
+gbase('runaansl',   "Runaan's Leggings", 'legs',   'uncommon',  [['rof', 5, 12], ['hp', 22, 60]]);
+gbase('striders',   "Striders",          'legs',   'uncommon',  [['spd', 7, 17], ['dash', -20, -7]]);
+gbase('ashfall',    "Ashfall Tassets",   'legs',   'uncommon',  [['burn', 8, 20], ['def', 3, 9]]);
+gbase('galeplate',  "Galeplate",         'legs',   'rare',      [['spd', 12, 27], ['dashc', 1, 2], ['hp', -30, -10]]);
+gbase('ferrous',    "Ferrous Cuisses",   'legs',   'rare',      [['hp', 75, 170], ['def', 6, 15], ['thorns', 7, 17]]);
+gbase('scattershot',"Scattershot Belt",  'legs',   'rare',      [['proj', 1, 2], ['dmg', -10, -3], ['bspd', 12, 30]]);
+gbase('juggernaut', "Juggernaut Plates", 'legs',   'epic',      [['hp', 150, 330], ['def', 12, 26], ['thorns', 13, 30]], 'taunt');
+gbase('quicksilver',"Quicksilver Legs",  'legs',   'epic',      [['spd', 17, 38], ['dashc', 2, 3], ['dash', -35, -16]], 'lightfoot');
+gbase('warpgreaves',"Warp Greaves",      'legs',   'epic',      [['dashd', 90, 220], ['dashc', 1, 2], ['spd', 9, 22]], 'freerun');
+gbase('titanfall',  "Titanfall",         'legs',   'legendary', [['hp', 260, 540], ['def', 17, 35], ['thorns', 20, 45], ['spd', -18, -6]], 'fissure');
+gbase('tempest',    "Tempest Striders",  'legs',   'legendary', [['spd', 25, 52], ['dashc', 3, 4], ['dashd', 150, 330]], 'lightfoot');
+gbase('arcwrap',    "Arcwrap Faulds",    'legs',   'legendary', [['orbit', 2, 3], ['dmg', 20, 46], ['chain', 2, 3]], 'gravity');
+gbase('cosmos',     "Cosmos",            'legs',   'mythic',    [['spd', 34, 70], ['dashc', 4, 6], ['dmg', 32, 70], ['dashd', 220, 460]], 'freerun');
+gbase('stonewake',  "Stonewake",         'legs',   'mythic',    [['hp', 300, 620], ['def', 22, 42], ['thorns', 32, 68], ['blast', 25, 55]], 'fissure');
 
 /* ---- boots ---- */
-gbase('trackers',   "Trackers",          'boots',  'common',    [['spd', 2, 5]]);
-gbase('padded',     "Padded Boots",      'boots',  'common',    [['hp', 5, 15], ['spd', 1, 3]]);
-gbase('scrapsoles', "Scrap Soles",       'boots',  'common',    [['mag', 15, 50]]);
-gbase('swiftsole',  "Swiftsoles",        'boots',  'uncommon',  [['spd', 4, 9], ['dash', -10, -4]]);
-gbase('anchors',    "Anchor Boots",      'boots',  'uncommon',  [['def', 2, 6], ['hp', 10, 26], ['spd', -5, -2]]);
-gbase('sparkstep',  "Sparkstep",         'boots',  'uncommon',  [['bspd', 6, 16], ['crit', 1, 4]]);
-gbase('phasewalk',  "Phasewalkers",      'boots',  'rare',      [['dashc', 1, 1], ['dash', -20, -8]]);
-gbase('cinderstep', "Cinderstep",        'boots',  'rare',      [['burn', 6, 15], ['spd', 5, 12]]);
-gbase('collector',  "Collector's Tread", 'boots',  'rare',      [['mag', 60, 150], ['xp', 8, 20], ['core', 6, 16]]);
-gbase('blinkstep',  "Blinkstep",         'boots',  'epic',      [['dashc', 1, 2], ['dashd', 50, 130], ['spd', 6, 15]]);
-gbase('voidtread',  "Voidtread",         'boots',  'epic',      [['blast', 10, 26], ['bdmg', 10, 26], ['spd', 4, 11]]);
-gbase('hexsole',    "Hexsoles",          'boots',  'epic',      [['slow', 10, 24], ['exec', 2, 6], ['spd', 5, 13]]);
-gbase('worldstep',  "Worldstep",         'boots',  'legendary', [['spd', 14, 30], ['dashc', 2, 3], ['dashd', 90, 210], ['dash', -30, -14]]);
-gbase('cornucopia', "Cornucopia",        'boots',  'legendary', [['xp', 20, 45], ['core', 18, 40], ['mag', 140, 300], ['dmg', -12, -4]]);
+gbase('trackers',   "Trackers",          'boots',  'common',    [['spd', 4, 10]]);
+gbase('padded',     "Padded Boots",      'boots',  'common',    [['hp', 10, 28], ['spd', 2, 5]]);
+gbase('scrapsoles', "Scrap Soles",       'boots',  'common',    [['mag', 40, 110], ['xp', 3, 9]]);
+gbase('swiftsole',  "Swiftsoles",        'boots',  'uncommon',  [['spd', 7, 16], ['dash', -18, -7]]);
+gbase('anchors',    "Anchor Boots",      'boots',  'uncommon',  [['def', 4, 10], ['hp', 22, 55], ['spd', -6, -2]]);
+gbase('sparkstep',  "Sparkstep",         'boots',  'uncommon',  [['bspd', 12, 30], ['crit', 3, 9]]);
+gbase('phasewalk',  "Phasewalkers",      'boots',  'rare',      [['dashc', 1, 2], ['dash', -32, -14], ['spd', 6, 15]]);
+gbase('cinderstep', "Cinderstep",        'boots',  'rare',      [['burn', 12, 28], ['spd', 9, 21]]);
+gbase('collector',  "Collector's Tread", 'boots',  'rare',      [['mag', 130, 300], ['xp', 18, 42], ['core', 14, 34]]);
+gbase('blinkstep',  "Blinkstep",         'boots',  'epic',      [['dashc', 2, 3], ['dashd', 110, 260], ['spd', 11, 26]], 'freerun');
+gbase('voidtread',  "Voidtread",         'boots',  'epic',      [['blast', 20, 46], ['bdmg', 20, 46], ['spd', 8, 19]], 'fissure');
+gbase('hexsole',    "Hexsoles",          'boots',  'epic',      [['slow', 18, 40], ['exec', 5, 13], ['spd', 9, 22]], 'magnetic');
+gbase('worldstep',  "Worldstep",         'boots',  'legendary', [['spd', 24, 50], ['dashc', 3, 4], ['dashd', 190, 420], ['dash', -40, -20]], 'lightfoot');
+gbase('cornucopia', "Cornucopia",        'boots',  'legendary', [['xp', 40, 90], ['core', 35, 80], ['mag', 300, 650], ['dmg', -14, -4]], 'greed');
+gbase('emberwake',  "Emberwake",         'boots',  'legendary', [['burn', 22, 50], ['drone', 1, 2], ['spd', 12, 28]], 'plague');
+gbase('lightspeed', "Lightspeed",        'boots',  'mythic',    [['spd', 40, 80], ['dashc', 5, 7], ['rof', 22, 48], ['dash', -55, -30]], 'magnetic');
+gbase('hoard',      "Dragon's Hoard",    'boots',  'mythic',    [['core', 70, 150], ['xp', 70, 150], ['dmg', 30, 66], ['mag', 500, 1000]], 'greed');
 
 const BASE_BY_ID = {};
 for (const b of GEAR_BASES) BASE_BY_ID[b.id] = b;
 
 /* ---- materials ---- */
 const MATS = [
-  { id: 'amp1', name: 'Amplifier I',   ico: '✦', boost: 0.05 },
-  { id: 'amp2', name: 'Amplifier II',  ico: '✦', boost: 0.10 },
-  { id: 'amp3', name: 'Amplifier III', ico: '✦', boost: 0.15 },
-  { id: 'amp4', name: 'Amplifier IV',  ico: '✦', boost: 0.20 },
+  { id: 'amp1', name: 'Amplifier I',   ico: '✦', boost: 0.08 },
+  { id: 'amp2', name: 'Amplifier II',  ico: '✦', boost: 0.16 },
+  { id: 'amp3', name: 'Amplifier III', ico: '✦', boost: 0.24 },
+  { id: 'amp4', name: 'Amplifier IV',  ico: '✦', boost: 0.32 },
   { id: 'sim',  name: 'Simulator',     ico: '⚙' },
   { id: 'ins',  name: 'Insulator',     ico: '🔒' }
 ];
@@ -4509,13 +5214,13 @@ const GEAR = loadGear();
 function loadGear() {
   const g = store(GEAR_KEY) || {};
   const out = {
-    v: 2,
+    v: 3,
     uid: g.uid || 1,
     stash: Array.isArray(g.stash) ? g.stash : [],
     equipped: g.equipped || {},
     mats: g.mats || {}
   };
-  // an item whose base no longer exists is handed back as unidentified, never crashes
+  // an item whose base no longer exists is handed back sealed, never crashes
   out.stash = out.stash.filter(it => it && SLOT_BY_ID[it.slot] && RARITY_BY_ID[it.rarity]).map(it => {
     if (it.base && !BASE_BY_ID[it.base]) { it.base = null; it.rolls = []; it.rerolls = 0; }
     it.rolls = Array.isArray(it.rolls) ? it.rolls : [];
@@ -4536,17 +5241,19 @@ function spendMat(id) { if (matCount(id) <= 0) return false; GEAR.mats[id]--; re
 
 /* ---- drops ---- */
 function rollRarity(wave) {
-  const w = [
-    ['common',    Math.max(8, 100 - wave * 4.5)],
-    ['uncommon',  58],
-    ['rare',      Math.min(48, 6 + wave * 1.8)],
-    ['epic',      Math.min(24, 1 + wave * 0.9)],
-    ['legendary', Math.min(10, Math.max(0, (wave - 4) * 0.32))]
+  const w = wave || 1;
+  const table = [
+    ['common',    Math.max(10, 70 - w * 3.5)],
+    ['uncommon',  55],
+    ['rare',      Math.min(60, 14 + w * 2.2)],
+    ['epic',      Math.min(40, 4 + w * 1.7)],
+    ['legendary', Math.min(22, Math.max(0, (w - 2) * 1.0))],
+    ['mythic',    Math.min(8, Math.max(0, (w - 6) * 0.38))]
   ];
   let total = 0;
-  for (const e of w) total += e[1];
+  for (const e of table) total += e[1];
   let r = Math.random() * total;
-  for (const e of w) { r -= e[1]; if (r <= 0) return e[0]; }
+  for (const e of table) { r -= e[1]; if (r <= 0) return e[0]; }
   return 'common';
 }
 
@@ -4561,14 +5268,18 @@ function rollDrop(wave) {
 
 function rollMaterial(wave) {
   const r = Math.random();
-  if (r < 0.34) return 'sim';
-  if (r < 0.62) return 'ins';
-  const t = Math.random() * Math.max(1, Math.min(4, 1 + wave / 9));
-  return 'amp' + Math.max(1, Math.min(4, Math.ceil(t)));
+  if (r < 0.32) return 'sim';
+  if (r < 0.58) return 'ins';
+  const t = Math.ceil(Math.random() * Math.max(1, Math.min(4, 1 + (wave || 1) / 7)));
+  return 'amp' + Math.max(1, Math.min(4, t));
 }
 
 /* ---- naming and numbers ---- */
 function itemBase(it) { return it.base ? BASE_BY_ID[it.base] : null; }
+function itemMajor(it) {
+  const b = itemBase(it);
+  return b && b.major ? MAJORS[b.major] : null;
+}
 function itemName(it) {
   const r = RARITY_BY_ID[it.rarity], s = SLOT_BY_ID[it.slot];
   if (!it.base) return 'Unidentified ' + r.name + ' ' + s.name;
@@ -4585,10 +5296,17 @@ function statText(range, roll) {
   return (v > 0 ? '+' : '') + v + (def.pct ? '%' : (def.unit || ''));
 }
 function idCost(it) { return RARITY_BY_ID[it.rarity].idCost; }
-function rerollCost(it) { return Math.round(RARITY_BY_ID[it.rarity].idCost * 1.4 * Math.pow(1.7, it.rerolls)); }
+function rerollCost(it) { return Math.round(RARITY_BY_ID[it.rarity].idCost * 1.4 * Math.pow(1.55, it.rerolls)); }
 function salvageValue(it) {
   const r = RARITY_BY_ID[it.rarity];
   return it.base ? r.salvage : Math.round(r.salvage * 0.45);
+}
+/* how good a roll is overall, for sorting and for the quality badge */
+function itemQuality(it) {
+  if (!it.base || !it.rolls.length) return 0;
+  let sum = 0;
+  for (const r of it.rolls) sum += r;
+  return sum / it.rolls.length;
 }
 
 /* One roller for identify, reroll and simulate, so the amplifier and the
@@ -4640,11 +5358,34 @@ function rerollItem(it, ampId, simulate) {
   return null;
 }
 
+/* ---- mass salvage ---- */
+function salvageMatching(rarities, mode) {
+  const worn = {};
+  for (const s of SLOTS) if (GEAR.equipped[s.id]) worn[GEAR.equipped[s.id]] = 1;
+  const doomed = GEAR.stash.filter(it =>
+    rarities[it.rarity] && !worn[it.uid] &&
+    (mode === 'both' || (mode === 'sealed' ? !it.base : !!it.base)));
+  let cores = 0;
+  for (const it of doomed) cores += salvageValue(it);
+  return { list: doomed, cores: cores };
+}
+
+function doMassSalvage(rarities, mode) {
+  const hit = salvageMatching(rarities, mode);
+  if (!hit.list.length) return { n: 0, cores: 0 };
+  const kill = {};
+  for (const it of hit.list) kill[it.uid] = 1;
+  GEAR.stash = GEAR.stash.filter(it => !kill[it.uid]);
+  SAVE.cores += hit.cores;
+  if (kill[fgSel]) fgSel = 0;
+  saveMeta(); saveGear();
+  return { n: hit.list.length, cores: hit.cores };
+}
+
 /* ---- wearing it ---- */
 function equippedItem(slot) { return GEAR.equipped[slot] ? itemById(GEAR.equipped[slot]) : null; }
 
 function applyGear(p) {
-  p.gearNote = [];
   for (const s of SLOTS) {
     const it = equippedItem(s.id);
     if (!it || !it.base) continue;
@@ -4655,27 +5396,36 @@ function applyGear(p) {
       if (!def) continue;
       def.apply(p, statValue(range, it.rolls[i] !== undefined ? it.rolls[i] : 0));
     }
+    const major = base.major ? MAJORS[base.major] : null;
+    if (major) { major.apply(p); p.majors.push(base.major); }
   }
   p.hp = Math.min(p.hp, p.maxHp);
 }
 
 function gearSummary() {
-  let worn = 0;
-  for (const s of SLOTS) if (equippedItem(s.id)) worn++;
+  let worn = 0, majors = 0;
+  for (const s of SLOTS) {
+    const it = equippedItem(s.id);
+    if (!it) continue;
+    worn++;
+    if (itemMajor(it)) majors++;
+  }
   const un = GEAR.stash.filter(it => !it.base).length;
-  return worn + ' / 4 slots filled' + (un ? ' · ' + un + ' unidentified in the stash' : '') +
-         (GEAR.stash.length ? '' : ' · nothing has dropped yet');
+  if (!GEAR.stash.length) return 'nothing has dropped yet';
+  return worn + ' / 4 slots filled' + (majors ? ' · ' + majors + ' major ID' + (majors === 1 ? '' : 's') : '') +
+         (un ? ' · ' + un + ' sealed in the stash' : '');
 }
-
 
 /* ---------------- the Forge screen ---------------- */
 let fgSel = 0;          // uid of the item being looked at
 let fgAmp = null;       // amplifier queued for the next roll
 let fgReturn = 'menu';  // where Back goes
+let fgBulk = null;      // the mass-salvage selection, when it is open
 
 function forgeOpen() { return document.getElementById('forge').classList.contains('show'); }
 
 function openForge() {
+  fgBulk = null;
   fgReturn = game.state === 'select' ? 'select' : 'menu';
   if (game.state === 'over') fgReturn = 'menu';
   closeAllOverlays();
@@ -4749,10 +5499,12 @@ function renderForge(msg, bad) {
     const r = RARITY_BY_ID[it.rarity];
     const el = document.createElement('div');
     el.className = 'gitem' + (it.uid === fgSel ? ' sel' : '');
+    const major = itemMajor(it);
     el.innerHTML = '<div class="gn" style="color:' + r.color + '">' + itemName(it) + '</div>' +
       '<div class="gs">' + SLOT_BY_ID[it.slot].name +
-      (it.base ? (it.rerolls ? ' · ' + it.rerolls + ' rerolls' : '') : ' · sealed') +
-      (GEAR.equipped[it.slot] === it.uid ? ' · worn' : '') + '</div>';
+      (it.base ? ' · ' + Math.round(itemQuality(it) * 100) + '%' : ' · sealed') +
+      (GEAR.equipped[it.slot] === it.uid ? ' · worn' : '') + '</div>' +
+      (major ? '<div class="gs" style="color:#ffc857">✦ ' + major.name + '</div>' : '');
     el.addEventListener('click', () => { fgSel = it.uid; renderForge(); });
     stash.appendChild(el);
   }
@@ -4763,9 +5515,14 @@ function renderForge(msg, bad) {
 
 function renderForgeDetail() {
   const box = document.getElementById('fgDetail');
+  if (fgBulk) return renderBulk(box);
   const it = itemById(fgSel);
   if (!it) {
-    box.innerHTML = '<div class="gempty">Pick something from the stash.</div>';
+    box.innerHTML = '<div class="gempty">Pick something from the stash, or clear it out.</div>' +
+      '<div class="gacts"><button data-act="bulk">Mass salvage</button></div>';
+    for (const btn of box.querySelectorAll('.gacts button')) {
+      btn.addEventListener('click', () => { fgBulk = defaultBulk(); renderForge(); });
+    }
     return;
   }
   const r = RARITY_BY_ID[it.rarity];
@@ -4793,9 +5550,16 @@ function renderForgeDetail() {
         '<div class="gbar"><i style="width:' + pct + '%; background:' +
         (pct >= 85 ? '#ffc857' : pct >= 50 ? '#9dff5c' : '#40e0ff') + '"></i></div>';
     }
-    html += '<div class="gsub" style="margin:6px 0 0">' +
-      (it.rerolls ? 'Rerolled ' + it.rerolls + ' time' + (it.rerolls === 1 ? '' : 's') : 'Never rerolled') +
-      ' \u00b7 tap a stat to hold it through the next roll</div>';
+    html += '<div class="gsub" style="margin:6px 0 0">Overall ' + Math.round(itemQuality(it) * 100) + '% \u00b7 ' +
+      (it.rerolls ? 'rerolled ' + it.rerolls + ' time' + (it.rerolls === 1 ? '' : 's') : 'never rerolled') +
+      ' \u00b7 tap a stat to hold it</div>';
+    const major = itemMajor(it);
+    if (major) {
+      html += '<div style="margin-top:9px; padding:8px 9px; border-radius:8px; border:1px solid rgba(255,200,87,.35); background:rgba(255,200,87,.08)">' +
+        '<div style="font-weight:700; color:#ffc857; font-size:12.5px">\u2726 ' + major.name + '</div>' +
+        '<div style="font-size:11.5px; color:#dfe9f6; line-height:1.45; margin-top:2px">' + major.desc + '</div>' +
+        '<div style="font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:#7e9bc4; margin-top:4px">Major identification \u00b7 never rolls</div></div>';
+    }
   }
 
   html += '<div class="gacts">';
@@ -4806,7 +5570,8 @@ function renderForgeDetail() {
             '<button data-act="sim"' + (matCount('sim') ? '' : ' disabled') + '>Simulate (' + matCount('sim') + ')</button>' +
             '<button data-act="equip">' + (GEAR.equipped[it.slot] === it.uid ? 'Unequip' : 'Equip') + '</button>';
   }
-  html += '<button data-act="salvage">Salvage ◆ ' + salvageValue(it) + '</button></div></div>';
+  html += '<button data-act="salvage">Salvage ◆ ' + salvageValue(it) + '</button>' +
+          '<button data-act="bulk">Mass salvage</button></div></div>';
   box.innerHTML = html;
 
   for (const row of box.querySelectorAll('.grow.lockable')) {
@@ -4820,6 +5585,49 @@ function renderForgeDetail() {
   }
   for (const btn of box.querySelectorAll('.gacts button')) {
     btn.addEventListener('click', () => forgeAction(btn.getAttribute('data-act'), it));
+  }
+}
+
+function defaultBulk() {
+  const r = { mode: 'both', rarities: {} };
+  for (const x of RARITIES) r.rarities[x.id] = (x.id === 'common' || x.id === 'uncommon');
+  return r;
+}
+
+/* Clearing out the stash in one go. Worn gear is never in the list. */
+function renderBulk(box) {
+  const hit = salvageMatching(fgBulk.rarities, fgBulk.mode);
+  let html = '<div class="gdetail"><div class="gt" style="color:#ff6b9d">Mass Salvage</div>' +
+    '<div class="gsub">Worn gear is never included</div><div class="mats" style="margin-bottom:8px">';
+  for (const r of RARITIES) {
+    html += '<span class="mat" data-rar="' + r.id + '" style="cursor:pointer; ' +
+      (fgBulk.rarities[r.id] ? 'border-color:' + r.color + '; color:' + r.color : 'opacity:.5') + '">' +
+      (fgBulk.rarities[r.id] ? '✓ ' : '') + r.name + '</span>';
+  }
+  html += '</div><div class="mats" style="margin-bottom:8px">';
+  for (const m of [['both', 'Sealed and identified'], ['sealed', 'Sealed only'], ['ided', 'Identified only']]) {
+    html += '<span class="mat" data-mode="' + m[0] + '" style="cursor:pointer; ' +
+      (fgBulk.mode === m[0] ? 'border-color:#40e0ff; color:#40e0ff' : 'opacity:.5') + '">' + m[1] + '</span>';
+  }
+  html += '</div><div style="font-size:12.5px; color:#cfe6ff; margin-bottom:2px"><b>' + hit.list.length +
+    '</b> item' + (hit.list.length === 1 ? '' : 's') + ' → <b style="color:#ffc857">◆ ' + hit.cores + '</b></div>' +
+    '<div class="gacts"><button data-act="go"' + (hit.list.length ? '' : ' disabled') + '>Salvage ' + hit.list.length + '</button>' +
+    '<button data-act="cancel">Back</button></div></div>';
+  box.innerHTML = html;
+
+  for (const el of box.querySelectorAll('[data-rar]')) {
+    el.addEventListener('click', () => { const k = el.getAttribute('data-rar'); fgBulk.rarities[k] = !fgBulk.rarities[k]; renderForge(); });
+  }
+  for (const el of box.querySelectorAll('[data-mode]')) {
+    el.addEventListener('click', () => { fgBulk.mode = el.getAttribute('data-mode'); renderForge(); });
+  }
+  for (const btn of box.querySelectorAll('.gacts button')) {
+    btn.addEventListener('click', () => {
+      if (btn.getAttribute('data-act') === 'cancel') { fgBulk = null; return renderForge(); }
+      const done = doMassSalvage(fgBulk.rarities, fgBulk.mode);
+      fgBulk = null;
+      renderForge(done.n ? 'salvaged ' + done.n + ' for ◆ ' + done.cores : 'nothing matched', !done.n);
+    });
   }
 }
 
@@ -4842,6 +5650,7 @@ function forgeAction(act, it) {
     saveGear();
     return renderForge(GEAR.equipped[it.slot] ? 'worn' : 'taken off');
   }
+  if (act === 'bulk') { fgBulk = defaultBulk(); return renderForge(); }
   if (act === 'salvage') {
     SAVE.cores += salvageValue(it);
     if (GEAR.equipped[it.slot] === it.uid) delete GEAR.equipped[it.slot];
