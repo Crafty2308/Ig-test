@@ -91,6 +91,24 @@ button.b.ghost{border-color:#4a3a44; background:transparent}
   text-shadow:0 2px 0 #000, 0 0 8px rgba(0,0,0,.8); font-variant-numeric:tabular-nums}
 #speedo .wpn{font-size:11px; letter-spacing:.22em; color:var(--ink); margin-top:4px; opacity:.9}
 #speedo .wpn b{color:var(--c)}
+#topbar{position:absolute; top:calc(var(--sat) + 14px); left:calc(var(--sal) + 70px); display:flex; align-items:center; gap:10px}
+#hpWrap{position:relative; width:clamp(130px,22vw,230px); height:16px; background:rgba(0,0,0,.45); border:1.5px solid rgba(255,255,255,.35); transform:skewX(-18deg); overflow:hidden}
+#hpFill{position:absolute; left:0; top:0; bottom:0; width:100%; background:linear-gradient(90deg,#ff2a3d,#ff6a5a); transition:width .15s}
+#hpFill.low{animation:blink .5s infinite alternate}
+@keyframes blink{from{opacity:1}to{opacity:.45}}
+#hpTxt{position:absolute; right:8px; top:50%; transform:translateY(-50%) skewX(18deg); font-size:11px; font-weight:900; letter-spacing:.1em; text-shadow:0 1px 0 #000}
+#waveTxt{position:absolute; top:calc(var(--sat) + 10px); left:50%; transform:translateX(-50%); text-align:center; font-weight:900; font-style:italic; letter-spacing:.18em; font-size:13px; color:var(--muted)}
+#waveTxt b{color:var(--ink); font-size:22px}
+#waveTxt span{display:block; font-size:10px; letter-spacing:.3em; font-style:normal}
+#banner{position:absolute; top:24%; left:50%; transform:translateX(-50%); text-align:center; opacity:0; pointer-events:none}
+#banner.show{animation:bannerIn 2.2s ease-out forwards}
+#banner .bt{font-size:clamp(30px,9vh,64px); font-weight:900; font-style:italic; letter-spacing:.12em; text-shadow:0 0 18px rgba(255,42,61,.7), 3px 0 0 var(--red)}
+#banner .bs{font-size:12px; letter-spacing:.4em; color:#ffd24a; margin-top:4px}
+@keyframes bannerIn{0%{opacity:0; transform:translateX(-50%) scale(1.4)}10%{opacity:1; transform:translateX(-50%) scale(1)}80%{opacity:1}100%{opacity:0}}
+#grabUI{position:absolute; left:50%; top:62%; transform:translateX(-50%); text-align:center}
+#grabUI .gt{font-weight:900; letter-spacing:.2em; font-size:16px; color:#e2b0ff; text-shadow:0 0 10px #b04aff; animation:blink .18s infinite alternate}
+#grabUI .gbar{width:220px; height:8px; margin:6px auto 0; background:rgba(255,255,255,.15); transform:skewX(-20deg)}
+#grabUI .gbar i{display:block; height:100%; width:0; background:#d9a0ff; box-shadow:0 0 8px #b04aff}
 #vignette{position:absolute; inset:0; opacity:0; background:radial-gradient(ellipse at center, transparent 45%, rgba(255,20,40,.75) 100%)}
 </style>
 <script type="importmap">
@@ -104,6 +122,10 @@ button.b.ghost{border-color:#4a3a44; background:transparent}
 <div id="hud" class="hidden">
   <div id="vignette"></div>
   <div id="dmgLayer"></div>
+  <div id="topbar"><div id="hpWrap"><div id="hpFill"></div><span id="hpTxt">100</span></div></div>
+  <div id="waveTxt"></div>
+  <div id="banner"></div>
+  <div id="grabUI" class="hidden"><div class="gt">GRABBED — MASH ATTACK!</div><div class="gbar"><i id="grabBar"></i></div></div>
   <div id="crosshair"></div>
   <div id="dashPips"></div>
   <div id="speedo"><div class="num">0</div><div class="unit">M/S</div><div class="bar"><div class="fill"></div></div><div class="wpn"></div></div>
@@ -116,7 +138,17 @@ button.b.ghost{border-color:#4a3a44; background:transparent}
     <button class="b primary" data-act="play">Play</button>
     <button class="b ghost" data-act="settings">Settings</button>
   </div>
+  <div class="tag" id="bestTxt"></div>
   <div class="hint" id="titleHint"></div>
+</div>
+
+<div id="over" class="screen hidden">
+  <h2 id="overTitle">WIPED OUT</h2>
+  <div class="stats" id="overStats"></div>
+  <div class="row">
+    <button class="b primary" data-act="retry">Retry</button>
+    <button class="b ghost" data-act="quit">Menu</button>
+  </div>
 </div>
 
 <div id="pause" class="screen hidden">
@@ -194,7 +226,7 @@ const T = {
 const mods = {};
 function resetMods() {
   Object.assign(mods, { wallBuild: 1, dashMax: 2, dashRecharge: 1, slamRadius: 1, decayBonus: 0, wjBoost: 1,
-    bladeMult: 1, hammerKeep: 0, pellets: 0, recoilMul: 1, shieldBreak: 1 });
+    bladeMult: 1, hammerKeep: 0, pellets: 0, recoilMul: 1, shieldBreak: 1, hitKnock: 1 });
 }
 resetMods();
 
@@ -504,7 +536,7 @@ function resetPlayer() {
   P.sliding = false; P.slideCd = 0; P.slamming = false;
   P.dash = mods.dashMax; P.dashT = 0; P.dashActive = 0;
   P.wall = null; P.wallCd = 0; P.eye = T.EYE; P.dip = 0; P.trauma = 0; P.fovKick = 0;
-  P.hp = P.maxHp = 100; P.invuln = 0; P.topSpeed = 0;
+  P.hp = P.maxHp = 100; P.invuln = 0; P.topSpeed = 0; P.grabbed = null; P.grabProg = 0; P.grabNeed = 1; P.inPuddle = false;
   groundAt(P.pos.x, P.pos.z, 99, _gp); P.pos.y = _gp.h;
 }
 const _gp = { h: 0, n: new V3(0, 1, 0), solid: null };
@@ -582,8 +614,9 @@ function stepPlayer(dt) {
       if (n.y > .985) setHSpeed(hs + T.SLIDE_BUILD * dt);
       if (wm > .1 && hs > .5) rotateH(P.vel.x, P.vel.z, wx, wz, T.SLIDE_TURN * wm * dt);
     } else if (wm > .05) {
-      if (hs <= T.RUN) {
-        const tx = wx * T.RUN * wm, tz = wz * T.RUN * wm;
+      const run = P.inPuddle ? T.RUN * .45 : T.RUN;
+      if (hs <= run) {
+        const tx = wx * run * wm, tz = wz * run * wm;
         const ex = tx - P.vel.x, ez = tz - P.vel.z, el = Math.hypot(ex, ez), st = T.ACCEL * dt;
         if (el <= st) { P.vel.x = tx; P.vel.z = tz; } else { P.vel.x += ex / el * st; P.vel.z += ez / el * st; }
       } else {
@@ -592,7 +625,9 @@ function stepPlayer(dt) {
         else rotateH(P.vel.x, P.vel.z, wx, wz, T.TURN * wm * Math.sqrt(T.RUN / hs) * dt);
       }
     } else {
-      setHSpeed(Math.max(0, hs - (hs < T.RUN ? T.FRICTION_LOW : T.FRICTION_HIGH) * dt));
+      // inside a well's field the ground gives way: low friction so the pull can drag you in
+      const fr = P.wellPull > 0 ? T.FRICTION_HIGH : hs < T.RUN ? T.FRICTION_LOW : T.FRICTION_HIGH;
+      setHSpeed(Math.max(0, hs - fr * dt));
     }
   } else if (!P.wall) {
     // air control: accelerate up to RUN, above that you can only carve
@@ -635,6 +670,10 @@ function stepPlayer(dt) {
     P.onGround = false; P.coyote = 0; P.jumpBuf = 0; P.jumpLock = .12; P.sliding = false;
     emit('onJump');
   }
+
+  // ---- sludge puddles bog you down to a crawl while you're on the ground in them
+  P.inPuddle = P.onGround && puddleAt(P.pos.x, P.pos.z);
+  if (P.inPuddle) { const h2 = hspeed(); if (h2 > 4) setHSpeed(h2 - (h2 - 4) * 3.5 * dt); }
 
   // ---- speed decay above the threshold: staying fast takes skill
   hs = hspeed();
@@ -1031,7 +1070,7 @@ function updateHUD() {
    Game state, screens
    ===================================================================== */
 let state = 'title', settingsReturn = 'title';
-const screens = { title: $('#title'), pause: $('#pause'), settings: $('#settings') };
+const screens = { title: $('#title'), pause: $('#pause'), settings: $('#settings'), over: $('#over') };
 function show(name) {
   for (const k in screens) screens[k].classList.toggle('hidden', k !== name);
 }
@@ -1050,8 +1089,10 @@ function startGame() {
   if (!IS_TOUCH_ACTIVE) { try { const p = canvas.requestPointerLock(); if (p && p.catch) p.catch(() => {}); } catch (e) {} }
 }
 function setupRun() {
-  // step 2: training dummies to test speed-based damage
-  for (const [x, z] of [[0, -9], [8, 2], [-8, 2], [-14, -30], [22, 8], [-4, 38]]) spawnEnemy('dummy', x, z, { home: { x, z } });
+  Object.assign(WAVE, { n: 0, queue: [], active: false, next: 1.2, dmgMul: 1, hpMul: 1 });
+  for (const q of puddles) q.life = 0;
+  lastHpKey = lastWaveKey = '';
+  bannerEl.classList.remove('show');
 }
 function pauseGame() {
   if (state !== 'playing') return;
@@ -1081,7 +1122,8 @@ document.addEventListener('click', e => {
   const act = b.dataset.act;
   if (act === 'play') startGame();
   else if (act === 'resume') resumeGame();
-  else if (act === 'quit') { state = 'title'; show('title'); setPlayingUI(false); }
+  else if (act === 'retry') startGame();
+  else if (act === 'quit') { state = 'title'; show('title'); setPlayingUI(false); enemies.length = 0; showBest(); }
   else if (act === 'settings') { settingsReturn = state === 'paused' ? 'pause' : 'title'; buildSettings(); show('settings'); }
   else if (act === 'settingsBack') show(settingsReturn);
   else if (act === 'layout') openLayoutEditor();
@@ -1181,6 +1223,11 @@ addEventListener('resize', resize);
 addEventListener('orientationchange', () => setTimeout(resize, 120));
 if (window.visualViewport) visualViewport.addEventListener('resize', resize);
 
+function showBest() {
+  const b = store.get('best', null);
+  $('#bestTxt').innerHTML = b && b.wave ? `BEST · WAVE <b>${b.wave}</b> · TOP SPEED <b>${b.speed.toFixed(1)}</b> M/S` : '';
+}
+showBest();
 $('#titleHint').innerHTML = IS_TOUCH
   ? 'Left thumb: move · Right thumb: look · Hold SLIDE on the ground to slide, tap it in the air to SLAM'
   : 'WASD move · Mouse look · Space jump · Ctrl/C slide (slam in air) · Shift dash · LMB attack · Q swap · Esc pause';
@@ -1416,7 +1463,6 @@ function enemyMove(e, dt, tx, tz, speed, accel) {
   const wx = l > 1e-4 ? tx / l * speed : 0, wz = l > 1e-4 ? tz / l * speed : 0;
   const ex = wx - e.vel.x, ez = wz - e.vel.z, el = Math.hypot(ex, ez), st = accel * dt;
   if (el <= st) { e.vel.x = wx; e.vel.z = wz; } else { e.vel.x += ex / el * st; e.vel.z += ez / el * st; }
-  if (puddleSlow) { const k = puddleSlow(e.pos.x, e.pos.z, true); if (k < 1) { e.vel.x *= Math.pow(k, dt * 4); e.vel.z *= Math.pow(k, dt * 4); } }
   e.pos.x += e.vel.x * dt; e.pos.z += e.vel.z * dt;
   const gh = terrainH(e.pos.x, e.pos.z);
   e.vel.y -= T.G * dt; e.pos.y += e.vel.y * dt;
@@ -1424,7 +1470,6 @@ function enemyMove(e, dt, tx, tz, speed, accel) {
   collideLateral(e.pos, d.r, d.h, e.vel);
   if (l > .1 && e.stun <= 0) e.yaw = dampAngle(e.yaw, Math.atan2(-tx, -tz), d.turn || 8, dt);
 }
-let puddleSlow = null; // set by the sludger module
 function dampAngle(a, b, k, dt) { return a + wrapAngle(b - a) * (1 - Math.exp(-k * dt)); }
 function separateEnemies() {
   for (let i = 0; i < enemies.length; i++) {
@@ -1458,6 +1503,7 @@ function later(s, f) { timers.push({ t: s, f }); }
 function updateTimers(dt) { for (let i = timers.length - 1; i >= 0; i--) if ((timers[i].t -= dt) <= 0) { const f = timers[i].f; timers.splice(i, 1); f(); } }
 
 function updateEnemies(dt) {
+  P.wellPull = 0;
   for (const e of enemies) {
     if (!e.alive) continue;
     e.t += dt; e.flash -= dt; e.hitFx = Math.max(0, e.hitFx - dt * 6); e.stun = Math.max(0, e.stun - dt); e.atkCd -= dt;
@@ -1740,6 +1786,380 @@ function updateViewmodel(dt) {
 }
 
 /* =====================================================================
+   Getting hit: HP loss AND a chunk of speed, then brief invulnerability
+   ===================================================================== */
+const vignette = $('#vignette');
+let vignetteT = 0;
+function hurtPlayer(dmg, fromX, fromZ) {
+  if (state !== 'playing' || P.invuln > 0 || P.dashActive > 0 || P.hp <= 0) return false;
+  dmg = Math.round(dmg * WAVE.dmgMul);
+  P.hp -= dmg;
+  const hs = hspeed();
+  const lost = Math.min(hs, Math.max(hs * .45, 6)) * mods.hitKnock;
+  setHSpeed(hs - lost);
+  emit('onSpend', lost);
+  if (fromX !== undefined) {
+    const dx = P.pos.x - fromX, dz = P.pos.z - fromZ, l = Math.hypot(dx, dz) || 1;
+    P.vel.x += dx / l * 3.5; P.vel.z += dz / l * 3.5;
+  }
+  P.sliding = false; P.wall = null;
+  P.invuln = .9; P.trauma = Math.min(1, P.trauma + .55); vignetteT = 1;
+  haptic(60);
+  emit('onHurt', dmg, lost);
+  if (P.hp <= 0) { P.hp = 0; gameOver(); }
+  return true;
+}
+function distToPlayer(e) { return Math.hypot(P.pos.x - e.pos.x, P.pos.z - e.pos.z); }
+function meleeTouch(e, reach, dmg, cd) {
+  if (e.atkCd > 0 || e.stun > 0) return false;
+  const d = distToPlayer(e);
+  if (d > e.d.r + T.RADIUS + reach || Math.abs(P.pos.y - e.pos.y) > 1.8) return false;
+  e.atkCd = cd;
+  if (hurtPlayer(dmg, e.pos.x, e.pos.z)) {
+    const dx = e.pos.x - P.pos.x, dz = e.pos.z - P.pos.z, l = Math.hypot(dx, dz) || 1;
+    e.vel.x += dx / l * 5; e.vel.z += dz / l * 5; e.stun = .25;
+    return true;
+  }
+  return false;
+}
+
+/* =====================================================================
+   The five enemies — each one attacks your momentum differently
+   ===================================================================== */
+// Chaser: basic melee rusher
+defineEnemy('chaser', {
+  hp: 30, r: .55, h: 1.6, max: 40, color: 0xff4a36, emissive: 0x2a0500,
+  geo: mergeGeos([
+    new THREE.OctahedronGeometry(.62, 0).scale(.9, 1.05, 1.35).translate(0, .85, 0),
+    new THREE.ConeGeometry(.12, .5, 4).rotateX(-Math.PI / 2).translate(.3, 1.15, -.5),
+    new THREE.ConeGeometry(.12, .5, 4).rotateX(-Math.PI / 2).translate(-.3, 1.15, -.5),
+  ]),
+  init(e) { e.flank = rand(-.6, .6); e.spd = Math.min(9.4, 7.2 + WAVE.n * .1); },
+  update(e, dt) {
+    const d = distToPlayer(e);
+    let tx = P.pos.x - e.pos.x, tz = P.pos.z - e.pos.z;
+    if (d > 6) { const c = Math.cos(e.flank), s = Math.sin(e.flank); [tx, tz] = [tx * c - tz * s, tx * s + tz * c]; }
+    enemyMove(e, dt, tx, tz, e.spd, 22);
+    meleeTouch(e, .35, 10, 1.1);
+  },
+});
+
+// Grabber: latches on and pins you to 0 speed until you mash attack
+defineEnemy('grabber', {
+  hp: 45, r: .6, h: 1.8, max: 16, color: 0xb04aff, emissive: 0x14041f,
+  geo: mergeGeos([
+    new THREE.BoxGeometry(.9, 1.1, .7).translate(0, .85, 0),
+    new THREE.OctahedronGeometry(.32, 0).translate(0, 1.65, -.05),
+    new THREE.BoxGeometry(.16, .16, 1.0).translate(.55, 1.1, -.45),
+    new THREE.BoxGeometry(.16, .16, 1.0).translate(-.55, 1.1, -.45),
+  ]),
+  init(e) { e.grabCd = 1.5; },
+  update(e, dt) {
+    if (P.grabbed === e) {
+      // hold on in front of the player, drain HP slowly
+      e.pos.x = P.pos.x + fwd.x * 1.05; e.pos.z = P.pos.z + fwd.z * 1.05; e.pos.y = P.pos.y;
+      e.yaw = Math.atan2(fwd.x, fwd.z);
+      e.drain = (e.drain || 0) + dt;
+      if (e.drain > .5) { e.drain = 0; P.hp -= Math.round(3 * WAVE.dmgMul); vignetteT = Math.max(vignetteT, .45); haptic(15); if (P.hp <= 0) { P.hp = 0; gameOver(); } }
+      return;
+    }
+    e.grabCd -= dt;
+    enemyMove(e, dt, P.pos.x - e.pos.x, P.pos.z - e.pos.z, Math.min(8, 6 + WAVE.n * .06), 18);
+    if (e.grabCd <= 0 && e.stun <= 0 && !P.grabbed && P.invuln <= 0 && P.dashActive <= 0 &&
+        distToPlayer(e) < e.d.r + T.RADIUS + .45 && Math.abs(P.pos.y - e.pos.y) < 1.6) {
+      P.grabbed = e; P.grabNeed = 6 + Math.floor(WAVE.n / 4); P.grabProg = 0;
+      emit('onSpend', hspeed());
+      P.vel.set(0, Math.min(P.vel.y, 0), 0); P.sliding = false; P.wall = null; P.slamming = false;
+      P.trauma = Math.min(1, P.trauma + .4); haptic(80);
+      emit('onGrab', e);
+    }
+  },
+  onDeath(e) { if (P.grabbed === e) releaseGrab(false); },
+  tint(e, c) { if (P.grabbed === e) c.lerp(_white, .25 + .25 * Math.sin(e.t * 20)); },
+});
+function releaseGrab(broke) {
+  const e = P.grabbed; P.grabbed = null;
+  if (!e) return;
+  if (broke) {
+    const dx = e.pos.x - P.pos.x, dz = e.pos.z - P.pos.z, l = Math.hypot(dx, dz) || 1;
+    e.vel.set(dx / l * 12, 4, dz / l * 12); e.stun = 1.6; e.grabCd = 3;
+    P.invuln = Math.max(P.invuln, .7);
+    eCenter(e, _v2); burst(_v2, 16, 9, 0xd9a0ff, 1, .5, 3); dmgNumber(_v2, 'FREE!', 'text');
+    emit('onGrabBreak', e);
+  }
+}
+grabMash = () => {
+  P.grabProg++;
+  P.trauma = Math.min(1, P.trauma + .12); haptic(10);
+  emit('onMash', P.grabProg / P.grabNeed);
+  if (P.grabProg >= P.grabNeed) releaseGrab(true);
+};
+
+// Sludger: leaves slowing puddles
+const PUD_MAX = 48;
+const pudMesh = new THREE.InstancedMesh(
+  new THREE.CircleGeometry(1, 14).rotateX(-Math.PI / 2),
+  new THREE.MeshBasicMaterial({ color: 0x5fd12a, transparent: true, opacity: .55, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -3 }),
+  PUD_MAX
+);
+pudMesh.frustumCulled = false; scene.add(pudMesh);
+const puddles = []; for (let i = 0; i < PUD_MAX; i++) puddles.push({ life: 0, x: 0, z: 0, r: 2.3, y: 0 });
+let pudHead = 0;
+function dropPuddle(x, z) {
+  const q = puddles[pudHead]; pudHead = (pudHead + 1) % PUD_MAX;
+  q.x = x; q.z = z; q.y = terrainH(x, z); q.life = 8; q.r = 2.3;
+}
+function puddleAt(x, z) {
+  for (const q of puddles) if (q.life > 0) { const dx = x - q.x, dz = z - q.z; if (dx * dx + dz * dz < q.r * q.r) return true; }
+  return false;
+}
+function updatePuddles(dt) {
+  let n = 0;
+  for (const q of puddles) {
+    if (q.life <= 0) continue;
+    q.life -= dt; if (q.life <= 0) continue;
+    const s = q.r * Math.min(1, (8 - q.life) * 4) * Math.min(1, q.life);
+    _q.identity();
+    pudMesh.setMatrixAt(n++, _m4.compose(_p3.set(q.x, q.y + .05, q.z), _q, _s3.set(s, 1, s)));
+  }
+  pudMesh.count = n; pudMesh.instanceMatrix.needsUpdate = true;
+}
+defineEnemy('sludger', {
+  hp: 55, r: .75, h: 1.2, max: 16, color: 0x7ad83a, emissive: 0x0c1a04,
+  geo: mergeGeos([
+    new THREE.IcosahedronGeometry(.8, 0).scale(1.15, .7, 1.25).translate(0, .55, 0),
+    new THREE.OctahedronGeometry(.16, 0).translate(.28, .9, -.75),
+    new THREE.OctahedronGeometry(.16, 0).translate(-.28, .9, -.75),
+  ]),
+  bob: .05,
+  init(e) { e.drop = rand(.2, 1); },
+  update(e, dt) {
+    enemyMove(e, dt, P.pos.x - e.pos.x, P.pos.z - e.pos.z, 4.6, 10);
+    if ((e.drop -= dt) <= 0) { e.drop = 1.1; dropPuddle(e.pos.x, e.pos.z); }
+    meleeTouch(e, .3, 8, 1.2);
+  },
+});
+
+// Well: stationary, pulls you toward itself
+const WELL_R = 18;
+const wellFieldTex = canvasTex(128, 128, (g, w) => {
+  const c = w / 2;
+  for (let i = 0; i < 4; i++) { g.strokeStyle = `rgba(90,140,255,${.55 - i * .1})`; g.lineWidth = 3; g.beginPath(); g.arc(c, c, c * (.35 + i * .2), 0, TAU); g.stroke(); }
+  g.strokeStyle = 'rgba(160,190,255,.7)'; g.lineWidth = 2;
+  for (let i = 0; i < 6; i++) { const a = i / 6 * TAU; g.beginPath(); g.moveTo(c + Math.cos(a) * c * .95, c + Math.sin(a) * c * .95); g.quadraticCurveTo(c + Math.cos(a + .6) * c * .5, c + Math.sin(a + .6) * c * .5, c, c); g.stroke(); }
+}, false);
+const wellFields = new THREE.InstancedMesh(
+  new THREE.PlaneGeometry(2, 2).rotateX(-Math.PI / 2),
+  new THREE.MeshBasicMaterial({ map: wellFieldTex, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: .8 }),
+  6
+);
+wellFields.frustumCulled = false; scene.add(wellFields);
+defineEnemy('well', {
+  hp: 90, r: .9, h: 1.6, max: 6, color: 0x3a6aff, emissive: 0x0a1650, anchored: true, hover: 1.1, mass: 99, spawnT: 1.2,
+  geo: mergeGeos([
+    new THREE.IcosahedronGeometry(.75, 0).translate(0, .8, 0),
+    new THREE.TorusGeometry(1.3, .09, 4, 18).rotateX(Math.PI / 2).rotateZ(.35).translate(0, .8, 0),
+    new THREE.TorusGeometry(1.0, .07, 4, 16).rotateX(Math.PI / 2).rotateZ(-.5).translate(0, .8, 0),
+  ]),
+  update(e, dt) {
+    e.yaw += dt * 2.4;
+    e.vel.set(0, 0, 0);
+    const dx = e.pos.x - P.pos.x, dz = e.pos.z - P.pos.z, d = Math.hypot(dx, dz);
+    if (d < WELL_R && d > .1 && !P.grabbed) {
+      const k = 17 * (1 - d / WELL_R) + 3;
+      P.vel.x += dx / d * k * dt; P.vel.z += dz / d * k * dt; P.wellPull += k;
+      if (!P.onGround) P.vel.y += ((e.pos.y + 1) - P.pos.y > 0 ? 4 : -2) * dt * (1 - d / WELL_R);
+    }
+    meleeTouch(e, 1.1, 12, .9);
+  },
+});
+
+// Shielder: frontal shield, only breaks on hits above a speed threshold
+const SHIELD_SPEED = 18;
+const shieldMesh = new THREE.InstancedMesh(
+  new THREE.BoxGeometry(1.5, 1.6, .14),
+  new THREE.MeshLambertMaterial({ color: 0x7fe0ff, emissive: 0x1a6a88, transparent: true, opacity: .72, flatShading: true }),
+  16
+);
+shieldMesh.frustumCulled = false; scene.add(shieldMesh);
+defineEnemy('shielder', {
+  hp: 70, r: .65, h: 1.8, max: 16, color: 0x8a96a8, emissive: 0x0a0e14, turn: 2.2,
+  geo: mergeGeos([
+    new THREE.BoxGeometry(.95, 1.35, .8).translate(0, .8, 0),
+    new THREE.BoxGeometry(.5, .4, .5).translate(0, 1.7, 0),
+  ]),
+  init(e) { e.shield = true; },
+  update(e, dt) {
+    enemyMove(e, dt, P.pos.x - e.pos.x, P.pos.z - e.pos.z, e.shield ? 4.8 : 6.2, 12);
+    meleeTouch(e, .5, 14, 1.3);
+  },
+  onHit(e, amount, dir, opts) {
+    if (!e.shield || opts.fromAbove || !opts.from) return;
+    // frontal if the attacker is within ±70° of the direction the shielder faces
+    const fx = -Math.sin(e.yaw), fz = -Math.cos(e.yaw);
+    const ax = opts.from.x - e.pos.x, az = opts.from.z - e.pos.z, al = Math.hypot(ax, az) || 1;
+    if ((fx * ax + fz * az) / al < Math.cos(70 * Math.PI / 180)) return;
+    if ((opts.speed || 0) >= SHIELD_SPEED * mods.shieldBreak) {
+      e.shield = false;
+      eCenter(e, _v2); burst(_v2, 24, 10, 0x7fe0ff, 1.3, .6, 3); dmgNumber(_v2, 'SHIELD BROKEN', 'text');
+      emit('onShieldBreak', e);
+      return;
+    }
+    return 'block';
+  },
+});
+function updateEnemyExtras() {
+  let ns = 0, nw = 0;
+  const t = performance.now() / 1000;
+  for (const e of enemies) {
+    if (!e.alive) continue;
+    const k = e.spawnT > 0 ? 1 - e.spawnT / (e.d.spawnT ?? .8) : 1;
+    if (e.type === 'shielder' && e.shield && ns < 16) {
+      const fx = -Math.sin(e.yaw), fz = -Math.cos(e.yaw);
+      _q.setFromEuler(_e3.set(0, e.yaw, 0));
+      shieldMesh.setMatrixAt(ns++, _m4.compose(_p3.set(e.pos.x + fx * .85, e.pos.y + .95, e.pos.z + fz * .85), _q, _s3.set(k, k, k)));
+    } else if (e.type === 'well' && nw < 6) {
+      const s = WELL_R * k;
+      _q.setFromEuler(_e3.set(0, -t * 1.5, 0));
+      wellFields.setMatrixAt(nw++, _m4.compose(_p3.set(e.pos.x, terrainH(e.pos.x, e.pos.z) + .08, e.pos.z), _q, _s3.set(s, 1, s)));
+    }
+  }
+  shieldMesh.count = ns; shieldMesh.instanceMatrix.needsUpdate = true;
+  wellFields.count = nw; wellFields.instanceMatrix.needsUpdate = true;
+}
+
+/* =====================================================================
+   Waves
+   ===================================================================== */
+const WAVE = { n: 0, queue: [], spawnT: 0, active: false, next: 0, dmgMul: 1, hpMul: 1 };
+const E_COST = { chaser: 1, sludger: 1.6, grabber: 1.6, shielder: 2, well: 3.2 };
+const E_UNLOCK = { chaser: 1, sludger: 2, grabber: 3, shielder: 4, well: 5 };
+function buildWave(n) {
+  const types = Object.keys(E_UNLOCK).filter(k => E_UNLOCK[k] <= n);
+  let budget = 4 + n * 2.3;
+  const q = [];
+  // introduce the newest enemy type on its wave
+  for (const k of types) if (E_UNLOCK[k] === n) { q.push(k); budget -= E_COST[k]; if (k !== 'well') { q.push(k); budget -= E_COST[k]; } }
+  const wellCap = 1 + Math.floor(n / 7);
+  const weights = { chaser: 5, sludger: 2, grabber: 1.6, shielder: 1.6, well: .7 };
+  while (budget > .9) {
+    let tot = 0; for (const k of types) tot += weights[k];
+    let r = Math.random() * tot, pick = 'chaser';
+    for (const k of types) { r -= weights[k]; if (r <= 0) { pick = k; break; } }
+    if (pick === 'well' && q.filter(k => k === 'well').length >= wellCap) pick = 'chaser';
+    q.push(pick); budget -= E_COST[pick];
+  }
+  // shuffle, but keep introductions early
+  for (let i = q.length - 1; i > 2; i--) { const j = 2 + Math.floor(Math.random() * (i - 1)); [q[i], q[j]] = [q[j], q[i]]; }
+  return q;
+}
+function startWave(n) {
+  WAVE.n = n; WAVE.queue = buildWave(n); WAVE.spawnT = .6; WAVE.active = true;
+  WAVE.hpMul = 1 + (n - 1) * .12; WAVE.dmgMul = 1 + (n - 1) * .04;
+  const shrink = n > 1 && (n - 1) % 5 === 0 && edgeTarget > ARENA.EDGE_MIN;
+  if (shrink) edgeTarget = Math.max(ARENA.EDGE_MIN, edgeTarget - ARENA.SHRINK);
+  banner(`WAVE ${n}`, shrink ? 'THE ARENA SHRINKS' : (Object.keys(E_UNLOCK).find(k => E_UNLOCK[k] === n) ? 'NEW: ' + Object.keys(E_UNLOCK).find(k => E_UNLOCK[k] === n).toUpperCase() : ''));
+  emit('onWaveStart', n);
+}
+function aliveCount() { let c = 0; for (const e of enemies) if (e.alive) c++; return c; }
+function spawnPoint(out) {
+  for (let tries = 0; tries < 30; tries++) {
+    const a = rand(0, TAU), r = rand(10, edgeTarget - 5);
+    const x = Math.cos(a) * r, z = Math.sin(a) * r;
+    if (Math.hypot(x - P.pos.x, z - P.pos.z) < 15) continue;
+    let bad = false;
+    for (const s of solids) if (insideFoot(s, x, z, 1.5)) { bad = true; break; }
+    if (bad) continue;
+    return out.set(x, 0, z);
+  }
+  return out.set(-P.pos.x * .5, 0, -P.pos.z * .5);
+}
+function updateWaves(dt) {
+  if (!WAVE.active) {
+    if (WAVE.next > 0 && (WAVE.next -= dt) <= 0) { WAVE.next = 0; betweenWaves(); }
+    return;
+  }
+  const alive = aliveCount();
+  const maxAlive = Math.min(26, 6 + WAVE.n * 1.2);
+  WAVE.spawnT -= dt;
+  if (WAVE.queue.length && WAVE.spawnT <= 0 && alive < maxAlive) {
+    const group = Math.min(WAVE.queue.length, 2 + Math.floor(Math.random() * Math.min(4, 1 + WAVE.n / 3)));
+    const c = spawnPoint(_v3);
+    for (let i = 0; i < group; i++) {
+      const type = WAVE.queue.shift();
+      const x = c.x + rand(-3, 3), z = c.z + rand(-3, 3);
+      const e = spawnEnemy(type, x, z);
+      e.hp = e.maxHp = Math.round(e.d.hp * WAVE.hpMul);
+      burst(_v2.set(e.pos.x, e.pos.y + .2, e.pos.z), 8, 5, e.d.color, 1, .6, 3, .3);
+    }
+    WAVE.spawnT = Math.max(1.1, 2.8 - WAVE.n * .08);
+  }
+  if (!WAVE.queue.length && alive === 0) {
+    WAVE.active = false;
+    P.hp = Math.min(P.maxHp, P.hp + 15);
+    banner('WAVE CLEAR', '+15 HP');
+    emit('onWaveClear', WAVE.n);
+    WAVE.next = 1.6;
+  }
+}
+// between waves: step 4 offers upgrades here
+function betweenWaves() { startWave(WAVE.n + 1); }
+
+/* =====================================================================
+   Banner, HP, wave, grab prompt
+   ===================================================================== */
+const bannerEl = $('#banner');
+let bannerT = 0;
+function banner(title, sub) {
+  bannerEl.innerHTML = `<div class="bt">${title}</div>${sub ? `<div class="bs">${sub}</div>` : ''}`;
+  bannerEl.classList.remove('show'); void bannerEl.offsetWidth; bannerEl.classList.add('show');
+  bannerT = 2.2;
+}
+const hpFill = $('#hpFill'), hpTxt = $('#hpTxt'), waveTxt = $('#waveTxt'), grabUI = $('#grabUI'), grabBar = $('#grabBar');
+let lastHpKey = '', lastWaveKey = '';
+function updateHUD2(dt) {
+  const hk = P.hp + '/' + P.maxHp;
+  if (hk !== lastHpKey) {
+    lastHpKey = hk;
+    hpFill.style.width = clamp(P.hp / P.maxHp * 100, 0, 100) + '%';
+    hpTxt.textContent = Math.ceil(P.hp);
+    hpFill.classList.toggle('low', P.hp / P.maxHp < .3);
+  }
+  const left = WAVE.queue.length + aliveCount();
+  const wk = WAVE.n + '|' + left;
+  if (wk !== lastWaveKey) { lastWaveKey = wk; waveTxt.innerHTML = WAVE.n ? `WAVE <b>${WAVE.n}</b><span>${left} LEFT</span>` : ''; }
+  grabUI.classList.toggle('hidden', !P.grabbed);
+  if (P.grabbed) grabBar.style.width = (P.grabProg / P.grabNeed * 100) + '%';
+  vignetteT = Math.max(0, vignetteT - dt * 2.2);
+  const lowHp = P.hp / P.maxHp < .3 ? .25 + .1 * Math.sin(performance.now() / 180) : 0;
+  vignette.style.opacity = Math.max(vignetteT, lowHp).toFixed(3);
+  if (bannerT > 0 && (bannerT -= dt) <= 0) bannerEl.classList.remove('show');
+}
+
+/* =====================================================================
+   Game over
+   ===================================================================== */
+function gameOver() {
+  if (state !== 'playing') return;
+  state = 'gameover';
+  releaseAllTouches(); setPlayingUI(false);
+  if (pointerLocked()) document.exitPointerLock();
+  const best = store.get('best', { wave: 0, speed: 0, damage: 0 });
+  const reached = WAVE.n, isBest = reached > best.wave;
+  const nb = { wave: Math.max(best.wave, reached), speed: Math.max(best.speed, P.topSpeed), damage: Math.max(best.damage, stats.damage) };
+  store.set('best', nb);
+  $('#overStats').innerHTML = `
+    <span>Wave reached</span><b>${reached}${isBest ? ' ★' : ''}</b>
+    <span>Top speed</span><b>${P.topSpeed.toFixed(1)} m/s</b>
+    <span>Total damage</span><b>${Math.round(stats.damage).toLocaleString()}</b>
+    <span>Kills</span><b>${stats.kills}</b>
+    <span>Best wave</span><b>${nb.wave}</b>`;
+  $('#overTitle').textContent = isBest ? 'NEW BEST' : 'WIPED OUT';
+  emit('onGameOver');
+  setTimeout(() => { if (state === 'gameover') show('over'); }, 700);
+}
+
+/* =====================================================================
    Main loop
    ===================================================================== */
 const debug = { manual: false };
@@ -1751,6 +2171,7 @@ function simulate(dt) {
   updateWeapons(dt);
   updateEnemies(dt);
   updateTimers(dt);
+  updateWaves(dt);
   edgeR = damp(edgeR, edgeTarget, 1.2, dt);
 }
 function adaptQuality(dt) {
@@ -1770,6 +2191,7 @@ function frame(now) {
     if (!debug.manual) simulate(dt);
     updateCamera(dt);
     updateHUD();
+    updateHUD2(dt);
     pushShadow(P.pos.x, P.pos.z, P.pos.y, 1.1);
     updateViewmodel(dt);
   }
@@ -1777,6 +2199,8 @@ function frame(now) {
     updateParticles(state === 'playing' ? dt : 0);
     updateTracers(state === 'playing' ? dt : 0);
     updateEnemyMeshes();
+    updateEnemyExtras();
+    updatePuddles(state === 'playing' ? dt : 0);
     updateDmgNumbers(state === 'playing' ? dt : 0);
   } else if (state === 'title') {
     const t = now / 1000 * .08;
@@ -1803,7 +2227,7 @@ function tick(seconds) {
   const n = Math.round(seconds * 60);
   for (let i = 0; i < n; i++) { simulate(1 / 60); updateCamera(1 / 60); clearEdges(); }
 }
-window.__redline = { debug, tick, hooks, enemies, WEAPONS, WS, stats, spawnEnemy, damageEnemy, ETYPES, P, input, T, mods, get state() { return state; }, startGame, pauseGame, resumeGame, groundAt, terrainH, solids, settings, layout: () => layout };
+window.__redline = { edgeTarget: () => edgeTarget, debug, tick, hooks, WAVE, startWave, hurtPlayer, puddles, dropPuddle, releaseGrab, enemies, WEAPONS, WS, stats, spawnEnemy, damageEnemy, ETYPES, P, input, T, mods, get state() { return state; }, startGame, pauseGame, resumeGame, groundAt, terrainH, solids, settings, layout: () => layout };
 </script>
 </body>
 </html>

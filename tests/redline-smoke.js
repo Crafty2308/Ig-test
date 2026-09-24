@@ -28,7 +28,7 @@ const ok = (n, c, x) => { if (c) pass++; else { fail++; console.log('FAIL: ' + n
 
   await p.tap('[data-act=play]');
   await p.waitForTimeout(300);
-  await p.evaluate(() => { __redline.debug.manual = true; });
+  await p.evaluate(() => { __redline.debug.manual = true; __redline.WAVE.next = 1e9; });
   const cdp = await ctx.newCDPSession(p);
   const touch = (type, pts) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: pts.map((q, i) => ({ x: q[0], y: q[1], id: q[2] ?? i })) });
   const run = s => p.evaluate(s => __redline.tick(s), s);
@@ -163,6 +163,75 @@ const ok = (n, c, x) => { if (c) pass++; else { fail++; console.log('FAIL: ' + n
   ok('swap cycles weapons', W2.swap === 1, W2);
   await shot('05-weapons');
 
+  // --- step 3: enemies, getting hit, waves
+  const E3 = await R(() => {
+    const r = __redline, { P, input, enemies, spawnEnemy, WS, tick } = r;
+    const out = {};
+    const reset = () => {
+      enemies.length = 0; for (const q of r.puddles) q.life = 0;
+      P.pos.set(-20, 0, 40); P.pos.y = r.terrainH(-20, 40); P.vel.set(0, 0, 0); P.yaw = -Math.PI / 2; P.pitch = 0;
+      P.onGround = true; P.wall = null; P.dashActive = 0; P.sliding = false; P.slamming = false; P.grabbed = null;
+      P.hp = P.maxHp; P.invuln = 0; WS.idx = 0; WS.cd = 0; WS.swap = 0; WS.windup = 0; WS.buf = 0;
+      input.mx = input.my = 0;
+    };
+    const mk = (type, dx, dz) => { const e = spawnEnemy(type, P.pos.x + dx, P.pos.z + dz); e.spawnT = 0; return e; };
+    // getting hit costs HP and a chunk of speed, then i-frames
+    reset(); P.vel.set(20, 0, 0);
+    r.hurtPlayer(10, P.pos.x + 1, P.pos.z);
+    out.hit = { hp: P.hp, speed: Math.hypot(P.vel.x, P.vel.z), again: r.hurtPlayer(10, P.pos.x + 1, P.pos.z) };
+    // chaser runs you down when you stand still
+    reset(); mk('chaser', 8, 0); tick(2.5);
+    out.chaser = P.hp;
+    // grabber pins you to 0 speed until you mash
+    reset(); const g = mk('grabber', 1.3, 0); g.grabCd = 0; P.vel.set(10, 0, 0); tick(.2);
+    out.grab = { grabbed: P.grabbed === g, speed: Math.hypot(P.vel.x, P.vel.z) };
+    input.my = 1; tick(.3); out.grab.stillPinned = Math.hypot(P.vel.x, P.vel.z) < .01; input.my = 0;
+    let presses = 0; while (P.grabbed && presses < 20) { input.attackPressed = true; tick(1 / 60); tick(.05); presses++; }
+    out.grab.freedAfter = presses; out.grab.free = !P.grabbed;
+    // sludge puddle slows you to a crawl
+    reset(); input.my = 1; tick(.6); r.dropPuddle(P.pos.x + 3, P.pos.z); r.puddles.forEach(q => { if (q.life > 0) q.r = 6; }); tick(1.2);
+    out.puddle = Math.hypot(P.vel.x, P.vel.z); input.my = 0;
+    // well pulls you in
+    reset(); P.pos.set(-8, 0, 20); P.pos.y = r.terrainH(-8, 20); const w = spawnEnemy('well', 2, 20); w.spawnT = 0; tick(.5);
+    out.well = { vx: P.vel.x, moved: P.pos.x + 8 };
+    // shielder: frontal hit below threshold is blocked, fast hit breaks it, back hit always lands
+    reset(); let sh = mk('shielder', 2.2, 0); sh.yaw = Math.atan2(-(P.pos.x - sh.pos.x), -(P.pos.z - sh.pos.z)); sh.hp = sh.maxHp = 999;
+    P.vel.set(10, 0, 0); input.attackPressed = true; tick(1 / 60);
+    out.shield = { slowFront: 999 - sh.hp, still: sh.shield };
+    WS.cd = 0; P.vel.set(22, 0, 0); P.pos.x = sh.pos.x - 2.2; input.attackPressed = true; tick(1 / 60);
+    out.shield.broke = !sh.shield; out.shield.fastDmg = 999 - sh.hp;
+    reset(); sh = mk('shielder', 2.2, 0); sh.yaw = Math.atan2(-(P.pos.x - sh.pos.x), -(P.pos.z - sh.pos.z)) + Math.PI; sh.hp = sh.maxHp = 999;
+    P.vel.set(8, 0, 0); input.attackPressed = true; tick(1 / 60);
+    out.shield.backDmg = 999 - sh.hp;
+    // waves: spawn, clear, advance; shrink every 5
+    reset(); r.startWave(1); tick(4);
+    out.wave1 = { n: r.WAVE.n, spawned: enemies.length };
+    for (const e of enemies) e.hp = -1, e.alive = false; r.WAVE.queue.length = 0; tick(.1); tick(2.5);
+    out.wave2 = r.WAVE.n;
+    const edge0 = r.WAVE.n; void edge0;
+    return out;
+  });
+  ok('hit: HP and speed drop', E3.hit.hp === 90 && E3.hit.speed < 12, E3.hit);
+  ok('hit: brief invulnerability', E3.hit.again === false, E3.hit);
+  ok('chaser damages a standing player', E3.chaser < 100, E3);
+  ok('grabber latches and zeroes speed', E3.grab.grabbed && E3.grab.speed < .01 && E3.grab.stillPinned, E3.grab);
+  ok('mashing attack breaks the grab', E3.grab.free && E3.grab.freedAfter >= 6, E3.grab);
+  ok('sludge puddle slows to a crawl', E3.puddle < 5.5, E3);
+  ok('well pulls the player in', E3.well.vx > 1 && E3.well.moved > 0, E3.well);
+  ok('shield blocks slow frontal hits', E3.shield.slowFront === 0 && E3.shield.still, E3.shield);
+  ok('fast frontal hit breaks the shield', E3.shield.broke && E3.shield.fastDmg > 20, E3.shield);
+  ok('hits from behind bypass the shield', E3.shield.backDmg > 6, E3.shield);
+  ok('wave 1 spawns enemies', E3.wave1.n === 1 && E3.wave1.spawned > 0, E3.wave1);
+  ok('clearing a wave starts the next', E3.wave2 === 2, E3);
+  await shot('06-enemies');
+
+  const shrink = await R(() => { const r = __redline; const before = r.edgeTarget(); r.startWave(6); return [before, r.edgeTarget()]; });
+  ok('arena edge shrinks every 5 waves', shrink[1] < shrink[0], shrink);
+
+  // a live look at a mixed wave
+  await R(() => { const r = __redline; r.enemies.length = 0; r.P.hp = 999; r.P.pos.set(0, 1.1, 14); r.P.yaw = 0; r.P.pitch = -.08; r.startWave(8); r.tick(6); });
+  await shot('07-wave8');
+
   // --- settings persist + layout editor
   await R(() => __redline.pauseGame());
   ok('paused', await R(() => __redline.state) === 'paused');
@@ -181,6 +250,17 @@ const ok = (n, c, x) => { if (c) pass++; else { fail++; console.log('FAIL: ' + n
   await shot('04-layout');
   const saved = await R(() => JSON.parse(localStorage.getItem('redline.layout') || 'null'));
   ok('layout drag saved', saved && saved.dash && saved.dash.x < .7, saved);
+
+  // --- game over
+  await p.evaluate(() => { document.querySelector('#layoutEd').classList.add('hidden'); __redline.resumeGame(); });
+  await R(() => { const r = __redline; r.P.hp = 100; r.P.invuln = 0; r.hurtPlayer(500); });
+  await p.waitForTimeout(900);
+  ok('game over screen', await p.isVisible('#over') && await R(() => __redline.state) === 'gameover');
+  await shot('08-over');
+  ok('best wave saved', await R(() => (JSON.parse(localStorage.getItem('redline.best')) || {}).wave >= 1));
+  await p.tap('[data-act=retry]');
+  await p.waitForTimeout(200);
+  ok('retry restarts', await R(() => __redline.state) === 'playing' && await R(() => __redline.P.hp) === 100);
 
   // --- portrait shows rotate screen
   await p.setViewportSize({ width: 390, height: 844 });
