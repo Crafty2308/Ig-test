@@ -122,6 +122,47 @@ const ok = (n, c, x) => { if (c) pass++; else { fail++; console.log('FAIL: ' + n
   ok('wall-jump gives a speed boost away from wall', wr.off && wr.s2 > wr.s1 + 2 && wr.vx < 0, wr);
   await shot('02-wall');
 
+  // --- step 2: weapons, damage = speed × multiplier
+  const W2 = await R(() => {
+    const { P, input, enemies, spawnEnemy, WS, tick } = __redline;
+    const out = {};
+    const arena = () => { enemies.length = 0; };
+    const setup = (speed, weapon) => {
+      arena();
+      P.pos.set(-20, 0, 40); P.vel.set(speed, 0, 0); P.yaw = -Math.PI / 2; P.pitch = -.15; P.onGround = true; P.wall = null;
+      P.dashActive = 0; P.sliding = false; P.slamming = false; P.grabbed = false;
+      WS.idx = weapon; WS.cd = 0; WS.swap = 0; WS.windup = 0; WS.buf = 0;
+      const e = spawnEnemy('dummy', -17.5, 40, { home: { x: 0, z: 0 } }); e.spawnT = 0; e.hp = e.maxHp = 5000;
+      return e;
+    };
+    // 0 speed → 0 damage
+    let e = setup(0, 0); input.attackPressed = true; tick(1 / 60);
+    out.zero = e.maxHp - e.hp;
+    // blade at 12 m/s → 12 damage, speed kept (pure hit, no decay window)
+    e = setup(12, 0); input.attackPressed = true; tick(1 / 60);
+    out.blade = { dmg: e.maxHp - e.hp, speedAfter: Math.hypot(P.vel.x, P.vel.z) };
+    // hammer at 10 m/s: 4.5x, consumes speed
+    e = setup(10, 1); P.vel.set(10, 0, 0); input.attackPressed = true; tick(.4);
+    out.hammer = { dmg: e.maxHp - e.hp, speedAfter: Math.hypot(P.vel.x, P.vel.z) };
+    // shotgun: recoil pushes you backwards
+    e = setup(0, 2); P.pitch = 0; input.attackPressed = true; tick(1 / 60);
+    out.shotgun = { dmg: e.maxHp - e.hp, vx: P.vel.x };
+    e = setup(15, 2); P.pitch = 0; P.vel.set(15, 0, 0); input.attackPressed = true; tick(1 / 60);
+    out.shotgunFast = e.maxHp - e.hp;
+    // swap cycles
+    WS.idx = 0; WS.windup = 0; input.swapPressed = true; tick(1 / 60); out.swap = WS.idx;
+    enemies.length = 0;
+    return out;
+  });
+  ok('0 speed deals 0 damage', W2.zero === 0, W2);
+  ok('blade: damage = speed x 1.0', Math.abs(W2.blade.dmg - 12) < .6, W2.blade);
+  ok('blade keeps speed on hit', W2.blade.speedAfter > 11.5, W2.blade);
+  ok('hammer: big hit, spends all speed', W2.hammer.dmg > 30 && W2.hammer.speedAfter < .5, W2.hammer);
+  ok('shotgun at 0 speed: 0 dmg but recoil launches back', W2.shotgun.dmg === 0 && W2.shotgun.vx < -8, W2.shotgun);
+  ok('shotgun at speed deals damage', W2.shotgunFast > 20, W2);
+  ok('swap cycles weapons', W2.swap === 1, W2);
+  await shot('05-weapons');
+
   // --- settings persist + layout editor
   await R(() => __redline.pauseGame());
   ok('paused', await R(() => __redline.state) === 'paused');
