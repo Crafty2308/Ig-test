@@ -109,6 +109,30 @@ button.b.ghost{border-color:#4a3a44; background:transparent}
 #grabUI .gt{font-weight:900; letter-spacing:.2em; font-size:16px; color:#e2b0ff; text-shadow:0 0 10px #b04aff; animation:blink .18s infinite alternate}
 #grabUI .gbar{width:220px; height:8px; margin:6px auto 0; background:rgba(255,255,255,.15); transform:skewX(-20deg)}
 #grabUI .gbar i{display:block; height:100%; width:0; background:#d9a0ff; box-shadow:0 0 8px #b04aff}
+#crosshair.hit::before,#crosshair.hit::after{background:#ff2a3d}
+#crosshair.hit{transform:scale(1.35) rotate(45deg); transition:transform .05s}
+#crosshair.kill{transform:scale(1.8) rotate(45deg)}
+#speedo .bar{position:relative; overflow:visible}
+#speedo .fill{border-radius:3px}
+#speedo .tick{position:absolute; top:-3px; bottom:-3px; width:2px; background:#7fe0ff; box-shadow:0 0 4px #7fe0ff}
+#speedo .tick.decay{background:#ff2a3d; box-shadow:0 0 4px #ff2a3d}
+#wpills{display:flex; gap:6px; justify-content:center; margin-top:4px}
+#wpills span{font-size:9px; letter-spacing:.2em; padding:2px 6px; border:1px solid rgba(255,255,255,.2); color:var(--muted); transform:skewX(-14deg)}
+#wpills span.on{color:#140306; background:var(--c); border-color:var(--c); font-weight:900}
+#refund{position:absolute; left:50%; bottom:calc(var(--sab) + 120px); transform:translateX(-50%); font-weight:900; letter-spacing:.2em; font-size:13px; color:#5ee1ff; opacity:0; text-shadow:0 0 10px #5ee1ff}
+#refund.show{animation:refundUp 1.1s ease-out forwards}
+@keyframes refundUp{0%{opacity:0; transform:translate(-50%,10px)}15%{opacity:1; transform:translate(-50%,0)}75%{opacity:1}100%{opacity:0; transform:translate(-50%,-14px)}}
+.rule{margin:0; font-size:12px; letter-spacing:.14em; color:var(--ink); opacity:.85; text-align:center}
+.rule b{color:var(--red)}
+#upCards{gap:14px; align-items:stretch}
+.card{appearance:none; font:inherit; color:var(--ink); cursor:pointer; touch-action:manipulation; width:clamp(150px,26vw,230px); min-height:clamp(120px,34vh,180px);
+  background:linear-gradient(160deg, rgba(60,14,24,.95), rgba(18,8,16,.95)); border:2px solid #5a2a38; border-radius:6px; padding:14px 12px;
+  display:flex; flex-direction:column; gap:8px; align-items:center; justify-content:center; text-align:center; position:relative; transform:skewX(-4deg); transition:transform .08s, border-color .08s}
+.card:hover,.card:active{border-color:var(--red); transform:skewX(-4deg) translateY(-3px)}
+.card .n{font-weight:900; font-style:italic; letter-spacing:.1em; font-size:clamp(14px,4.2vh,19px); text-transform:uppercase}
+.card .d{font-size:13px; color:#d9cbd3; line-height:1.4}
+.card .k{position:absolute; top:6px; left:10px; font-size:11px; color:var(--muted)}
+.card .lv{position:absolute; top:6px; right:10px; font-size:10px; color:#ffd24a; letter-spacing:.15em}
 #vignette{position:absolute; inset:0; opacity:0; background:radial-gradient(ellipse at center, transparent 45%, rgba(255,20,40,.75) 100%)}
 </style>
 <script type="importmap">
@@ -128,18 +152,26 @@ button.b.ghost{border-color:#4a3a44; background:transparent}
   <div id="grabUI" class="hidden"><div class="gt">GRABBED — MASH ATTACK!</div><div class="gbar"><i id="grabBar"></i></div></div>
   <div id="crosshair"></div>
   <div id="dashPips"></div>
-  <div id="speedo"><div class="num">0</div><div class="unit">M/S</div><div class="bar"><div class="fill"></div></div><div class="wpn"></div></div>
+  <div id="speedo"><div class="num">0</div><div class="unit">M/S</div><div class="bar"><div class="fill"></div><i class="tick" id="tickShield"></i><i class="tick decay" id="tickDecay"></i></div><div class="wpn"></div><div id="wpills"></div></div>
+  <div id="refund"></div>
 </div>
 
 <div id="title" class="screen">
   <h1>REDLINE</h1>
   <p class="tag">speed is damage</p>
+  <p class="rule">DAMAGE = <b>YOUR SPEED</b> × WEAPON · STAND STILL AND YOU DEAL <b>0</b></p>
   <div class="row">
     <button class="b primary" data-act="play">Play</button>
     <button class="b ghost" data-act="settings">Settings</button>
   </div>
   <div class="tag" id="bestTxt"></div>
   <div class="hint" id="titleHint"></div>
+</div>
+
+<div id="upgrade" class="screen hidden">
+  <p class="tag" id="upWave">WAVE CLEARED</p>
+  <h2>CHOOSE AN UPGRADE</h2>
+  <div class="row" id="upCards"></div>
 </div>
 
 <div id="over" class="screen hidden">
@@ -153,6 +185,7 @@ button.b.ghost{border-color:#4a3a44; background:transparent}
 
 <div id="pause" class="screen hidden">
   <h2>PAUSED</h2>
+  <div class="tag" id="pauseUps" style="max-width:640px;text-align:center;line-height:1.8"></div>
   <div class="row">
     <button class="b primary" data-act="resume">Resume</button>
     <button class="b ghost" data-act="settings">Settings</button>
@@ -226,7 +259,7 @@ const T = {
 const mods = {};
 function resetMods() {
   Object.assign(mods, { wallBuild: 1, dashMax: 2, dashRecharge: 1, slamRadius: 1, decayBonus: 0, wjBoost: 1,
-    bladeMult: 1, hammerKeep: 0, pellets: 0, recoilMul: 1, shieldBreak: 1, hitKnock: 1 });
+    bladeMult: 1, hammerKeep: 0, pellets: 0, recoilMul: 1, shieldBreak: 1, hitKnock: 1, refund: 0, leech: 0 });
 }
 resetMods();
 
@@ -706,6 +739,7 @@ function startWallRun() {
     P.wall = { nx: contact.nx, nz: contact.nz, id: contact.id, t: 0, lost: 0 };
     P.vel.y = P.vel.y < 0 ? P.vel.y * .2 : Math.min(P.vel.y, 4);
     P.sliding = false;
+    emit('onWallRun');
   }
 }
 
@@ -828,7 +862,7 @@ touchUI.innerHTML = `
 #touchUI{position:fixed; inset:0; z-index:6; touch-action:none}
 #touchUI .tb{position:absolute; border-radius:50%; display:flex; align-items:center; justify-content:center; pointer-events:none;
   border:2px solid rgba(255,255,255,.35); background:rgba(20,10,20,.28); color:rgba(255,255,255,.85);
-  font-weight:900; font-size:11px; letter-spacing:.12em; transform:translate(-50%,-50%); backdrop-filter:blur(2px); -webkit-backdrop-filter:blur(2px)}
+  font-weight:900; font-size:11px; letter-spacing:.12em; transform:translate(-50%,-50%)}
 #touchUI .tb.down{background:rgba(255,42,61,.55); border-color:#ff2a3d; transform:translate(-50%,-50%) scale(.93)}
 #touchUI .tb[data-id=attack]{border-color:rgba(255,42,61,.8); font-size:13px}
 #touchUI .tb .cd{position:absolute; inset:-2px; border-radius:50%; pointer-events:none}
@@ -898,7 +932,7 @@ function pressButton(id, down) {
   if (down) haptic(8);
 }
 function onTouchStart(e) {
-  e.preventDefault();
+  if (e.cancelable) e.preventDefault();
   unlockAudio();
   if (state !== 'playing') return;
   for (const t of e.changedTouches) {
@@ -914,7 +948,7 @@ function onTouchStart(e) {
   }
 }
 function onTouchMove(e) {
-  e.preventDefault();
+  if (e.cancelable) e.preventDefault();
   if (state !== 'playing') return;
   const k = .0052 * settings.sens;
   for (const t of e.changedTouches) {
@@ -934,7 +968,7 @@ function onTouchMove(e) {
   }
 }
 function onTouchEnd(e) {
-  e.preventDefault();
+  if (e.cancelable) e.preventDefault();
   for (const t of e.changedTouches) {
     const rec = touches.get(t.identifier); if (!rec) continue;
     touches.delete(t.identifier);
@@ -1017,17 +1051,6 @@ let IS_TOUCH_ACTIVE = IS_TOUCH;
 addEventListener('touchstart', () => { if (!IS_TOUCH_ACTIVE) { IS_TOUCH_ACTIVE = true; if (state === 'playing') touchUI.classList.remove('hidden'); } }, { passive: true });
 
 /* =====================================================================
-   Audio (unlock only for now)
-   ===================================================================== */
-let actx = null;
-function unlockAudio() {
-  try {
-    if (!actx) { const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return; actx = new AC(); }
-    if (actx.state === 'suspended') actx.resume();
-  } catch (e) { /* no audio */ }
-}
-
-/* =====================================================================
    HUD
    ===================================================================== */
 const speedo = $('#speedo'), speedNum = speedo.querySelector('.num'), speedFill = speedo.querySelector('.fill');
@@ -1070,7 +1093,7 @@ function updateHUD() {
    Game state, screens
    ===================================================================== */
 let state = 'title', settingsReturn = 'title';
-const screens = { title: $('#title'), pause: $('#pause'), settings: $('#settings'), over: $('#over') };
+const screens = { title: $('#title'), pause: $('#pause'), settings: $('#settings'), over: $('#over'), upgrade: $('#upgrade') };
 function show(name) {
   for (const k in screens) screens[k].classList.toggle('hidden', k !== name);
 }
@@ -1092,11 +1115,13 @@ function setupRun() {
   Object.assign(WAVE, { n: 0, queue: [], active: false, next: 1.2, dmgMul: 1, hpMul: 1 });
   for (const q of puddles) q.life = 0;
   lastHpKey = lastWaveKey = '';
+  for (const k in taken) delete taken[k];
+  bank = 0;
   bannerEl.classList.remove('show');
 }
 function pauseGame() {
   if (state !== 'playing') return;
-  state = 'paused'; releaseAllTouches(); show('pause'); setPlayingUI(false);
+  state = 'paused'; releaseAllTouches(); showRunUpgrades(); show('pause'); setPlayingUI(false);
   if (pointerLocked()) document.exitPointerLock();
 }
 function resumeGame() {
@@ -1598,6 +1623,11 @@ function hammerSmash() {
   const w = WEAPONS[1], spd = dmgSpeed();
   const px = P.pos.x + fwd.x * w.reach, pz = P.pos.z + fwd.z * w.reach;
   const py = groundAt(px, pz, P.pos.y + 1, _gp).h;
+  // the hammer spends your momentum (before damage, so kill refunds land on top)
+  const kept = spd * mods.hammerKeep;
+  setHSpeed(kept);
+  if (kept < .01) { P.vel.x = 0; P.vel.z = 0; }
+  emit('onSpend', spd - kept);
   let n = 0;
   for (const e of enemies) {
     if (!e.alive || e.spawnT > 0) continue;
@@ -1608,11 +1638,6 @@ function hammerSmash() {
     damageEnemy(e, spd * w.mult * fall, dir, { weapon: 'hammer', speed: spd, knock: 1.8, lift: 6, from: P.pos });
     n++;
   }
-  // the hammer spends your momentum
-  const kept = spd * mods.hammerKeep;
-  emit('onSpend', spd - kept);
-  setHSpeed(kept);
-  if (kept < .01) { P.vel.x = 0; P.vel.z = 0; }
   P.sliding = false;
   ring(px, py, pz, w.radius, 22, 0xff5a3a);
   burst(_v1.set(px, py + .3, pz), 18, 8, 0xffb080, 1.2, .5, 5);
@@ -1765,6 +1790,7 @@ function updateViewmodel(dt) {
   const hh = .5 * Math.tan(vmCam.fov * Math.PI / 360), hw = hh * vmCam.aspect;
   vmRoot.position.set(Math.min(hw * .58, .42) + vm.swayX + bobX, -hh * .72 + vm.swayY + bob - swapK * .45 - (P.sliding ? .03 : 0), -.5);
   vmRoot.rotation.set(0, 0, P.sliding ? .12 : 0);
+  vmRoot.scale.setScalar(clamp(vmCam.aspect / 2.1, .68, 1));   // tablets (4:3) get a smaller weapon
   m.position.set(0, 0, 0); m.rotation.set(0, 0, 0);
   if (w.id === 'blade') {
     vm.swingT = Math.min(1, vm.swingT + dt / .2);
@@ -2076,7 +2102,7 @@ function spawnPoint(out) {
 }
 function updateWaves(dt) {
   if (!WAVE.active) {
-    if (WAVE.next > 0 && (WAVE.next -= dt) <= 0) { WAVE.next = 0; betweenWaves(); }
+    if (WAVE.next > 0 && (WAVE.next -= dt) <= 0) { WAVE.next = 0; if (WAVE.n === 0) startWave(1); else betweenWaves(); }
     return;
   }
   const alive = aliveCount();
@@ -2160,6 +2186,215 @@ function gameOver() {
 }
 
 /* =====================================================================
+   Upgrades — pick 1 of 3 between waves
+   ===================================================================== */
+const UPGRADES = [
+  { id: 'wallrun', name: 'Wall Burner', desc: 'Wall-runs build 2× speed', max: 1, apply() { mods.wallBuild *= 2; } },
+  { id: 'refund', name: 'Momentum Refund', desc: 'Kills refund 50% of the momentum you lost', max: 1, apply() { mods.refund = .5; } },
+  { id: 'dash', name: 'Extra Dash', desc: '+1 dash charge', max: 2, apply() { mods.dashMax++; P.dash++; } },
+  { id: 'slam', name: 'Crater', desc: 'Slam radius +50%', max: 2, apply() { mods.slamRadius += .5; } },
+  { id: 'hammerKeep', name: 'Follow-Through', desc: 'Hammer keeps 25% of your speed', max: 2, apply() { mods.hammerKeep += .25; } },
+  { id: 'recharge', name: 'Quick Charge', desc: 'Dashes recharge 35% faster', max: 2, apply() { mods.dashRecharge *= 1.35; } },
+  { id: 'hp', name: 'Plating', desc: '+25 max HP and a full heal', max: 3, apply() { P.maxHp += 25; P.hp = P.maxHp; } },
+  { id: 'footing', name: 'Sure Footing', desc: 'Hits knock off half as much speed', max: 1, apply() { mods.hitKnock *= .5; } },
+  { id: 'edge', name: 'Kinetic Edge', desc: 'Blade multiplier +0.4', max: 2, apply() { mods.bladeMult += .4; } },
+  { id: 'buck', name: 'Buckshot', desc: 'Shotgun +3 pellets, +25% recoil', max: 2, apply() { mods.pellets += 3; mods.recoilMul += .25; } },
+  { id: 'slip', name: 'Slipstream', desc: 'Speed decay starts 6 m/s later', max: 2, apply() { mods.decayBonus += 6; } },
+  { id: 'launch', name: 'Launch Pad', desc: 'Wall-jump speed boost +60%', max: 2, apply() { mods.wjBoost += .6; } },
+  { id: 'breaker', name: 'Shield Breaker', desc: 'Shields break at 30% lower speed', max: 1, apply() { mods.shieldBreak *= .7; } },
+  { id: 'leech', name: 'Velocity Leech', desc: 'Kills heal 1 HP per 8 m/s of speed', max: 1, apply() { mods.leech = 1; } },
+];
+const taken = {};
+let offer = [];
+function rollUpgrades() {
+  const pool = UPGRADES.filter(u => (taken[u.id] || 0) < u.max);
+  const out = [];
+  while (out.length < 3 && pool.length) out.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0]);
+  return out;
+}
+function offerUpgrades() {
+  offer = rollUpgrades();
+  if (!offer.length) { startWave(WAVE.n + 1); return; }
+  state = 'upgrade';
+  releaseAllTouches(); setPlayingUI(false);
+  if (pointerLocked()) document.exitPointerLock();
+  $('#upCards').innerHTML = offer.map((u, i) => `
+    <button class="card" data-up="${i}">
+      <span class="k">${IS_TOUCH_ACTIVE ? '' : i + 1}</span>
+      <span class="n">${u.name}</span>
+      <span class="d">${u.desc}</span>
+      ${(taken[u.id] || 0) ? `<span class="lv">LV ${(taken[u.id] || 0) + 1}</span>` : ''}
+    </button>`).join('');
+  $('#upWave').textContent = `WAVE ${WAVE.n} CLEARED`;
+  upgradeOpenedAt = performance.now();
+  show('upgrade');
+  sfx.waveClear();
+}
+let upgradeOpenedAt = 0;
+function pickUpgrade(i, fromTap) {
+  const u = offer[i]; if (!u || state !== 'upgrade') return;
+  if (fromTap && performance.now() - upgradeOpenedAt < 450) return;   // a thumb still mid-fight shouldn't pick blindly
+  u.apply(); taken[u.id] = (taken[u.id] || 0) + 1;
+  sfx.pick();
+  state = 'playing'; show(null); setPlayingUI(true); clearEdges(); last = performance.now();
+  if (!IS_TOUCH_ACTIVE) { try { const p = canvas.requestPointerLock(); if (p && p.catch) p.catch(() => {}); } catch (e) {} }
+  startWave(WAVE.n + 1);
+}
+document.addEventListener('click', e => { const c = e.target.closest && e.target.closest('[data-up]'); if (c) pickUpgrade(+c.dataset.up, true); });
+addEventListener('keydown', e => { if (state === 'upgrade' && /^Digit[123]$/.test(e.code)) pickUpgrade(+e.code.slice(5) - 1); });
+betweenWaves = offerUpgrades;
+
+// momentum bank: speed you lose (hits, grabs, hammer) can be refunded on kills
+let bank = 0;
+on('onSpend', lost => { bank += lost; });
+on('onKill', () => {
+  if (mods.refund && bank > .5) {
+    const gain = bank * mods.refund; bank = 0;
+    const hs = hspeed();
+    if (hs > .5) setHSpeed(hs + gain); else { P.vel.x += fwd.x * gain; P.vel.z += fwd.z * gain; }
+    refundFlash(gain);
+  }
+  if (mods.leech) { P.hp = Math.min(P.maxHp, P.hp + Math.floor(hspeed() / 8)); }
+});
+function decayBank(dt) { bank *= Math.exp(-dt / 5); }
+
+/* =====================================================================
+   Audio — procedural WebAudio, unlocked on the first touch (iOS)
+   ===================================================================== */
+const AU = { ctx: null, master: null, noise: null, wind: null, windGain: null, windFilter: null, last: {} };
+function unlockAudio() {
+  try {
+    if (!AU.ctx) {
+      const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return;
+      const ctx = AU.ctx = new AC();
+      const comp = ctx.createDynamicsCompressor(); comp.threshold.value = -14; comp.ratio.value = 6; comp.connect(ctx.destination);
+      AU.master = ctx.createGain(); AU.master.gain.value = settings.volume; AU.master.connect(comp);
+      const len = ctx.sampleRate; const buf = ctx.createBuffer(1, len, ctx.sampleRate), d = buf.getChannelData(0);
+      for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+      AU.noise = buf;
+      // silent blip: the actual iOS unlock
+      const s = ctx.createBufferSource(); s.buffer = ctx.createBuffer(1, 1, 22050); s.connect(ctx.destination); s.start(0);
+      // wind bed that rises with speed
+      const w = ctx.createBufferSource(); w.buffer = buf; w.loop = true;
+      AU.windFilter = ctx.createBiquadFilter(); AU.windFilter.type = 'bandpass'; AU.windFilter.Q.value = .7; AU.windFilter.frequency.value = 500;
+      AU.windGain = ctx.createGain(); AU.windGain.gain.value = 0;
+      w.connect(AU.windFilter); AU.windFilter.connect(AU.windGain); AU.windGain.connect(AU.master); w.start();
+    }
+    if (AU.ctx.state === 'suspended' || AU.ctx.state === 'interrupted') AU.ctx.resume();
+  } catch (e) { /* no audio available */ }
+}
+for (const ev of ['touchend', 'pointerdown', 'keydown', 'click']) addEventListener(ev, unlockAudio, { capture: true, passive: true });
+function tone(type, f0, f1, dur, vol, delay = 0, attack = .005) {
+  const c = AU.ctx; if (!c || c.state !== 'running') return;
+  const t = c.currentTime + delay, o = c.createOscillator(), g = c.createGain();
+  o.type = type; o.frequency.setValueAtTime(f0, t); o.frequency.exponentialRampToValueAtTime(Math.max(20, f1), t + dur);
+  g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(vol, t + attack); g.gain.exponentialRampToValueAtTime(.0005, t + dur);
+  o.connect(g); g.connect(AU.master); o.start(t); o.stop(t + dur + .02);
+}
+function noise(dur, vol, f0, f1, ftype = 'bandpass', q = 1, delay = 0) {
+  const c = AU.ctx; if (!c || c.state !== 'running') return;
+  const t = c.currentTime + delay, s = c.createBufferSource(), f = c.createBiquadFilter(), g = c.createGain();
+  s.buffer = AU.noise; s.playbackRate.value = rand(.9, 1.1);
+  f.type = ftype; f.Q.value = q; f.frequency.setValueAtTime(f0, t); f.frequency.exponentialRampToValueAtTime(Math.max(30, f1), t + dur);
+  g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(.0005, t + dur);
+  s.connect(f); f.connect(g); g.connect(AU.master); s.start(t, rand(0, .5)); s.stop(t + dur + .02);
+}
+function throttle(key, ms) { const n = performance.now(); if (n - (AU.last[key] || 0) < ms) return false; AU.last[key] = n; return true; }
+const sfx = {
+  hit(d) {
+    if (!throttle('hit', 35)) return;
+    const k = clamp(d / 120, 0, 1);
+    noise(.07 + k * .1, .35 + k * .3, 3500, 800, 'highpass', .8);
+    tone('square', 420 - k * 220, 120 - k * 60, .09 + k * .12, .12 + k * .1);
+    if (d > 60) tone('sine', 110, 40, .3, .45);
+  },
+  zero() { if (throttle('zero', 60)) tone('triangle', 180, 150, .06, .12); },
+  swing() { noise(.13, .22, 2400, 600, 'bandpass', 2); },
+  windup() { tone('sawtooth', 90, 180, .24, .08); },
+  hammer(n) { tone('sine', 110, 32, .5, .7); noise(.4, .5, 1200, 80, 'lowpass', .7); if (n) tone('square', 220, 60, .2, .15); },
+  shotgun() { noise(.3, .8, 4000, 200, 'lowpass', .6); tone('sine', 150, 45, .22, .6); },
+  dash() { noise(.22, .45, 350, 2600, 'bandpass', 1.4); },
+  jump() { tone('sine', 280, 460, .08, .09); },
+  land(i) { if (i > 7 && throttle('land', 80)) noise(.12, clamp(i / 40, .08, .4), 600, 90, 'lowpass', .8); },
+  slam() { tone('sine', 80, 26, .7, .9); noise(.6, .7, 1600, 60, 'lowpass', .8); tone('square', 60, 30, .3, .15); },
+  walljump() { tone('triangle', 330, 660, .1, .12); noise(.1, .15, 1500, 3000, 'bandpass', 2); },
+  wallrun() { noise(.18, .12, 900, 1600, 'bandpass', 3); },
+  hurt() { tone('sawtooth', 220, 70, .28, .32); noise(.2, .35, 900, 200, 'lowpass', .8); },
+  grab() { tone('sawtooth', 70, 60, .5, .3); tone('square', 140, 90, .4, .12); },
+  mash(k) { tone('square', 300 + k * 500, 250 + k * 500, .04, .08); },
+  free() { tone('triangle', 300, 900, .2, .2); noise(.2, .25, 800, 3000, 'bandpass', 1); },
+  kill() { if (!throttle('kill', 40)) return; tone('triangle', 520, 1250, .14, .18); tone('sine', 1500, 2200, .08, .06, .05); },
+  block() { if (!throttle('block', 60)) return; tone('square', 880, 860, .07, .12); tone('square', 1320, 1300, .1, .07); },
+  shieldBreak() { noise(.35, .5, 5000, 1500, 'highpass', .7); tone('triangle', 1200, 300, .3, .15); },
+  waveStart() { [0, 4, 7, 12].forEach((s, i) => tone('sawtooth', 110 * Math.pow(2, s / 12), 110 * Math.pow(2, s / 12), .35, .1, i * .09, .01)); tone('sine', 55, 40, .9, .4); },
+  waveClear() { [0, 7, 12, 16, 19].forEach((s, i) => tone('triangle', 440 * Math.pow(2, s / 12), 440 * Math.pow(2, s / 12), .25, .12, i * .06)); },
+  pick() { tone('square', 660, 990, .1, .1); tone('triangle', 990, 1320, .15, .08, .06); },
+  over() { [12, 7, 3, 0].forEach((s, i) => tone('sawtooth', 110 * Math.pow(2, s / 12), 100 * Math.pow(2, s / 12), .4, .12, i * .16)); },
+  swap() { tone('square', 500, 700, .05, .06); },
+  refund() { tone('triangle', 700, 1400, .18, .12); },
+};
+on('onHitEnemy', (e, amt) => amt > 0 ? sfx.hit(amt) : sfx.zero());
+on('onKill', () => sfx.kill());
+on('onSwing', () => sfx.swing());
+on('onHammerWindup', () => sfx.windup());
+on('onHammer', n => sfx.hammer(n));
+on('onShoot', () => sfx.shotgun());
+on('onDash', () => { sfx.dash(); haptic(15); });
+on('onJump', () => sfx.jump());
+on('onLand', i => sfx.land(i));
+on('onSlam', () => sfx.slam());
+on('onWallJump', () => { sfx.walljump(); haptic(12); });
+on('onWallRun', () => sfx.wallrun());
+on('onHurt', () => sfx.hurt());
+on('onGrab', () => sfx.grab());
+on('onMash', k => sfx.mash(k));
+on('onGrabBreak', () => sfx.free());
+on('onBlock', () => { sfx.block(); haptic(10); });
+on('onShieldBreak', () => { sfx.shieldBreak(); haptic(30); });
+on('onWaveStart', () => sfx.waveStart());
+on('onGameOver', () => sfx.over());
+on('onSwap', () => sfx.swap());
+function updateAudio(playing) {
+  if (!AU.ctx || !AU.windGain) return;
+  const s = playing ? hspeed() : 0, t = AU.ctx.currentTime;
+  AU.windGain.gain.setTargetAtTime(clamp((s - 8) / 34, 0, 1) * .22, t, .08);
+  AU.windFilter.frequency.setTargetAtTime(350 + s * 45, t, .08);
+}
+onSettingsChanged = () => { if (AU.master) AU.master.gain.value = settings.volume; };
+
+/* =====================================================================
+   HUD polish: hit marker, refund flash, weapon pills, speed ticks
+   ===================================================================== */
+const crosshair = $('#crosshair'), refundEl = $('#refund');
+let hitMarkT = 0;
+on('onHitEnemy', (e, amt) => { if (amt > 0) { hitMarkT = .14; crosshair.classList.add('hit'); } });
+on('onKill', () => { hitMarkT = .22; crosshair.classList.add('hit', 'kill'); });
+function refundFlash(g) {
+  refundEl.textContent = `+${g.toFixed(1)} M/S REFUND`;
+  refundEl.classList.remove('show'); void refundEl.offsetWidth; refundEl.classList.add('show');
+  sfx.refund();
+}
+const pillsEl = $('#wpills');
+pillsEl.innerHTML = WEAPONS.map((w, i) => `<span data-w="${i}">${w.name}</span>`).join('');
+let lastPill = -1;
+function updateHUD3(dt) {
+  if (hitMarkT > 0 && (hitMarkT -= dt) <= 0) crosshair.classList.remove('hit', 'kill');
+  if (WS.idx !== lastPill) { lastPill = WS.idx; pillsEl.querySelectorAll('span').forEach(s => s.classList.toggle('on', +s.dataset.w === WS.idx)); }
+  const shieldAt = SHIELD_SPEED * mods.shieldBreak, decayAt = T.DECAY_START + mods.decayBonus;
+  const tk = shieldAt.toFixed(1) + '|' + decayAt;
+  if (tk !== speedTickKey) {
+    speedTickKey = tk;
+    $('#tickShield').style.left = clamp(shieldAt / 45 * 100, 0, 100) + '%';
+    $('#tickDecay').style.left = clamp(decayAt / 45 * 100, 0, 100) + '%';
+  }
+}
+let speedTickKey = '';
+function showRunUpgrades() {
+  const list = UPGRADES.filter(u => taken[u.id]).map(u => `${u.name}${taken[u.id] > 1 ? ' ×' + taken[u.id] : ''}`);
+  $('#pauseUps').textContent = list.length ? 'UPGRADES: ' + list.join(' · ') : '';
+}
+
+/* =====================================================================
    Main loop
    ===================================================================== */
 const debug = { manual: false };
@@ -2172,6 +2407,7 @@ function simulate(dt) {
   updateEnemies(dt);
   updateTimers(dt);
   updateWaves(dt);
+  decayBank(dt);
   edgeR = damp(edgeR, edgeTarget, 1.2, dt);
 }
 function adaptQuality(dt) {
@@ -2192,6 +2428,7 @@ function frame(now) {
     updateCamera(dt);
     updateHUD();
     updateHUD2(dt);
+    updateHUD3(dt);
     pushShadow(P.pos.x, P.pos.z, P.pos.y, 1.1);
     updateViewmodel(dt);
   }
@@ -2216,6 +2453,7 @@ function frame(now) {
   renderer.render(scene, camera);
   if (state === 'playing' || state === 'paused') { renderer.clearDepth(); renderer.render(vmScene, vmCam); }
   if (!debug.manual) clearEdges();
+  updateAudio(state === 'playing');
   adaptQuality(dt);
 }
 resize();
@@ -2227,7 +2465,7 @@ function tick(seconds) {
   const n = Math.round(seconds * 60);
   for (let i = 0; i < n; i++) { simulate(1 / 60); updateCamera(1 / 60); clearEdges(); }
 }
-window.__redline = { edgeTarget: () => edgeTarget, debug, tick, hooks, WAVE, startWave, hurtPlayer, puddles, dropPuddle, releaseGrab, enemies, WEAPONS, WS, stats, spawnEnemy, damageEnemy, ETYPES, P, input, T, mods, get state() { return state; }, startGame, pauseGame, resumeGame, groundAt, terrainH, solids, settings, layout: () => layout };
+window.__redline = { UPGRADES, taken, pickUpgrade, sfx, AU, edgeTarget: () => edgeTarget, debug, tick, hooks, WAVE, startWave, hurtPlayer, puddles, dropPuddle, releaseGrab, enemies, WEAPONS, WS, stats, spawnEnemy, damageEnemy, ETYPES, P, input, T, mods, get state() { return state; }, startGame, pauseGame, resumeGame, groundAt, terrainH, solids, settings, layout: () => layout };
 </script>
 </body>
 </html>

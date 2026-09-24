@@ -35,6 +35,7 @@ const ok = (n, c, x) => { if (c) pass++; else { fail++; console.log('FAIL: ' + n
   const R = f => p.evaluate(f);
 
   ok('playing', await R(() => __redline.state) === 'playing');
+  ok('first wave starts without an upgrade pick', await R(() => { const r = __redline; r.WAVE.next = .01; r.tick(.1); const ok = r.WAVE.n === 1 && r.state === 'playing'; r.enemies.length = 0; r.WAVE.active = false; r.WAVE.queue.length = 0; r.WAVE.n = 0; r.WAVE.next = 1e9; return ok; }));
   ok('touch UI visible', await p.isVisible('#touchUI'));
   const standing = await R(() => ({ y: __redline.P.pos.y, g: __redline.P.onGround }));
   await run(.3);
@@ -207,7 +208,7 @@ const ok = (n, c, x) => { if (c) pass++; else { fail++; console.log('FAIL: ' + n
     reset(); r.startWave(1); tick(4);
     out.wave1 = { n: r.WAVE.n, spawned: enemies.length };
     for (const e of enemies) e.hp = -1, e.alive = false; r.WAVE.queue.length = 0; tick(.1); tick(2.5);
-    out.wave2 = r.WAVE.n;
+    out.upgradeScreen = r.state;
     const edge0 = r.WAVE.n; void edge0;
     return out;
   });
@@ -222,7 +223,27 @@ const ok = (n, c, x) => { if (c) pass++; else { fail++; console.log('FAIL: ' + n
   ok('fast frontal hit breaks the shield', E3.shield.broke && E3.shield.fastDmg > 20, E3.shield);
   ok('hits from behind bypass the shield', E3.shield.backDmg > 6, E3.shield);
   ok('wave 1 spawns enemies', E3.wave1.n === 1 && E3.wave1.spawned > 0, E3.wave1);
-  ok('clearing a wave starts the next', E3.wave2 === 2, E3);
+  ok('clearing a wave offers upgrades', E3.upgradeScreen === 'upgrade', E3);
+  ok('three upgrade cards shown', await p.locator('#upCards .card').count() === 3);
+  await shot('06b-upgrade');
+  const before = await R(() => ({ ...__redline.mods, hp: __redline.P.maxHp }));
+  await p.waitForTimeout(500);
+  await p.tap('#upCards .card >> nth=0');
+  const after = await R(() => ({ ...__redline.mods, hp: __redline.P.maxHp, n: __redline.WAVE.n, state: __redline.state, taken: Object.keys(__redline.taken).length }));
+  ok('picking an upgrade starts the next wave', after.n === 2 && after.state === 'playing', after);
+  ok('upgrade applied', after.taken === 1 && JSON.stringify(before) !== JSON.stringify(after), { before, after });
+  const RF = await R(() => {
+    const r = __redline, { P, enemies } = r;
+    enemies.length = 0; r.mods.refund = .5;
+    P.pos.set(-20, r.terrainH(-20, 40), 40); P.vel.set(20, 0, 0); P.yaw = -Math.PI / 2; P.pitch = -.1; P.invuln = 0; P.onGround = true;
+    r.hurtPlayer(5, P.pos.x + 1, P.pos.z);
+    const afterHit = Math.hypot(P.vel.x, P.vel.z);
+    const e = r.spawnEnemy('chaser', P.pos.x + 2, P.pos.z); e.spawnT = 0; e.hp = 1;
+    r.WS.idx = 0; r.WS.cd = 0; r.WS.swap = 0; r.input.attackPressed = true; r.tick(1 / 60);
+    r.mods.refund = 0;
+    return { afterHit, afterKill: Math.hypot(P.vel.x, P.vel.z), dead: !e.alive };
+  });
+  ok('kills refund lost momentum (upgrade)', RF.dead && RF.afterKill > RF.afterHit + 3, RF);
   await shot('06-enemies');
 
   const shrink = await R(() => { const r = __redline; const before = r.edgeTarget(); r.startWave(6); return [before, r.edgeTarget()]; });
@@ -268,6 +289,7 @@ const ok = (n, c, x) => { if (c) pass++; else { fail++; console.log('FAIL: ' + n
   ok('rotate screen in portrait', await p.isVisible('#rotate'));
   await p.setViewportSize({ width: 844, height: 390 });
 
+  ok('audio context unlocked by a touch', await R(() => !!__redline.AU.ctx));
   ok('no page errors', errs.length === 0, errs);
   console.log(`${pass} passed, ${fail} failed`);
   await b.close();
