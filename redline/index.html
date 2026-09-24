@@ -1,0 +1,1223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="REDLINE">
+<meta name="application-name" content="REDLINE">
+<meta name="theme-color" content="#08060c">
+<meta name="format-detection" content="telephone=no">
+<meta name="description" content="First-person arena combat where speed is damage.">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<title>REDLINE</title>
+<style>
+:root{
+  --red:#ff2a3d; --red-dim:#7a1320; --ink:#f4eef2; --muted:#9b8f99; --bg:#08060c; --panel:rgba(16,10,18,.86);
+  --sat:env(safe-area-inset-top,0px); --sar:env(safe-area-inset-right,0px);
+  --sab:env(safe-area-inset-bottom,0px); --sal:env(safe-area-inset-left,0px);
+}
+*{box-sizing:border-box}
+html,body{
+  margin:0; padding:0; position:fixed; inset:0; overflow:hidden; background:var(--bg); color:var(--ink);
+  font-family:ui-sans-serif,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  overscroll-behavior:none; touch-action:none;
+  -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; -webkit-tap-highlight-color:transparent;
+  -webkit-text-size-adjust:100%; text-size-adjust:100%;
+}
+canvas#c{position:fixed; inset:0; width:100%; height:100%; display:block; touch-action:none}
+#safeProbe{position:fixed; top:var(--sat); right:var(--sar); bottom:var(--sab); left:var(--sal); pointer-events:none; visibility:hidden}
+.hidden{display:none !important}
+
+/* ---------- screens ---------- */
+.screen{position:fixed; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:14px;
+  padding:calc(var(--sat) + 12px) calc(var(--sar) + 16px) calc(var(--sab) + 12px) calc(var(--sal) + 16px);
+  background:radial-gradient(ellipse at center, rgba(20,6,14,.55), rgba(4,2,6,.88)); z-index:20; touch-action:manipulation}
+.screen h1{margin:0; font-size:clamp(44px,11vh,104px); letter-spacing:.14em; font-weight:900; font-style:italic; line-height:1;
+  color:var(--ink); text-shadow:0 0 24px rgba(255,42,61,.55), 4px 0 0 var(--red)}
+.screen h2{margin:0; font-size:clamp(24px,6vh,44px); letter-spacing:.12em; font-weight:900; font-style:italic}
+.tag{margin:0; color:var(--muted); letter-spacing:.3em; text-transform:uppercase; font-size:12px}
+.row{display:flex; gap:12px; flex-wrap:wrap; justify-content:center}
+button.b{appearance:none; border:2px solid var(--red); background:rgba(255,42,61,.08); color:var(--ink); font:inherit; font-weight:800;
+  letter-spacing:.18em; padding:12px 26px; min-width:150px; border-radius:4px; text-transform:uppercase; cursor:pointer;
+  touch-action:manipulation; transform:skewX(-8deg)}
+button.b:active,button.b.primary{background:var(--red); color:#140306}
+button.b.ghost{border-color:#4a3a44; background:transparent}
+.stats{display:grid; grid-template-columns:auto auto; gap:4px 22px; font-size:15px; letter-spacing:.08em}
+.stats b{color:var(--red); text-align:right; font-variant-numeric:tabular-nums}
+.hint{color:var(--muted); font-size:12px; letter-spacing:.06em; text-align:center; max-width:640px; line-height:1.5}
+
+/* settings */
+#settings{justify-content:flex-start}
+.panel{background:var(--panel); border:1px solid #3a2733; border-radius:8px; padding:14px 18px; width:min(560px,100%);
+  max-height:100%; overflow-y:auto; -webkit-overflow-scrolling:touch; overscroll-behavior:contain; touch-action:pan-y}
+.set{display:flex; align-items:center; justify-content:space-between; gap:14px; padding:9px 0; border-bottom:1px solid #2a1c25; font-size:14px; letter-spacing:.06em}
+.set:last-child{border-bottom:0}
+.set input[type=range]{width:52%; accent-color:var(--red); touch-action:pan-x}
+.set .val{min-width:40px; text-align:right; color:var(--red); font-variant-numeric:tabular-nums}
+.tog{width:54px; height:28px; border-radius:14px; background:#3a2733; position:relative; flex:none; cursor:pointer}
+.tog::after{content:""; position:absolute; top:3px; left:3px; width:22px; height:22px; border-radius:50%; background:#bbb; transition:left .15s}
+.tog.on{background:var(--red)} .tog.on::after{left:29px; background:#fff}
+
+/* rotate */
+#rotate{position:fixed; inset:0; z-index:100; background:var(--bg); display:none; flex-direction:column; align-items:center; justify-content:center; gap:18px; text-align:center; padding:24px}
+#rotate .phone{width:46px; height:80px; border:3px solid var(--ink); border-radius:9px; animation:rot 1.8s ease-in-out infinite}
+@keyframes rot{0%,20%{transform:rotate(0)}55%,100%{transform:rotate(-90deg)}}
+@media (orientation:portrait) and (pointer:coarse){ #rotate{display:flex} }
+
+/* ---------- HUD ---------- */
+#hud{position:fixed; inset:0; pointer-events:none; z-index:5}
+#crosshair{position:absolute; left:50%; top:50%; width:22px; height:22px; margin:-11px 0 0 -11px}
+#crosshair::before,#crosshair::after{content:""; position:absolute; background:rgba(255,255,255,.85); box-shadow:0 0 3px #000}
+#crosshair::before{left:10px; top:3px; width:2px; height:16px}
+#crosshair::after{top:10px; left:3px; height:2px; width:16px}
+#speedo{position:absolute; left:50%; bottom:calc(var(--sab) + 8px); transform:translateX(-50%); text-align:center; --c:#5ee1ff}
+#speedo .num{font-size:clamp(34px,9vh,64px); font-weight:900; font-style:italic; line-height:.9; color:var(--c);
+  text-shadow:0 0 14px var(--c), 0 2px 0 #000; font-variant-numeric:tabular-nums; letter-spacing:.02em}
+#speedo .unit{font-size:10px; letter-spacing:.35em; color:var(--muted); margin-top:2px}
+#speedo .bar{width:clamp(160px,30vw,300px); height:6px; background:rgba(255,255,255,.12); margin:5px auto 0; border-radius:3px; overflow:hidden; transform:skewX(-20deg)}
+#speedo .fill{height:100%; width:0; background:var(--c); box-shadow:0 0 10px var(--c)}
+#speedo.hot .num{animation:pulse .35s ease-in-out infinite alternate}
+@keyframes pulse{from{transform:scale(1)}to{transform:scale(1.09)}}
+#dashPips{position:absolute; left:50%; bottom:calc(var(--sab) + 12px); transform:translateX(calc(-50% - clamp(110px,18vw,190px))); display:flex; gap:5px}
+.pip{width:16px; height:8px; border:1.5px solid #5ee1ff; transform:skewX(-20deg); position:relative; overflow:hidden}
+.pip i{position:absolute; left:0; top:0; bottom:0; background:#5ee1ff}
+#vignette{position:absolute; inset:0; opacity:0; background:radial-gradient(ellipse at center, transparent 45%, rgba(255,20,40,.75) 100%)}
+</style>
+<script type="importmap">
+{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.min.js" } }
+</script>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="safeProbe"></div>
+
+<div id="hud" class="hidden">
+  <div id="vignette"></div>
+  <div id="crosshair"></div>
+  <div id="dashPips"></div>
+  <div id="speedo"><div class="num">0</div><div class="unit">M/S</div><div class="bar"><div class="fill"></div></div></div>
+</div>
+
+<div id="title" class="screen">
+  <h1>REDLINE</h1>
+  <p class="tag">speed is damage</p>
+  <div class="row">
+    <button class="b primary" data-act="play">Play</button>
+    <button class="b ghost" data-act="settings">Settings</button>
+  </div>
+  <div class="hint" id="titleHint"></div>
+</div>
+
+<div id="pause" class="screen hidden">
+  <h2>PAUSED</h2>
+  <div class="row">
+    <button class="b primary" data-act="resume">Resume</button>
+    <button class="b ghost" data-act="settings">Settings</button>
+    <button class="b ghost" data-act="quit">Quit</button>
+  </div>
+</div>
+
+<div id="settings" class="screen hidden">
+  <h2>SETTINGS</h2>
+  <div class="panel" id="setPanel"></div>
+  <div class="row">
+    <button class="b ghost" data-act="layout">Edit Buttons</button>
+    <button class="b primary" data-act="settingsBack">Back</button>
+  </div>
+</div>
+
+<div id="rotate"><div class="phone"></div><div style="letter-spacing:.2em;font-weight:800">ROTATE YOUR DEVICE</div><div class="hint">REDLINE plays in landscape.</div></div>
+
+<script type="module">
+import * as THREE from 'three';
+
+/* =====================================================================
+   Utilities & persistence
+   ===================================================================== */
+const V3 = THREE.Vector3;
+const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
+const lerp = (a, b, t) => a + (b - a) * t;
+const damp = (a, b, k, dt) => lerp(a, b, 1 - Math.exp(-k * dt));
+const rand = (a, b) => a + Math.random() * (b - a);
+const TAU = Math.PI * 2;
+const $ = s => document.querySelector(s);
+const wrapAngle = a => { while (a > Math.PI) a -= TAU; while (a < -Math.PI) a += TAU; return a; };
+
+const store = {
+  get(k, d) { try { const v = localStorage.getItem('redline.' + k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
+  set(k, v) { try { localStorage.setItem('redline.' + k, JSON.stringify(v)); } catch (e) { /* private mode / quota */ } },
+};
+const IS_TOUCH = (window.matchMedia && matchMedia('(pointer: coarse)').matches) || ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
+
+const SETTINGS_DEFAULT = { sens: 1, aimAssist: true, fovFx: true, volume: 0.7, haptics: true };
+const settings = Object.assign({}, SETTINGS_DEFAULT, store.get('settings', {}));
+const saveSettings = () => store.set('settings', settings);
+
+function haptic(ms) {
+  if (!settings.haptics) return;
+  try { if (navigator.vibrate) navigator.vibrate(ms); } catch (e) { /* iOS has no vibrate: ignore */ }
+}
+
+/* =====================================================================
+   Tuning — movement feel lives here
+   ===================================================================== */
+const T = {
+  G: 24,              // gravity m/s²
+  RUN: 9,             // top speed from plain running
+  ACCEL: 55,          // ground accel below RUN
+  TURN: 3.4,          // ground carve rate (rad/s) at RUN; falls off with speed
+  AIR_TURN: 1.6,      // air carve rate
+  AIR_ACCEL: 16,
+  BRAKE: 16,          // pulling against velocity above RUN
+  FRICTION_LOW: 20,   // no input, below RUN
+  FRICTION_HIGH: 2.2, // no input, above RUN — momentum carries
+  JUMP: 8.6, COYOTE: .12, JUMP_BUF: .14,
+  SLIDE_MIN: 3, SLIDE_BOOST: 3.5, SLIDE_BOOST_CD: 1.0, SLIDE_BUILD: 1.3, SLIDE_TURN: 1.5, SLIDE_SLOPE: 1.0, RUN_SLOPE: .35,
+  DASH_BURST: 18, DASH_TIME: .16, DASH_KEEP: 3, DASH_RECHARGE: 1.7,
+  WALL_MIN: 5, WALL_BUILD: 2.4, WALL_TIME: 2.2, WJ_OUT: 7, WJ_UP: 8.6, WJ_BOOST: 2.5, WJ_MUL: 1.06,
+  SLAM_V: 42, SLAM_RADIUS: 5,
+  DECAY_START: 20, DECAY: .12,
+  EYE: 1.6, EYE_SLIDE: .85, RADIUS: .45, HEIGHT: 1.8, STEP: .55, SNAP: .5, LAUNCH_REL: 3,
+};
+// run modifiers (upgrades write into this)
+const mods = {};
+function resetMods() {
+  Object.assign(mods, { wallBuild: 1, dashMax: 2, dashRecharge: 1, slamRadius: 1, decayBonus: 0, wjBoost: 1 });
+}
+resetMods();
+
+/* =====================================================================
+   Renderer / scene
+   ===================================================================== */
+const canvas = $('#c');
+const DPR = window.devicePixelRatio || 1;
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: DPR < 2, powerPreference: 'high-performance', stencil: false });
+const MAX_PR = Math.min(DPR, 2);
+let pixelRatio = MAX_PR;
+renderer.setPixelRatio(pixelRatio);
+renderer.autoClear = false;
+
+const scene = new THREE.Scene();
+const FOG = 0x12070f;
+scene.background = new THREE.Color(FOG);
+scene.fog = new THREE.Fog(FOG, 45, 170);
+const camera = new THREE.PerspectiveCamera(70, 1, 0.05, 500);
+camera.rotation.order = 'YXZ';
+scene.add(camera);
+scene.add(new THREE.HemisphereLight(0x9fb0e0, 0x3a1822, 1.9));
+const sun = new THREE.DirectionalLight(0xffd8c8, 2.2);
+sun.position.set(40, 70, 25);
+scene.add(sun);
+
+function canvasTex(w, h, draw, repeat = true) {
+  const c = document.createElement('canvas'); c.width = w; c.height = h;
+  draw(c.getContext('2d'), w, h);
+  const t = new THREE.CanvasTexture(c);
+  if (repeat) t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+const floorTex = canvasTex(128, 128, (g, w) => {
+  g.fillStyle = '#2a2230'; g.fillRect(0, 0, w, w);
+  g.fillStyle = '#322838'; g.fillRect(0, 0, w / 2, w / 2); g.fillRect(w / 2, w / 2, w / 2, w / 2);
+  g.strokeStyle = '#5a4660'; g.lineWidth = 3; g.strokeRect(0, 0, w, w);
+});
+const hillTex = canvasTex(128, 128, (g, w) => {
+  g.fillStyle = '#3b2632'; g.fillRect(0, 0, w, w);
+  g.strokeStyle = '#ff4a5a'; g.globalAlpha = .55; g.lineWidth = 3;
+  for (let i = -w; i < w * 2; i += 32) { g.beginPath(); g.moveTo(i, 0); g.lineTo(i + w, w); g.stroke(); }
+});
+const wallTex = canvasTex(64, 256, (g, w, h) => {
+  g.fillStyle = '#231b28'; g.fillRect(0, 0, w, h);
+  g.fillStyle = '#2c2232'; for (let y = 0; y < h; y += 32) g.fillRect(0, y, w, 16);
+}, true);
+const wallGlow = canvasTex(64, 256, (g, w, h) => {
+  g.fillStyle = '#000'; g.fillRect(0, 0, w, h);
+  g.fillStyle = '#ff2a3d'; g.fillRect(0, h * .30, w, 6); g.fillRect(0, h * .70, w, 3);
+}, true);
+const blobTex = canvasTex(64, 64, (g, w) => {
+  const gr = g.createRadialGradient(w / 2, w / 2, 0, w / 2, w / 2, w / 2);
+  gr.addColorStop(0, 'rgba(0,0,0,.6)'); gr.addColorStop(.6, 'rgba(0,0,0,.3)'); gr.addColorStop(1, 'rgba(0,0,0,0)');
+  g.fillStyle = gr; g.fillRect(0, 0, w, w);
+}, false);
+
+/* =====================================================================
+   Arena: analytic heightfield (bowl + hills) and solids (walls, pillars, blocks)
+   ===================================================================== */
+const ARENA = { R: 64, BOWL_START: 44, BOWL_H: 8, BOWL_W: 18, EDGE0: 60, EDGE_MIN: 30, SHRINK: 6 };
+let edgeR = ARENA.EDGE0, edgeTarget = ARENA.EDGE0;
+
+// radial "kicker" hills: rise → plateau → fall
+const hills = [];
+for (let i = 0; i < 4; i++) {
+  const a = Math.PI / 4 + i * Math.PI / 2, r = 21;
+  hills.push({ x: Math.cos(a) * r, z: Math.sin(a) * r, ca: Math.cos(a), sa: Math.sin(a), rise: 8, top: 4, w: 10, taper: 3.5, h: 3 });
+}
+function hillH(hl, x, z) {
+  const dx = x - hl.x, dz = z - hl.z;
+  const al = Math.abs(dx * hl.ca + dz * hl.sa), ac = Math.abs(-dx * hl.sa + dz * hl.ca);
+  const half = hl.top / 2 + hl.rise;
+  if (al >= half || ac >= hl.w / 2) return 0;
+  const pa = al <= hl.top / 2 ? 1 : 1 - (al - hl.top / 2) / hl.rise;
+  let pc = (hl.w / 2 - ac) / hl.taper; pc = pc >= 1 ? 1 : pc * pc * (3 - 2 * pc);
+  return hl.h * pa * pc;
+}
+function bowlH(r) { if (r <= ARENA.BOWL_START) return 0; const t = (r - ARENA.BOWL_START) / ARENA.BOWL_W; return t * t * ARENA.BOWL_H; }
+function terrainH(x, z) {
+  let h = bowlH(Math.hypot(x, z));
+  for (let i = 0; i < hills.length; i++) { const v = hillH(hills[i], x, z); if (v > h) h = v; }
+  return h;
+}
+function terrainN(x, z, out) {
+  const e = .12;
+  return out.set(terrainH(x - e, z) - terrainH(x + e, z), 2 * e, terrainH(x, z - e) - terrainH(x, z + e)).normalize();
+}
+
+// solids: boxes (oriented in XZ) and cylinders. y0..y1 vertical extent.
+const solids = [];
+function addBox(x, z, ang, hx, hz, height, kind) {
+  const base = Math.min(terrainH(x, z), 0);
+  solids.push({ type: 'box', id: solids.length, x, z, c: Math.cos(ang), s: Math.sin(ang), ang, hx, hz, y0: base - 1, y1: base + height, kind });
+}
+function addCyl(x, z, r, height, kind) {
+  solids.push({ type: 'cyl', id: solids.length, x, z, r, y0: -1, y1: height, kind });
+}
+// center podium
+addCyl(0, 0, 4, 1.1, 'block');
+// inner pillars
+for (let i = 0; i < 4; i++) { const a = i * Math.PI / 2; addCyl(Math.cos(a) * 11, Math.sin(a) * 11, 1.4, 9, 'pillar'); }
+// tangential run-walls between the hills
+for (let i = 0; i < 4; i++) {
+  const a = i * Math.PI / 2, r = 33;
+  addBox(Math.cos(a) * r, Math.sin(a) * r, a + Math.PI / 2, 8.5, .6, 7, 'wall');
+}
+// radial fins out on the bowl lip
+for (let i = 0; i < 4; i++) {
+  const a = Math.PI / 4 + i * Math.PI / 2 + .32, r = 40;
+  addBox(Math.cos(a) * r, Math.sin(a) * r, a, 6, .6, 6, 'wall');
+}
+// outer pillars and low blocks
+for (let i = 0; i < 8; i++) { const a = i * Math.PI / 4 + Math.PI / 8; addCyl(Math.cos(a) * 27, Math.sin(a) * 27, 1.2, 10, 'pillar'); }
+for (let i = 0; i < 4; i++) { const a = i * Math.PI / 2 + Math.PI / 4 + .55, r = 16; addBox(Math.cos(a) * r, Math.sin(a) * r, a, 1.6, 1.6, 1.2, 'block'); }
+
+// ---------- arena meshes
+const arenaGroup = new THREE.Group(); scene.add(arenaGroup);
+{
+  const g = new THREE.RingGeometry(0, ARENA.R + 16, 80, 40);
+  g.rotateX(-Math.PI / 2);
+  const p = g.attributes.position, uv = g.attributes.uv;
+  for (let i = 0; i < p.count; i++) {
+    const x = p.getX(i), z = p.getZ(i);
+    p.setY(i, bowlH(Math.hypot(x, z)));
+    uv.setXY(i, x / 4, z / 4);
+  }
+  g.computeVertexNormals();
+  arenaGroup.add(new THREE.Mesh(g, new THREE.MeshLambertMaterial({ map: floorTex })));
+}
+{
+  const mat = new THREE.MeshLambertMaterial({ map: hillTex });
+  for (const hl of hills) {
+    const L = hl.top + hl.rise * 2;
+    const g = new THREE.PlaneGeometry(L, hl.w, 24, 10);
+    g.rotateX(-Math.PI / 2);
+    const p = g.attributes.position, uv = g.attributes.uv;
+    for (let i = 0; i < p.count; i++) {
+      const lx = p.getX(i), lz = p.getZ(i);
+      const x = hl.x + lx * hl.ca - lz * hl.sa, z = hl.z + lx * hl.sa + lz * hl.ca;
+      p.setXYZ(i, x, hillH(hl, x, z) + .03, z);
+      uv.setXY(i, x / 4, z / 4);
+    }
+    g.computeVertexNormals();
+    arenaGroup.add(new THREE.Mesh(g, mat));
+  }
+}
+{
+  const wallMat = new THREE.MeshLambertMaterial({ map: wallTex, emissiveMap: wallGlow, emissive: 0xffffff, emissiveIntensity: 1 });
+  const blockMat = new THREE.MeshLambertMaterial({ color: 0x4a3a52 });
+  const topMat = new THREE.MeshLambertMaterial({ color: 0x5c4966 });
+  for (const s of solids) {
+    let m;
+    const h = s.y1 - s.y0;
+    if (s.type === 'box') {
+      m = new THREE.Mesh(new THREE.BoxGeometry(s.hx * 2, h, s.hz * 2), s.kind === 'wall' ? wallMat : blockMat);
+      m.rotation.y = -s.ang;
+    } else {
+      m = new THREE.Mesh(new THREE.CylinderGeometry(s.r, s.r, h, s.kind === 'pillar' ? 10 : 24), s.kind === 'pillar' ? wallMat : topMat);
+    }
+    m.position.set(s.x, (s.y0 + s.y1) / 2, s.z);
+    arenaGroup.add(m);
+  }
+}
+// distant skyline (instanced) for parallax — helps you feel speed
+{
+  const N = 44, g = new THREE.BoxGeometry(1, 1, 1); g.translate(0, .5, 0);
+  const im = new THREE.InstancedMesh(g, new THREE.MeshLambertMaterial({ color: 0x1c1422 }), N);
+  const m = new THREE.Matrix4(), q = new THREE.Quaternion(), sc = new V3(), ps = new V3();
+  for (let i = 0; i < N; i++) {
+    const a = i / N * TAU + rand(-.05, .05), r = rand(95, 150);
+    ps.set(Math.cos(a) * r, 0, Math.sin(a) * r);
+    q.setFromAxisAngle(new V3(0, 1, 0), rand(0, TAU));
+    sc.set(rand(6, 16), rand(18, 70), rand(6, 16));
+    im.setMatrixAt(i, m.compose(ps, q, sc));
+  }
+  scene.add(im);
+}
+// energy edge (shrinks every 5 waves)
+const edgeTex = canvasTex(256, 64, (g, w, h) => {
+  const gr = g.createLinearGradient(0, h, 0, 0);
+  gr.addColorStop(0, 'rgba(255,42,61,.9)'); gr.addColorStop(.35, 'rgba(255,42,61,.25)'); gr.addColorStop(1, 'rgba(255,42,61,0)');
+  g.fillStyle = gr; g.fillRect(0, 0, w, h);
+  g.fillStyle = 'rgba(255,120,130,.6)'; for (let x = 0; x < w; x += 16) g.fillRect(x, 0, 2, h);
+});
+edgeTex.repeat.set(24, 1);
+const edgeMesh = new THREE.Mesh(
+  new THREE.CylinderGeometry(1, 1, 22, 96, 1, true),
+  new THREE.MeshBasicMaterial({ map: edgeTex, transparent: true, side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending, fog: false })
+);
+edgeMesh.position.y = 8;
+scene.add(edgeMesh);
+
+// ---------- blob shadows (one instanced mesh for everything)
+const SHADOW_MAX = 96;
+const shadowMesh = new THREE.InstancedMesh(
+  new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2),
+  new THREE.MeshBasicMaterial({ map: blobTex, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 }),
+  SHADOW_MAX
+);
+shadowMesh.frustumCulled = false;
+scene.add(shadowMesh);
+let shadowCount = 0;
+const _m4 = new THREE.Matrix4(), _q = new THREE.Quaternion(), _s3 = new V3(), _p3 = new V3(), _up = new V3(0, 1, 0), _n3 = new V3();
+function pushShadow(x, z, feetY, size) {
+  if (shadowCount >= SHADOW_MAX) return;
+  const gh = groundAt(x, z, feetY + .05, _gs).h;
+  const height = Math.max(0, feetY - gh);
+  const s = size * clamp(1 - height / 12, .35, 1);
+  _q.setFromUnitVectors(_up, _gs.n);
+  _m4.compose(_p3.set(x, gh + .04, z), _q, _s3.set(s, 1, s));
+  shadowMesh.setMatrixAt(shadowCount++, _m4);
+}
+const _gs = { h: 0, n: new V3(0, 1, 0), solid: null };
+
+// ---------- collision queries
+function insideFoot(s, x, z, margin) {
+  const dx = x - s.x, dz = z - s.z;
+  if (s.type === 'cyl') return dx * dx + dz * dz < (s.r + margin) * (s.r + margin);
+  const lx = dx * s.c + dz * s.s, lz = -dx * s.s + dz * s.c;
+  return Math.abs(lx) < s.hx + margin && Math.abs(lz) < s.hz + margin;
+}
+function groundAt(x, z, feetY, out) {
+  let h = terrainH(x, z), solid = null;
+  for (let i = 0; i < solids.length; i++) {
+    const s = solids[i];
+    if (s.y1 > feetY + T.STEP || s.y1 <= h) continue;
+    if (insideFoot(s, x, z, T.RADIUS * .4)) { h = s.y1; solid = s; }
+  }
+  out.h = h; out.solid = solid;
+  if (solid) out.n.set(0, 1, 0); else terrainN(x, z, out.n);
+  return out;
+}
+// Push a vertical capsule (feet p, radius r) out of solids and the edge. Returns last horizontal contact.
+const contact = { hit: false, nx: 0, nz: 0, id: -1 };
+function collideLateral(p, r, height, vel) {
+  contact.hit = false;
+  for (let i = 0; i < solids.length; i++) {
+    const s = solids[i];
+    if (p.y >= s.y1 - T.STEP || p.y + height <= s.y0) continue;
+    const dx = p.x - s.x, dz = p.z - s.z;
+    let nx, nz, push;
+    if (s.type === 'cyl') {
+      const d = Math.hypot(dx, dz), min = s.r + r;
+      if (d >= min) continue;
+      if (d < 1e-5) { nx = 1; nz = 0; } else { nx = dx / d; nz = dz / d; }
+      push = min - d;
+    } else {
+      const lx = dx * s.c + dz * s.s, lz = -dx * s.s + dz * s.c;
+      const cx = clamp(lx, -s.hx, s.hx), cz = clamp(lz, -s.hz, s.hz);
+      const ex = lx - cx, ez = lz - cz, d2 = ex * ex + ez * ez;
+      if (d2 >= r * r) continue;
+      let nlx, nlz;
+      if (d2 > 1e-10) { const d = Math.sqrt(d2); nlx = ex / d; nlz = ez / d; push = r - d; }
+      else {
+        const px = s.hx - Math.abs(lx), pz = s.hz - Math.abs(lz);
+        if (px < pz) { nlx = Math.sign(lx) || 1; nlz = 0; push = px + r; } else { nlx = 0; nlz = Math.sign(lz) || 1; push = pz + r; }
+      }
+      nx = nlx * s.c - nlz * s.s; nz = nlx * s.s + nlz * s.c;
+    }
+    p.x += nx * push; p.z += nz * push;
+    if (vel) { const vn = vel.x * nx + vel.z * nz; if (vn < 0) { vel.x -= nx * vn; vel.z -= nz * vn; } }
+    contact.hit = true; contact.nx = nx; contact.nz = nz; contact.id = s.id;
+  }
+  const rr = Math.hypot(p.x, p.z), lim = edgeR - r;
+  if (rr > lim) {
+    const nx = -p.x / rr, nz = -p.z / rr;
+    p.x = -nx * lim; p.z = -nz * lim;
+    if (vel) { const vn = vel.x * nx + vel.z * nz; if (vn < 0) { vel.x -= nx * vn; vel.z -= nz * vn; } }
+    contact.hit = true; contact.nx = nx; contact.nz = nz; contact.id = 'edge';
+  }
+  return contact;
+}
+
+/* =====================================================================
+   Input state (touch + keyboard/mouse feed the same struct)
+   ===================================================================== */
+const input = {
+  mx: 0, my: 0,              // move vector (x right, y forward), magnitude ≤ 1
+  lookX: 0, lookY: 0,        // accumulated look delta in radians
+  jumpPressed: false, slideHeld: false, slidePressed: false, dashPressed: false,
+  attackHeld: false, attackPressed: false, swapPressed: false,
+  touchAttack: false,
+};
+function clearEdges() {
+  input.jumpPressed = input.slidePressed = input.dashPressed = input.attackPressed = input.swapPressed = false;
+  input.lookX = input.lookY = 0;
+}
+
+/* =====================================================================
+   Player
+   ===================================================================== */
+const P = {
+  pos: new V3(), vel: new V3(), yaw: 0, pitch: 0, roll: 0,
+  onGround: false, gN: new V3(0, 1, 0), coyote: 0, jumpBuf: 0, airTime: 0, jumpLock: 0,
+  sliding: false, slideCd: 0, slamming: false,
+  dash: 2, dashT: 0, dashActive: 0, dashDir: new V3(), dashKeep: 0,
+  wall: null, wallCd: 0, wallCdId: null,
+  eye: T.EYE, bobPhase: 0, dip: 0, trauma: 0, fovKick: 0,
+  hp: 100, maxHp: 100, invuln: 0, topSpeed: 0,
+};
+function resetPlayer() {
+  P.pos.set(0, 0, 14); P.vel.set(0, 0, 0); P.yaw = 0; P.pitch = -.05; P.roll = 0;
+  P.onGround = false; P.coyote = P.jumpBuf = P.airTime = P.jumpLock = 0;
+  P.sliding = false; P.slideCd = 0; P.slamming = false;
+  P.dash = mods.dashMax; P.dashT = 0; P.dashActive = 0;
+  P.wall = null; P.wallCd = 0; P.eye = T.EYE; P.dip = 0; P.trauma = 0; P.fovKick = 0;
+  P.hp = P.maxHp = 100; P.invuln = 0; P.topSpeed = 0;
+  groundAt(P.pos.x, P.pos.z, 99, _gp); P.pos.y = _gp.h;
+}
+const _gp = { h: 0, n: new V3(0, 1, 0), solid: null };
+const hspeed = () => Math.hypot(P.vel.x, P.vel.z);
+function setHSpeed(s) { const h = hspeed(); if (h > 1e-4) { P.vel.x *= s / h; P.vel.z *= s / h; } }
+function rotateH(vx, vz, tx, tz, maxA) {           // rotate (vx,vz) toward direction (tx,tz) by ≤ maxA, keep length
+  const a = Math.atan2(vz, vx), b = Math.atan2(tz, tx);
+  const d = clamp(wrapAngle(b - a), -maxA, maxA), len = Math.hypot(vx, vz);
+  P.vel.x = Math.cos(a + d) * len; P.vel.z = Math.sin(a + d) * len;
+}
+const fwd = new V3(), right = new V3();
+function lookDir(out) {
+  const cp = Math.cos(P.pitch);
+  return out.set(-Math.sin(P.yaw) * cp, Math.sin(P.pitch), -Math.cos(P.yaw) * cp);
+}
+
+const hooks = { onLand: [], onSlam: [], onDash: [], onJump: [], onWallJump: [] };
+const emit = (k, ...a) => { for (const f of hooks[k]) f(...a); };
+
+function stepPlayer(dt) {
+  P.coyote = Math.max(0, P.coyote - dt); P.jumpBuf = Math.max(0, P.jumpBuf - dt);
+  P.slideCd = Math.max(0, P.slideCd - dt); P.wallCd = Math.max(0, P.wallCd - dt);
+  P.jumpLock = Math.max(0, P.jumpLock - dt); P.invuln = Math.max(0, P.invuln - dt);
+  if (input.jumpPressed) P.jumpBuf = T.JUMP_BUF;
+  P.airTime = P.onGround ? 0 : P.airTime + dt;
+
+  if (P.dash < mods.dashMax) {
+    P.dashT += dt * mods.dashRecharge;
+    if (P.dashT >= T.DASH_RECHARGE) { P.dashT = 0; P.dash++; }
+  } else P.dashT = 0;
+
+  fwd.set(-Math.sin(P.yaw), 0, -Math.cos(P.yaw));
+  right.set(Math.cos(P.yaw), 0, -Math.sin(P.yaw));
+  let wx = fwd.x * input.my + right.x * input.mx, wz = fwd.z * input.my + right.z * input.mx;
+  const wm = Math.min(1, Math.hypot(wx, wz));
+  if (wm > 1e-4) { const l = Math.hypot(wx, wz); wx /= l; wz /= l; }
+
+  // ---- dash: short burst, then leave you a bit faster than before
+  if (input.dashPressed && P.dash >= 1 && !P.grabbed) {
+    P.dash--;
+    let dx = wx, dz = wz;
+    if (wm < .2) { dx = fwd.x; dz = fwd.z; }
+    const s = Math.max(hspeed(), T.RUN);
+    P.dashDir.set(dx, 0, dz); P.dashActive = T.DASH_TIME; P.dashKeep = s + T.DASH_KEEP;
+    P.vel.set(dx * (s + T.DASH_BURST), 0, dz * (s + T.DASH_BURST));
+    P.slamming = false; P.wall = null; P.invuln = Math.max(P.invuln, .2); P.fovKick = 1;
+    emit('onDash');
+  }
+  if (P.dashActive > 0) {
+    P.dashActive -= dt; P.vel.y = 0;
+    if (P.dashActive <= 0 && hspeed() > 1) setHSpeed(P.dashKeep);
+    moveAndCollide(dt);
+    return;
+  }
+
+  // ---- slam: slide pressed while airborne
+  if (input.slidePressed && !P.onGround && !P.slamming && P.airTime > .06 && !P.grabbed) {
+    P.slamming = true; P.wall = null; P.vel.y = Math.min(P.vel.y, -T.SLAM_V);
+  }
+
+  let hs = hspeed();
+  if (P.grabbed) { P.vel.set(0, Math.min(P.vel.y, 0), 0); hs = 0; }
+  else if (P.onGround) {
+    if (input.slideHeld && !P.sliding && hs > T.SLIDE_MIN) {
+      P.sliding = true;
+      if (P.slideCd <= 0) { setHSpeed(hs + T.SLIDE_BOOST); P.slideCd = T.SLIDE_BOOST_CD; }
+    }
+    if (P.sliding && (!input.slideHeld || hs < 2.2)) P.sliding = false;
+    // gravity along the slope — full when sliding, partial when running
+    const n = P.gN, k = (P.sliding ? T.SLIDE_SLOPE : T.RUN_SLOPE) * T.G * dt;
+    P.vel.x += n.y * n.x * k; P.vel.y += (n.y * n.y - 1) * k; P.vel.z += n.y * n.z * k;
+    hs = hspeed();
+    if (P.sliding) {
+      if (n.y > .985) setHSpeed(hs + T.SLIDE_BUILD * dt);
+      if (wm > .1 && hs > .5) rotateH(P.vel.x, P.vel.z, wx, wz, T.SLIDE_TURN * wm * dt);
+    } else if (wm > .05) {
+      if (hs <= T.RUN) {
+        const tx = wx * T.RUN * wm, tz = wz * T.RUN * wm;
+        const ex = tx - P.vel.x, ez = tz - P.vel.z, el = Math.hypot(ex, ez), st = T.ACCEL * dt;
+        if (el <= st) { P.vel.x = tx; P.vel.z = tz; } else { P.vel.x += ex / el * st; P.vel.z += ez / el * st; }
+      } else {
+        const dot = (P.vel.x * wx + P.vel.z * wz) / hs;
+        if (dot < -.55) setHSpeed(Math.max(0, hs - T.BRAKE * wm * dt));
+        else rotateH(P.vel.x, P.vel.z, wx, wz, T.TURN * wm * Math.sqrt(T.RUN / hs) * dt);
+      }
+    } else {
+      setHSpeed(Math.max(0, hs - (hs < T.RUN ? T.FRICTION_LOW : T.FRICTION_HIGH) * dt));
+    }
+  } else if (!P.wall) {
+    // air control: accelerate up to RUN, above that you can only carve
+    if (wm > .05) {
+      if (hs <= T.RUN) {
+        const tx = wx * T.RUN * wm, tz = wz * T.RUN * wm;
+        const ex = tx - P.vel.x, ez = tz - P.vel.z, el = Math.hypot(ex, ez), st = T.AIR_ACCEL * dt;
+        if (el <= st) { P.vel.x = tx; P.vel.z = tz; } else { P.vel.x += ex / el * st; P.vel.z += ez / el * st; }
+      } else rotateH(P.vel.x, P.vel.z, wx, wz, T.AIR_TURN * wm * Math.sqrt(T.RUN / hs) * dt);
+    }
+    P.vel.y = Math.max(P.vel.y - T.G * dt, -70);
+  }
+
+  // ---- wall-run physics
+  if (P.wall) {
+    const n = P.wall;
+    P.wall.t += dt;
+    P.vel.x -= n.nx * 5 * dt; P.vel.z -= n.nz * 5 * dt;          // stick
+    const gm = n.t < .9 ? .12 : .55;
+    P.vel.y -= T.G * gm * dt;
+    if (P.vel.y < -5) P.vel.y = damp(P.vel.y, -5, 6, dt);
+    if (wm > .25) setHSpeed(hspeed() + T.WALL_BUILD * mods.wallBuild * dt);
+    if (P.jumpBuf > 0) {
+      // strip into-wall velocity, boost along the wall, kick off
+      const vn = P.vel.x * n.nx + P.vel.z * n.nz; P.vel.x -= n.nx * vn; P.vel.z -= n.nz * vn;
+      const s = hspeed();
+      setHSpeed(s * T.WJ_MUL + T.WJ_BOOST * mods.wjBoost);
+      P.vel.x += n.nx * T.WJ_OUT; P.vel.z += n.nz * T.WJ_OUT;
+      P.vel.y = T.WJ_UP;
+      P.wallCd = .45; P.wallCdId = n.id; P.wall = null; P.jumpBuf = 0; P.jumpLock = .15; P.fovKick = .6;
+      emit('onWallJump');
+    } else if (n.t > T.WALL_TIME || (wm > .3 && wx * n.nx + wz * n.nz > .72)) {
+      P.wallCd = .45; P.wallCdId = n.id; P.wall = null;
+    }
+  }
+
+  // ---- jump
+  if (P.jumpBuf > 0 && (P.onGround || P.coyote > 0) && !P.grabbed) {
+    P.vel.y = Math.max(P.vel.y, 0) + T.JUMP;
+    P.onGround = false; P.coyote = 0; P.jumpBuf = 0; P.jumpLock = .12; P.sliding = false;
+    emit('onJump');
+  }
+
+  // ---- speed decay above the threshold: staying fast takes skill
+  hs = hspeed();
+  const thr = T.DECAY_START + mods.decayBonus;
+  if (hs > thr) setHSpeed(hs - (hs - thr) * T.DECAY * dt);
+
+  moveAndCollide(dt);
+
+  // ---- wall-run start / maintain
+  if (P.wall) {
+    if (!contact.hit) { _probe.copy(P.pos); collideLateral(_probe, T.RADIUS + .4, T.HEIGHT, null); }
+    if (P.onGround) P.wall = null;
+    else if (contact.hit && contact.id === P.wall.id) { P.wall.nx = contact.nx; P.wall.nz = contact.nz; P.wall.lost = 0; }
+    else if ((P.wall.lost += dt) > .12) { P.wallCd = .3; P.wallCdId = P.wall.id; P.wall = null; }
+  } else if (!P.onGround && !P.slamming && !P.grabbed) {
+    // not touching? probe a little further out so wall-runs catch without pixel-perfect steering
+    if (!contact.hit) { _probe.copy(P.pos); collideLateral(_probe, T.RADIUS + .4, T.HEIGHT, null); }
+    if (contact.hit && !(P.wallCd > 0 && P.wallCdId === contact.id)) startWallRun();
+  }
+
+  const s = hspeed();
+  if (s > P.topSpeed) P.topSpeed = s;
+}
+const _probe = new V3();
+function startWallRun() {
+  const vn = P.vel.x * contact.nx + P.vel.z * contact.nz;
+  const tx = P.vel.x - contact.nx * vn, tz = P.vel.z - contact.nz * vn;
+  const above = P.pos.y - groundAt(P.pos.x, P.pos.z, P.pos.y, _gp).h;
+  if (Math.hypot(tx, tz) > T.WALL_MIN && above > .7) {
+    P.wall = { nx: contact.nx, nz: contact.nz, id: contact.id, t: 0, lost: 0 };
+    P.vel.y = P.vel.y < 0 ? P.vel.y * .2 : Math.min(P.vel.y, 4);
+    P.sliding = false;
+  }
+}
+
+function moveAndCollide(dt) {
+  const dist = P.vel.length() * dt;
+  const n = Math.min(12, Math.max(1, Math.ceil(dist / .3)));
+  const h = dt / n;
+  let anyContact = false, cnx = 0, cnz = 0, cid = -1;
+  for (let i = 0; i < n; i++) {
+    P.pos.addScaledVector(P.vel, h);
+    collideLateral(P.pos, T.RADIUS, T.HEIGHT, P.vel);
+    if (contact.hit) { anyContact = true; cnx = contact.nx; cnz = contact.nz; cid = contact.id; }
+    groundAt(P.pos.x, P.pos.z, P.pos.y, _gp);
+    const gn = _gp.n;
+    if (P.pos.y <= _gp.h) {
+      if (!P.onGround) { const vy = P.vel.y; P.onGround = true; P.gN.copy(gn); P.pos.y = _gp.h; landed(vy); }
+      P.pos.y = _gp.h; P.gN.copy(gn);
+      const vn = P.vel.dot(gn); if (vn < 0) P.vel.addScaledVector(gn, -vn);
+    } else if (P.onGround && P.jumpLock <= 0 && P.pos.y - _gp.h < T.SNAP) {
+      // stay glued unless we're rising off the surface fast enough to launch
+      const groundVy = -(gn.x * P.vel.x + gn.z * P.vel.z) / gn.y;
+      if (P.vel.y - groundVy < T.LAUNCH_REL) {
+        P.pos.y = _gp.h; P.gN.copy(gn);
+        const sp = P.vel.length(), vn = P.vel.dot(gn);
+        P.vel.addScaledVector(gn, -vn);
+        const ns = P.vel.length(); if (ns > 1e-4) P.vel.multiplyScalar(sp / ns);
+      } else { P.onGround = false; P.coyote = T.COYOTE; }
+    } else if (P.onGround) { P.onGround = false; P.coyote = T.COYOTE; }
+  }
+  contact.hit = anyContact; contact.nx = cnx; contact.nz = cnz; contact.id = cid;
+}
+
+function landed(vy) {
+  const impact = -vy;
+  if (P.slamming) {
+    P.slamming = false;
+    const hs = hspeed();
+    emit('onSlam', impact, hs);
+    if (input.slideHeld) setHSpeed(Math.max(hs, 1) + impact * .3);   // slam → slide converts the fall
+    P.trauma = Math.min(1, P.trauma + .6);
+    haptic(30);
+  }
+  if (input.slideHeld && hspeed() > T.SLIDE_MIN) P.sliding = true;
+  P.dip = Math.min(.35, impact * .012);
+  P.wall = null;
+  emit('onLand', impact);
+}
+
+/* =====================================================================
+   Camera, speed lines, FOV
+   ===================================================================== */
+let baseFov = 70;
+function computeBaseFov() {
+  // aim for ~100° horizontal regardless of aspect
+  const aspect = camera.aspect, h = 100 * Math.PI / 180;
+  baseFov = clamp(2 * Math.atan(Math.tan(h / 2) / aspect) * 180 / Math.PI, 52, 80);
+}
+const SPEEDLINES = 70;
+const speedLines = new THREE.InstancedMesh(
+  new THREE.BoxGeometry(.018, .018, 2.6),
+  new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending, fog: false }),
+  SPEEDLINES
+);
+speedLines.frustumCulled = false;
+camera.add(speedLines);
+const slData = [];
+for (let i = 0; i < SPEEDLINES; i++) { const a = rand(0, TAU), r = rand(1.6, 4.5); slData.push({ x: Math.cos(a) * r, y: Math.sin(a) * r * .7, z: rand(-40, 0) }); }
+function updateSpeedLines(dt, s) {
+  const k = clamp((s - 16) / 22, 0, 1);
+  speedLines.material.opacity = k * .45;
+  speedLines.visible = k > 0.01;
+  if (!speedLines.visible) return;
+  for (let i = 0; i < SPEEDLINES; i++) {
+    const d = slData[i];
+    d.z += (s * 1.6 + 10) * dt;
+    if (d.z > 2) { d.z = rand(-45, -25); const a = rand(0, TAU), r = rand(1.6, 4.5); d.x = Math.cos(a) * r; d.y = Math.sin(a) * r * .7; }
+    _m4.makeTranslation(d.x, d.y, d.z);
+    speedLines.setMatrixAt(i, _m4);
+  }
+  speedLines.instanceMatrix.needsUpdate = true;
+}
+
+function updateCamera(dt) {
+  const hs = hspeed();
+  P.eye = damp(P.eye, P.sliding ? T.EYE_SLIDE : T.EYE, 14, dt);
+  P.dip = damp(P.dip, 0, 9, dt);
+  let bob = 0;
+  if (P.onGround && !P.sliding && hs > .5) { P.bobPhase += hs * dt * 1.15; bob = Math.sin(P.bobPhase * 2) * .045 * Math.min(1, hs / T.RUN); }
+  P.trauma = Math.max(0, P.trauma - dt * 1.8);
+  const sh = P.trauma * P.trauma, t = performance.now() / 1000;
+  const sx = (Math.sin(t * 71) + Math.sin(t * 37)) * .5 * sh * .12, sy = Math.sin(t * 53) * sh * .12;
+  camera.position.set(P.pos.x + sx, P.pos.y + P.eye - P.dip + bob + sy, P.pos.z);
+  let rollT = -input.mx * .025;
+  if (P.wall) { const side = P.wall.nx * right.x + P.wall.nz * right.z; rollT = -Math.sign(side) * .16; }
+  P.roll = damp(P.roll, rollT, 8, dt);
+  camera.rotation.set(P.pitch + sh * Math.sin(t * 61) * .02, P.yaw, P.roll);
+  P.fovKick = damp(P.fovKick, 0, 5, dt);
+  const fx = settings.fovFx ? clamp((hs - 10) / 30, 0, 1) * 18 + P.fovKick * 6 : 0;
+  const fov = baseFov + fx;
+  if (Math.abs(camera.fov - fov) > .05) { camera.fov = damp(camera.fov, fov, 8, dt); camera.updateProjectionMatrix(); }
+  updateSpeedLines(dt, settings.fovFx ? hs : Math.min(hs, 26));
+}
+
+/* =====================================================================
+   Touch controls
+   ===================================================================== */
+const BTN_DEFS = [
+  { id: 'attack', label: 'ATTACK', size: 104, x: .87, y: .72 },
+  { id: 'jump',   label: 'JUMP',   size: 76,  x: .955, y: .45 },
+  { id: 'slide',  label: 'SLIDE',  size: 76,  x: .735, y: .88 },
+  { id: 'dash',   label: 'DASH',   size: 66,  x: .76, y: .53 },
+  { id: 'swap',   label: 'SWAP',   size: 54,  x: .93, y: .17 },
+];
+const layoutDefault = () => Object.fromEntries(BTN_DEFS.map(b => [b.id, { x: b.x, y: b.y, s: 1 }]));
+let layout = Object.assign(layoutDefault(), store.get('layout', {}));
+const touchUI = document.createElement('div');
+touchUI.id = 'touchUI';
+touchUI.innerHTML = `
+<style>
+#touchUI{position:fixed; inset:0; z-index:6; touch-action:none}
+#touchUI .tb{position:absolute; border-radius:50%; display:flex; align-items:center; justify-content:center; pointer-events:none;
+  border:2px solid rgba(255,255,255,.35); background:rgba(20,10,20,.28); color:rgba(255,255,255,.85);
+  font-weight:900; font-size:11px; letter-spacing:.12em; transform:translate(-50%,-50%); backdrop-filter:blur(2px); -webkit-backdrop-filter:blur(2px)}
+#touchUI .tb.down{background:rgba(255,42,61,.55); border-color:#ff2a3d; transform:translate(-50%,-50%) scale(.93)}
+#touchUI .tb[data-id=attack]{border-color:rgba(255,42,61,.8); font-size:13px}
+#touchUI .tb .cd{position:absolute; inset:-2px; border-radius:50%; pointer-events:none}
+#joyBase,#joyKnob{position:absolute; border-radius:50%; pointer-events:none; transform:translate(-50%,-50%)}
+#joyBase{width:130px; height:130px; border:2px solid rgba(255,255,255,.25); background:rgba(255,255,255,.05)}
+#joyKnob{width:56px; height:56px; background:rgba(255,255,255,.35); border:2px solid rgba(255,255,255,.6)}
+#joyBase.idle{opacity:.35} #joyKnob.idle{opacity:.35}
+#pauseBtn{position:absolute; width:40px; height:40px; border-radius:8px; border:2px solid rgba(255,255,255,.3); background:rgba(20,10,20,.3);
+  display:flex; align-items:center; justify-content:center; gap:5px; pointer-events:none}
+#pauseBtn i{display:block; width:5px; height:15px; background:rgba(255,255,255,.8)}
+</style>
+<div id="joyBase" class="idle"></div><div id="joyKnob" class="idle"></div>
+<div id="pauseBtn"><i></i><i></i></div>
+${BTN_DEFS.map(b => `<div class="tb" data-id="${b.id}"><span>${b.label}</span><div class="cd"></div></div>`).join('')}`;
+document.body.appendChild(touchUI);
+touchUI.classList.add('hidden');
+const btnEls = {}; touchUI.querySelectorAll('.tb').forEach(el => btnEls[el.dataset.id] = el);
+const joyBase = $('#joyBase'), joyKnob = $('#joyKnob'), pauseBtnEl = $('#pauseBtn');
+let W = innerWidth, H = innerHeight, safe = { l: 0, t: 0, r: 0, b: 0, w: 1, h: 1 };
+const btnRects = {};
+function readSafe() {
+  const r = $('#safeProbe').getBoundingClientRect();
+  safe = { l: r.left, t: r.top, r: r.right, b: r.bottom, w: Math.max(1, r.width), h: Math.max(1, r.height) };
+}
+function btnPx(id) {
+  const L = layout[id], def = BTN_DEFS.find(b => b.id === id);
+  const size = def.size * L.s * clamp(Math.min(W, H) / 390, .85, 1.35);
+  return { x: safe.l + L.x * safe.w, y: safe.t + L.y * safe.h, r: size / 2 };
+}
+function placeButtons(container = touchUI) {
+  for (const b of BTN_DEFS) {
+    const el = container.querySelector(`.tb[data-id=${b.id}]`); if (!el) continue;
+    const p = btnPx(b.id);
+    btnRects[b.id] = p;
+    Object.assign(el.style, { left: p.x + 'px', top: p.y + 'px', width: p.r * 2 + 'px', height: p.r * 2 + 'px' });
+  }
+  const pb = { x: safe.l + 30, y: safe.t + 28, r: 26 };
+  btnRects.pause = pb;
+  Object.assign(pauseBtnEl.style, { left: pb.x - 20 + 'px', top: pb.y - 20 + 'px' });
+  joyIdlePos();
+}
+function joyIdlePos() {
+  if (joy) return;
+  const x = safe.l + safe.w * .16, y = safe.t + safe.h * .72;
+  joyBase.style.left = joyKnob.style.left = x + 'px'; joyBase.style.top = joyKnob.style.top = y + 'px';
+}
+function hitButton(x, y) {
+  let best = null, bd = Infinity;
+  for (const id in btnRects) {
+    const b = btnRects[id], d = Math.hypot(x - b.x, y - b.y);
+    if (d < b.r * 1.18 + 6 && d < bd) { bd = d; best = id; }
+  }
+  return best;
+}
+
+const touches = new Map();
+let joy = null;
+const JOY_R = 58;
+function pressButton(id, down) {
+  const el = btnEls[id]; if (el) el.classList.toggle('down', down);
+  if (id === 'attack') { input.attackHeld = down; if (down) input.attackPressed = true; }
+  else if (id === 'jump') { if (down) input.jumpPressed = true; }
+  else if (id === 'slide') { input.slideHeld = down; if (down) input.slidePressed = true; }
+  else if (id === 'dash') { if (down) input.dashPressed = true; }
+  else if (id === 'swap') { if (down) input.swapPressed = true; }
+  else if (id === 'pause' && down) pauseGame();
+  if (down) haptic(8);
+}
+function onTouchStart(e) {
+  e.preventDefault();
+  unlockAudio();
+  if (state !== 'playing') return;
+  for (const t of e.changedTouches) {
+    const x = t.clientX, y = t.clientY;
+    const b = hitButton(x, y);
+    if (b) { touches.set(t.identifier, { role: 'btn', id: b, x, y }); pressButton(b, true); input.touchAttack = true; }
+    else if (x < W * .5 && !joy) {
+      joy = { id: t.identifier, ox: x, oy: y };
+      touches.set(t.identifier, { role: 'joy' });
+      joyBase.classList.remove('idle'); joyKnob.classList.remove('idle');
+      joyBase.style.left = joyKnob.style.left = x + 'px'; joyBase.style.top = joyKnob.style.top = y + 'px';
+    } else touches.set(t.identifier, { role: 'look', x, y });
+  }
+}
+function onTouchMove(e) {
+  e.preventDefault();
+  if (state !== 'playing') return;
+  const k = .0052 * settings.sens;
+  for (const t of e.changedTouches) {
+    const rec = touches.get(t.identifier); if (!rec) continue;
+    const x = t.clientX, y = t.clientY;
+    if (rec.role === 'joy') {
+      let dx = x - joy.ox, dy = y - joy.oy, d = Math.hypot(dx, dy);
+      if (d > JOY_R) { joy.ox = x - dx / d * JOY_R; joy.oy = y - dy / d * JOY_R; dx = x - joy.ox; dy = y - joy.oy; d = JOY_R;
+        joyBase.style.left = joy.ox + 'px'; joyBase.style.top = joy.oy + 'px'; }
+      joyKnob.style.left = x + 'px'; joyKnob.style.top = y + 'px';
+      let m = d / JOY_R; m = m < .12 ? 0 : Math.min(1, (m - .12) / .76);
+      input.mx = d > 0 ? dx / d * m : 0; input.my = d > 0 ? -dy / d * m : 0;
+    } else if (rec.role === 'look' || (rec.role === 'btn' && rec.id === 'attack')) {
+      input.lookX -= (x - rec.x) * k; input.lookY -= (y - rec.y) * k;
+      rec.x = x; rec.y = y;
+    }
+  }
+}
+function onTouchEnd(e) {
+  e.preventDefault();
+  for (const t of e.changedTouches) {
+    const rec = touches.get(t.identifier); if (!rec) continue;
+    touches.delete(t.identifier);
+    if (rec.role === 'btn') pressButton(rec.id, false);
+    else if (rec.role === 'joy') { releaseJoy(); }
+  }
+}
+function releaseJoy() {
+  joy = null; input.mx = input.my = 0;
+  joyBase.classList.add('idle'); joyKnob.classList.add('idle'); joyIdlePos();
+}
+function releaseAllTouches() {
+  for (const [, rec] of touches) if (rec.role === 'btn') pressButton(rec.id, false);
+  touches.clear(); releaseJoy();
+}
+touchUI.addEventListener('touchstart', onTouchStart, { passive: false });
+touchUI.addEventListener('touchmove', onTouchMove, { passive: false });
+touchUI.addEventListener('touchend', onTouchEnd, { passive: false });
+touchUI.addEventListener('touchcancel', onTouchEnd, { passive: false });
+
+/* ---------- global gesture suppression (scroll, pinch, double-tap, callouts) */
+const allowNative = t => t && t.closest && t.closest('input,.panel');
+document.addEventListener('touchmove', e => { if (!allowNative(e.target) && e.cancelable) e.preventDefault(); }, { passive: false });
+for (const ev of ['gesturestart', 'gesturechange', 'gestureend']) document.addEventListener(ev, e => e.preventDefault(), { passive: false });
+document.addEventListener('contextmenu', e => e.preventDefault());
+document.addEventListener('dblclick', e => e.preventDefault(), { passive: false });
+document.addEventListener('selectstart', e => { if (!allowNative(e.target)) e.preventDefault(); });
+let lastTouchEnd = 0;
+document.addEventListener('touchend', e => {
+  const now = performance.now();
+  if (now - lastTouchEnd < 300 && !allowNative(e.target) && !(e.target.closest && e.target.closest('button,.tog')) && e.cancelable) e.preventDefault();
+  lastTouchEnd = now;
+}, { passive: false });
+
+/* =====================================================================
+   Keyboard & mouse fallback
+   ===================================================================== */
+const keys = new Set();
+const KEYMAP = { KeyW: 1, KeyA: 1, KeyS: 1, KeyD: 1, ArrowUp: 1, ArrowDown: 1, ArrowLeft: 1, ArrowRight: 1 };
+function keyMove() {
+  const x = (keys.has('KeyD') || keys.has('ArrowRight') ? 1 : 0) - (keys.has('KeyA') || keys.has('ArrowLeft') ? 1 : 0);
+  const y = (keys.has('KeyW') || keys.has('ArrowUp') ? 1 : 0) - (keys.has('KeyS') || keys.has('ArrowDown') ? 1 : 0);
+  const l = Math.hypot(x, y) || 1;
+  input.mx = x / l; input.my = y / l;
+}
+addEventListener('keydown', e => {
+  unlockAudio();
+  if (e.code === 'Escape' || e.code === 'KeyP') { if (state === 'playing') pauseGame(); else if (state === 'paused' && e.code === 'KeyP') resumeGame(); return; }
+  if (state !== 'playing') return;
+  if (e.repeat) { if (KEYMAP[e.code]) e.preventDefault(); return; }
+  keys.add(e.code);
+  if (KEYMAP[e.code]) { keyMove(); e.preventDefault(); }
+  if (e.code === 'Space') { input.jumpPressed = true; e.preventDefault(); }
+  if (e.code === 'ControlLeft' || e.code === 'ControlRight' || e.code === 'KeyC') { input.slideHeld = true; input.slidePressed = true; e.preventDefault(); }
+  if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') { input.dashPressed = true; e.preventDefault(); }
+  if (e.code === 'KeyQ') input.swapPressed = true;
+  input.touchAttack = false;
+});
+addEventListener('keyup', e => {
+  keys.delete(e.code);
+  if (KEYMAP[e.code]) keyMove();
+  if (e.code === 'ControlLeft' || e.code === 'ControlRight' || e.code === 'KeyC') input.slideHeld = keys.has('ControlLeft') || keys.has('ControlRight') || keys.has('KeyC');
+});
+addEventListener('blur', () => { keys.clear(); keyMove(); input.slideHeld = input.attackHeld = false; if (state === 'playing') pauseGame(); });
+const pointerLocked = () => document.pointerLockElement === canvas;
+canvas.addEventListener('mousedown', e => {
+  unlockAudio();
+  if (state !== 'playing' || IS_TOUCH_ACTIVE) return;
+  if (!pointerLocked()) { try { const p = canvas.requestPointerLock(); if (p && p.catch) p.catch(() => {}); } catch (err) {} return; }
+  if (e.button === 0) { input.attackHeld = true; input.attackPressed = true; input.touchAttack = false; }
+});
+addEventListener('mouseup', e => { if (e.button === 0 && !IS_TOUCH_ACTIVE) input.attackHeld = false; });
+addEventListener('mousemove', e => {
+  if (state !== 'playing' || !pointerLocked()) return;
+  const k = .0022 * settings.sens;
+  input.lookX -= e.movementX * k; input.lookY -= e.movementY * k;
+});
+document.addEventListener('pointerlockchange', () => { if (!pointerLocked() && state === 'playing' && !IS_TOUCH_ACTIVE) pauseGame(); });
+let IS_TOUCH_ACTIVE = IS_TOUCH;
+addEventListener('touchstart', () => { if (!IS_TOUCH_ACTIVE) { IS_TOUCH_ACTIVE = true; if (state === 'playing') touchUI.classList.remove('hidden'); } }, { passive: true });
+
+/* =====================================================================
+   Audio (unlock only for now)
+   ===================================================================== */
+let actx = null;
+function unlockAudio() {
+  try {
+    if (!actx) { const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return; actx = new AC(); }
+    if (actx.state === 'suspended') actx.resume();
+  } catch (e) { /* no audio */ }
+}
+
+/* =====================================================================
+   HUD
+   ===================================================================== */
+const speedo = $('#speedo'), speedNum = speedo.querySelector('.num'), speedFill = speedo.querySelector('.fill');
+const dashPips = $('#dashPips');
+let lastSpeedShown = -1, lastPipKey = '';
+function speedColor(s) {
+  const t = clamp(s / 40, 0, 1);
+  const hue = lerp(190, -10, t), light = lerp(62, 58, t);
+  return `hsl(${(hue + 360) % 360} 100% ${light}%)`;
+}
+function updateHUD() {
+  const s = Math.round(hspeed());
+  if (s !== lastSpeedShown) {
+    lastSpeedShown = s;
+    speedNum.textContent = s;
+    speedo.style.setProperty('--c', speedColor(s));
+    speedFill.style.width = clamp(s / 45 * 100, 0, 100) + '%';
+    speedo.classList.toggle('hot', s >= 28);
+  }
+  const key = P.dash + '|' + mods.dashMax + '|' + Math.round(P.dashT / T.DASH_RECHARGE * 10);
+  if (key !== lastPipKey) {
+    lastPipKey = key;
+    let h = '';
+    for (let i = 0; i < mods.dashMax; i++) {
+      const f = i < P.dash ? 1 : i === P.dash ? P.dashT / T.DASH_RECHARGE : 0;
+      h += `<div class="pip"><i style="width:${Math.round(f * 100)}%"></i></div>`;
+    }
+    dashPips.innerHTML = h;
+  }
+}
+
+/* =====================================================================
+   Game state, screens
+   ===================================================================== */
+let state = 'title', settingsReturn = 'title';
+const screens = { title: $('#title'), pause: $('#pause'), settings: $('#settings') };
+function show(name) {
+  for (const k in screens) screens[k].classList.toggle('hidden', k !== name);
+}
+function setPlayingUI(on) {
+  $('#hud').classList.toggle('hidden', !on);
+  touchUI.classList.toggle('hidden', !(on && IS_TOUCH_ACTIVE));
+}
+function startGame() {
+  resetMods(); resetPlayer();
+  edgeR = edgeTarget = ARENA.EDGE0;
+  state = 'playing'; show(null); setPlayingUI(true);
+  releaseAllTouches(); clearEdges();
+  goFullscreen();
+  if (!IS_TOUCH_ACTIVE) { try { const p = canvas.requestPointerLock(); if (p && p.catch) p.catch(() => {}); } catch (e) {} }
+}
+function pauseGame() {
+  if (state !== 'playing') return;
+  state = 'paused'; releaseAllTouches(); show('pause'); setPlayingUI(false);
+  if (pointerLocked()) document.exitPointerLock();
+}
+function resumeGame() {
+  state = 'playing'; show(null); setPlayingUI(true); clearEdges(); last = performance.now();
+  if (!IS_TOUCH_ACTIVE) { try { const p = canvas.requestPointerLock(); if (p && p.catch) p.catch(() => {}); } catch (e) {} }
+}
+function goFullscreen() {
+  if (!IS_TOUCH_ACTIVE) return;
+  const el = document.documentElement;
+  try {
+    const req = el.requestFullscreen || el.webkitRequestFullscreen;
+    if (req && !document.fullscreenElement && !document.webkitFullscreenElement) {
+      const p = req.call(el, { navigationUI: 'hide' });
+      if (p && p.then) p.then(() => { try { screen.orientation.lock('landscape').catch(() => {}); } catch (e) {} }).catch(() => {});
+    }
+  } catch (e) { /* iPhone Safari: no element fullscreen; home-screen install covers it */ }
+}
+document.addEventListener('visibilitychange', () => { if (document.hidden && state === 'playing') pauseGame(); });
+
+document.addEventListener('click', e => {
+  const b = e.target.closest && e.target.closest('[data-act]'); if (!b) return;
+  unlockAudio();
+  const act = b.dataset.act;
+  if (act === 'play') startGame();
+  else if (act === 'resume') resumeGame();
+  else if (act === 'quit') { state = 'title'; show('title'); setPlayingUI(false); }
+  else if (act === 'settings') { settingsReturn = state === 'paused' ? 'pause' : 'title'; buildSettings(); show('settings'); }
+  else if (act === 'settingsBack') show(settingsReturn);
+  else if (act === 'layout') openLayoutEditor();
+});
+
+/* ---------- settings screen */
+function buildSettings() {
+  const p = $('#setPanel');
+  const range = (key, label, min, max, step, fmt) => `<div class="set"><span>${label}</span><input type="range" data-k="${key}" min="${min}" max="${max}" step="${step}" value="${settings[key]}"><span class="val" data-v="${key}">${fmt(settings[key])}</span></div>`;
+  const tog = (key, label) => `<div class="set"><span>${label}</span><div class="tog ${settings[key] ? 'on' : ''}" data-t="${key}"></div></div>`;
+  const pct = v => Math.round(v * 100) + '%';
+  p.innerHTML =
+    range('sens', 'Look sensitivity', .2, 3, .05, v => (+v).toFixed(2)) +
+    tog('aimAssist', 'Aim assist (touch)') +
+    tog('fovFx', 'Speed FOV + speed lines') +
+    tog('haptics', 'Haptics') +
+    range('volume', 'Volume', 0, 1, .05, pct);
+  const fmts = { sens: v => (+v).toFixed(2), volume: pct };
+  p.querySelectorAll('input[type=range]').forEach(inp => inp.addEventListener('input', () => {
+    settings[inp.dataset.k] = +inp.value;
+    p.querySelector(`[data-v=${inp.dataset.k}]`).textContent = fmts[inp.dataset.k](inp.value);
+    saveSettings(); onSettingsChanged();
+  }));
+  p.querySelectorAll('.tog').forEach(t => t.addEventListener('click', () => {
+    settings[t.dataset.t] = !settings[t.dataset.t]; t.classList.toggle('on', settings[t.dataset.t]); saveSettings(); onSettingsChanged();
+  }));
+}
+function onSettingsChanged() { /* volume etc. hook */ }
+
+/* ---------- button layout editor */
+const editor = document.createElement('div');
+editor.id = 'layoutEd';
+editor.className = 'screen hidden';
+editor.style.cssText = 'background:rgba(6,3,8,.7); justify-content:flex-start; touch-action:none';
+editor.innerHTML = `
+<div style="text-align:center; font-weight:800; letter-spacing:.16em">DRAG BUTTONS TO MOVE · TAP ONE THEN − / + TO RESIZE</div>
+<div class="row" style="margin-top:4px">
+  <button class="b ghost" data-ed="minus" style="min-width:60px">−</button>
+  <button class="b ghost" data-ed="plus" style="min-width:60px">+</button>
+  <button class="b ghost" data-ed="reset">Reset</button>
+  <button class="b primary" data-ed="done">Done</button>
+</div>
+<div class="edBtns">${BTN_DEFS.map(b => `<div class="tb" data-id="${b.id}"><span>${b.label}</span></div>`).join('')}</div>
+<div style="position:absolute;left:0;top:0;bottom:0;width:50%;border-right:1px dashed rgba(255,255,255,.2);pointer-events:none"></div>
+<div class="hint" style="position:absolute;left:25%;top:55%;transform:translate(-50%,-50%)">left half: movement stick</div>`;
+editor.querySelector('.edBtns').style.cssText = 'position:absolute; inset:0';
+document.body.appendChild(editor);
+const edStyle = document.createElement('style');
+edStyle.textContent = `#layoutEd .tb{position:absolute; border-radius:50%; display:flex; align-items:center; justify-content:center; transform:translate(-50%,-50%);
+  border:2px solid rgba(255,255,255,.6); background:rgba(40,20,40,.6); color:#fff; font-weight:900; font-size:11px; letter-spacing:.12em; touch-action:none; cursor:grab}
+  #layoutEd .tb.sel{border-color:#ff2a3d; box-shadow:0 0 0 3px rgba(255,42,61,.4)}`;
+document.head.appendChild(edStyle);
+let edSel = 'attack', edDrag = null, edPrevScreen = 'settings';
+function openLayoutEditor() {
+  edPrevScreen = 'settings'; show(null); editor.classList.remove('hidden');
+  readSafe(); placeButtons(editor); markSel();
+}
+function markSel() { editor.querySelectorAll('.tb').forEach(el => el.classList.toggle('sel', el.dataset.id === edSel)); }
+editor.addEventListener('pointerdown', e => {
+  const el = e.target.closest('.tb'); if (!el) return;
+  e.preventDefault();
+  edSel = el.dataset.id; markSel();
+  const p = btnPx(edSel);
+  edDrag = { id: edSel, pid: e.pointerId, dx: p.x - e.clientX, dy: p.y - e.clientY };
+  try { el.setPointerCapture(e.pointerId); } catch (err) {}
+});
+editor.addEventListener('pointermove', e => {
+  if (!edDrag || e.pointerId !== edDrag.pid) return;
+  const L = layout[edDrag.id];
+  L.x = clamp((e.clientX + edDrag.dx - safe.l) / safe.w, .02, .98);
+  L.y = clamp((e.clientY + edDrag.dy - safe.t) / safe.h, .02, .98);
+  placeButtons(editor);
+});
+const edEnd = e => { if (edDrag && e.pointerId === edDrag.pid) { edDrag = null; store.set('layout', layout); } };
+editor.addEventListener('pointerup', edEnd); editor.addEventListener('pointercancel', edEnd);
+editor.addEventListener('click', e => {
+  const b = e.target.closest('[data-ed]'); if (!b) return;
+  const a = b.dataset.ed;
+  if (a === 'minus' || a === 'plus') { const L = layout[edSel]; L.s = clamp(L.s + (a === 'plus' ? .1 : -.1), .6, 1.8); }
+  else if (a === 'reset') layout = layoutDefault();
+  else if (a === 'done') { editor.classList.add('hidden'); store.set('layout', layout); placeButtons(); show(edPrevScreen); return; }
+  store.set('layout', layout); placeButtons(editor);
+});
+
+/* =====================================================================
+   Resize / orientation
+   ===================================================================== */
+function resize() {
+  W = innerWidth; H = innerHeight;
+  renderer.setSize(W, H, false);
+  camera.aspect = W / H; computeBaseFov(); camera.fov = baseFov; camera.updateProjectionMatrix();
+  readSafe(); placeButtons();
+  if (!editor.classList.contains('hidden')) placeButtons(editor);
+  if (state === 'playing' && H > W && IS_TOUCH_ACTIVE) pauseGame();
+}
+addEventListener('resize', resize);
+addEventListener('orientationchange', () => setTimeout(resize, 120));
+if (window.visualViewport) visualViewport.addEventListener('resize', resize);
+
+$('#titleHint').innerHTML = IS_TOUCH
+  ? 'Left thumb: move · Right thumb: look · Hold SLIDE on the ground to slide, tap it in the air to SLAM'
+  : 'WASD move · Mouse look · Space jump · Ctrl/C slide (slam in air) · Shift dash · LMB attack · Q swap · Esc pause';
+
+/* =====================================================================
+   Main loop
+   ===================================================================== */
+const debug = { manual: false };
+let last = performance.now(), frameAcc = 0, frameN = 0, qualityHold = 0;
+function simulate(dt) {
+  P.yaw = wrapAngle(P.yaw + input.lookX);
+  P.pitch = clamp(P.pitch + input.lookY, -1.45, 1.45);
+  stepPlayer(dt);
+  edgeR = damp(edgeR, edgeTarget, 1.2, dt);
+}
+function adaptQuality(dt) {
+  frameAcc += dt; frameN++;
+  if (frameAcc < 2) return;
+  const avg = frameAcc / frameN; frameAcc = 0; frameN = 0;
+  if (avg > 1 / 48 && pixelRatio > 1) { pixelRatio = Math.max(1, pixelRatio - .25); renderer.setPixelRatio(pixelRatio); qualityHold = 3; }
+  else if (avg < 1 / 58 && pixelRatio < MAX_PR && --qualityHold < 0) { pixelRatio = Math.min(MAX_PR, pixelRatio + .25); renderer.setPixelRatio(pixelRatio); qualityHold = 3; }
+}
+function frame(now) {
+  requestAnimationFrame(frame);
+  let dt = (now - last) / 1000; last = now;
+  if (!(dt > 0)) dt = 1 / 60;
+  dt = Math.min(dt, 1 / 20);
+  shadowCount = 0;
+  if (state === 'playing') {
+    if (!debug.manual) simulate(dt);
+    updateCamera(dt);
+    updateHUD();
+    pushShadow(P.pos.x, P.pos.z, P.pos.y, 1.1);
+  } else if (state === 'title') {
+    const t = now / 1000 * .08;
+    camera.position.set(Math.cos(t) * 19, 11, Math.sin(t) * 19);
+    camera.lookAt(0, 2, 0);
+    camera.rotation.z = 0;
+    speedLines.visible = false;
+  }
+  edgeMesh.scale.set(edgeR, 1, edgeR);
+  edgeTex.offset.x = (now / 1000 * .02) % 1;
+  shadowMesh.count = shadowCount; shadowMesh.instanceMatrix.needsUpdate = true;
+  renderer.clear();
+  renderer.render(scene, camera);
+  if (!debug.manual) clearEdges();
+  adaptQuality(dt);
+}
+resize();
+resetPlayer();
+requestAnimationFrame(frame);
+
+// test / debug handle: tick() runs the sim deterministically at 60 Hz
+function tick(seconds) {
+  const n = Math.round(seconds * 60);
+  for (let i = 0; i < n; i++) { simulate(1 / 60); updateCamera(1 / 60); clearEdges(); }
+}
+window.__redline = { debug, tick, hooks, P, input, T, mods, get state() { return state; }, startGame, pauseGame, resumeGame, groundAt, terrainH, solids, settings, layout: () => layout };
+</script>
+</body>
+</html>

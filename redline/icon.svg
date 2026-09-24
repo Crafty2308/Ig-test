@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" fill="#08060c"/>
+  <g transform="skewX(-12) translate(60 0)">
+    <rect x="70" y="150" width="300" height="34" fill="#ff2a3d"/>
+    <rect x="110" y="230" width="300" height="34" fill="#ff2a3d" opacity=".75"/>
+    <rect x="150" y="310" width="300" height="34" fill="#ff2a3d" opacity=".5"/>
+  </g>
+  <text x="256" y="455" text-anchor="middle" font-family="Arial Black,Arial,sans-serif" font-weight="900" font-style="italic" font-size="78" fill="#f4eef2" letter-spacing="6">REDLINE</text>
+</svg>
