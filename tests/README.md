@@ -5,7 +5,7 @@ Three suites, all runnable with plain `node` from the repo root.
     node tests/geom.js          # hit-detection geometry, standalone
     node tests/test.js          # the damage engine, items, trees, allocation
     node tests/combat-test.js   # combat invariants, driven in a real browser
-    node tests/redline-smoke.js # REDLINE: movement, weapons, enemies, waves, UI
+    node tests/redline-smoke.js # REDLINE: movement, melee, gun parts, bullet time, enemies, waves, UI
 
 `geom.js` and `test.js` pull the relevant functions straight out of
 `theorycraft.html` and run them in isolation — there is no build step and

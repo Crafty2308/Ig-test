@@ -123,56 +123,108 @@ const ok = (n, c, x) => { if (c) pass++; else { fail++; console.log('FAIL: ' + n
   ok('wall-jump gives a speed boost away from wall', wr.off && wr.s2 > wr.s1 + 2 && wr.vx < 0, wr);
   await shot('02-wall');
 
-  // --- step 2: weapons, damage = speed × multiplier
+  // --- weapons: melee button + guns built from parts. damage = speed × multiplier
   const W2 = await R(() => {
-    const { P, input, enemies, spawnEnemy, WS, tick } = __redline;
+    const r = __redline, { P, input, enemies, spawnEnemy, tick, MEL, ARS } = r;
     const out = {};
-    const arena = () => { enemies.length = 0; };
-    const setup = (speed, weapon) => {
-      arena();
-      P.pos.set(-20, 0, 40); P.vel.set(speed, 0, 0); P.yaw = -Math.PI / 2; P.pitch = -.15; P.onGround = true; P.wall = null;
-      P.dashActive = 0; P.sliding = false; P.slamming = false; P.grabbed = false;
-      WS.idx = weapon; WS.cd = 0; WS.swap = 0; WS.windup = 0; WS.buf = 0;
-      const e = spawnEnemy('dummy', -17.5, 40, { home: { x: 0, z: 0 } }); e.spawnT = 0; e.hp = e.maxHp = 5000;
+    const setup = (speed, dist = 2.5) => {
+      enemies.length = 0; for (const o of r.orbs) o.life = 0;
+      P.pos.set(-20, r.terrainH(-20, 40), 40); P.vel.set(speed, 0, 0); P.yaw = -Math.PI / 2; P.pitch = -.05; P.onGround = true; P.wall = null;
+      P.dashActive = 0; P.sliding = false; P.slamming = false; P.grabbed = null; P.hp = P.maxHp;
+      Object.assign(MEL, { cd: 0, hold: 0, charging: false, lunge: 0, lungeE: null });
+      for (const g of ARS.guns) { g.cd = 0; g.reloadT = 0; g.charge = 0; g.burstLeft = 0; g.ammo = g.st.mag; }
+      ARS.swapT = 0; ARS.buf = 0; r.TIME.hitstop = 0; r.TIME.scale = 1;
+      input.meleeHeld = input.attackHeld = false;
+      const e = spawnEnemy('dummy', -20 + dist, 40, { home: { x: 0, z: 0 } }); e.spawnT = 0; e.hp = e.maxHp = 5000;
       return e;
     };
-    // 0 speed → 0 damage
-    let e = setup(0, 0); input.attackPressed = true; tick(1 / 60);
-    out.zero = e.maxHp - e.hp;
-    // blade at 12 m/s → 12 damage, speed kept (pure hit, no decay window)
-    e = setup(12, 0); input.attackPressed = true; tick(1 / 60);
-    out.blade = { dmg: e.maxHp - e.hp, speedAfter: Math.hypot(P.vel.x, P.vel.z) };
-    // hammer at 10 m/s: 4.5x, consumes speed
-    e = setup(10, 1); P.vel.set(10, 0, 0); input.attackPressed = true; tick(.4);
-    out.hammer = { dmg: e.maxHp - e.hp, speedAfter: Math.hypot(P.vel.x, P.vel.z) };
-    // shotgun: recoil pushes you backwards
-    e = setup(0, 2); P.pitch = 0; input.attackPressed = true; tick(1 / 60);
-    out.shotgun = { dmg: e.maxHp - e.hp, vx: P.vel.x };
-    e = setup(15, 2); P.pitch = 0; P.vel.set(15, 0, 0); input.attackPressed = true; tick(1 / 60);
-    out.shotgunFast = e.maxHp - e.hp;
-    // swap cycles
-    WS.idx = 0; WS.windup = 0; input.swapPressed = true; tick(1 / 60); out.swap = WS.idx;
+    const hit = e => e.maxHp - e.hp;
+    // melee tap: blade
+    let e = setup(0); input.meleePressed = true; input.meleeHeld = true; tick(1 / 60); input.meleeHeld = false; tick(1 / 60);
+    out.zero = hit(e);
+    e = setup(12); input.meleePressed = true; input.meleeHeld = true; tick(1 / 60); input.meleeHeld = false; tick(1 / 60);
+    out.blade = { dmg: hit(e), speedAfter: Math.hypot(P.vel.x, P.vel.z) };
+    // melee hold: hammer spends all speed
+    e = setup(10, 3); input.my = .15; input.meleePressed = true; input.meleeHeld = true; tick(1 / 60); const afterSlash = hit(e);
+    input.my = 1; tick(.6); P.pos.x = -20; e.pos.x = -17.5; tick(1 / 60); input.meleeHeld = false; tick(1 / 60); input.my = 0;
+    out.hammer = { dmg: hit(e) - afterSlash, speedAfter: Math.hypot(P.vel.x, P.vel.z) };
+    // lunge: target out of reach but in the crosshair
+    e = setup(10, 7.5); input.meleePressed = true; input.meleeHeld = true; tick(1 / 60); const lungeSpeed = Math.hypot(P.vel.x, P.vel.z);
+    input.meleeHeld = false; tick(.35);
+    out.lunge = { lungeSpeed, dmg: hit(e) };
+    // sidearm: 0.9x per shot, ammo ticks down
+    ARS.idx = 0;
+    e = setup(0, 6); input.attackPressed = true; tick(1 / 60); out.gunZero = hit(e);
+    e = setup(15, 6); const a0 = ARS.guns[0].ammo; input.attackPressed = true; tick(1 / 60);
+    out.gun = { dmg: hit(e), ammoUsed: a0 - ARS.guns[0].ammo };
+    // empty mag auto-reloads
+    e = setup(0, 6); ARS.guns[0].ammo = 1; input.attackPressed = true; tick(1 / 60);
+    out.reload = { started: ARS.guns[0].reloadT > 0 }; tick(1.2); out.reload.full = ARS.guns[0].ammo === ARS.guns[0].st.mag;
+    // headshot crits
+    e = setup(15, 6); P.pitch = Math.atan2(1.72 - P.eye, 6); r.settings.aimAssist = false; input.attackPressed = true; tick(1 / 60);
+    out.crit = hit(e);
+    e = setup(15, 6); P.pitch = Math.atan2(.7 - P.eye, 6); input.attackPressed = true; tick(1 / 60);
+    out.body = hit(e); r.settings.aimAssist = true;
+    // scattergun recoil launches you backwards even at 0 speed (and deals 0)
+    ARS.idx = 1; e = setup(0, 6); P.pitch = 0; input.attackPressed = true; tick(1 / 60);
+    out.scatter = { dmg: hit(e), vx: P.vel.x };
+    // swap
+    ARS.idx = 0; input.swapPressed = true; tick(1 / 60); out.swap = ARS.idx; ARS.idx = 0;
+    // parts change stats
+    const base = ARS.guns[0].st.mult; ARS.owned.longBarrel = (ARS.owned.longBarrel || 0) + 1; r.install(0, 'longBarrel');
+    out.long = { mult: ARS.guns[0].st.mult / base, name: ARS.guns[0].st.name };
+    // railcaster: hold to charge, release to fire, pierces two in a row
+    ARS.owned.rail = 1; r.install(0, 'rail'); ARS.idx = 0;
+    e = setup(20, 25); const e2 = spawnEnemy('dummy', -20 + 29, 40, { home: { x: 0, z: 0 } }); e2.spawnT = 0; e2.hp = e2.maxHp = 5000;
+    input.attackHeld = true; input.attackPressed = true; tick(.8); const chargeHeld = hit(e); input.attackHeld = false; tick(1 / 60);
+    out.rail = { chargeHeld, dmg: hit(e), dmg2: e2.maxHp - e2.hp, speed: Math.hypot(P.vel.x, P.vel.z) };
+    // launcher: explosion + rocket jump off your own feet
+    ARS.owned.launcher = 1; r.install(0, 'launcher');
+    e = setup(15, 7); P.pitch = 0; input.attackPressed = true; tick(.4); out.rocket = hit(e);
+    e = setup(0, 30); P.pitch = -1.4; input.attackPressed = true; tick(.12);
+    out.rocketJump = P.vel.y;
+    r.install(0, 'sidearm'); r.install(0, 'stdBarrel');
+    // deflect an orb back into an enemy
+    e = setup(18, 14); const L = spawnEnemy('lancer', -20 + 14, 40); L.spawnT = 0; L.hp = L.maxHp = 5000; e.alive = false;
+    r.spawnOrb({ x: -18.5, y: P.pos.y + 1.4, z: 40 }, { x: -15, y: 0, z: 0 }, 11);
+    input.meleePressed = true; input.meleeHeld = true; tick(1 / 60); input.meleeHeld = false;
+    const mine = r.orbs.some(o => o.life > 0 && o.mine);
+    tick(.6);
+    out.deflect = { mine, lancerDmg: L.maxHp - L.hp, hp: P.hp };
+    // time: the world slows with speed
+    enemies.length = 0; P.pos.set(-20, r.terrainH(-20, 40), 40); P.vel.set(40, 0, 0); r.tick(.4); out.tsFast = r.TIME.scale;
+    P.vel.set(3, 0, 0); r.tick(.8); out.tsSlow = r.TIME.scale;
     enemies.length = 0;
     return out;
   });
-  ok('0 speed deals 0 damage', W2.zero === 0, W2);
+  ok('melee at 0 speed deals 0', W2.zero === 0, W2);
   ok('blade: damage = speed x 1.0', Math.abs(W2.blade.dmg - 12) < .6, W2.blade);
   ok('blade keeps speed on hit', W2.blade.speedAfter > 11.5, W2.blade);
-  ok('hammer: big hit, spends all speed', W2.hammer.dmg > 30 && W2.hammer.speedAfter < .5, W2.hammer);
-  ok('shotgun at 0 speed: 0 dmg but recoil launches back', W2.shotgun.dmg === 0 && W2.shotgun.vx < -8, W2.shotgun);
-  ok('shotgun at speed deals damage', W2.shotgunFast > 20, W2);
-  ok('swap cycles weapons', W2.swap === 1, W2);
+  ok('hold melee: hammer hits hard and spends speed', W2.hammer.dmg > 30 && W2.hammer.speedAfter < .5, W2.hammer);
+  ok('melee lunges to targets in the crosshair', W2.lunge.lungeSpeed > 14 && W2.lunge.dmg > 10, W2.lunge);
+  ok('gun at 0 speed deals 0', W2.gunZero === 0, W2);
+  ok('sidearm: damage = speed x 0.9, uses ammo', Math.abs(W2.gun.dmg - 13.5) < .8 && W2.gun.ammoUsed === 1, W2.gun);
+  ok('empty mag auto-reloads', W2.reload.started && W2.reload.full, W2.reload);
+  ok('headshots crit, body shots do not', W2.crit > 20 && W2.body > 10 && W2.body < 15, W2);
+  ok('scattergun recoil launches you back', W2.scatter.dmg === 0 && W2.scatter.vx < -8, W2.scatter);
+  ok('swap switches guns', W2.swap === 1, W2);
+  ok('long barrel: +20% mult and renames the gun', Math.abs(W2.long.mult - 1.2) < .01 && /Longshot/.test(W2.long.name), W2.long);
+  ok('railcaster charges, then pierces', W2.rail.chargeHeld === 0 && W2.rail.dmg > 60 && W2.rail.dmg2 > 60, W2.rail);
+  ok('launcher rockets explode', W2.rocket > 20, W2);
+  ok('rocket jump off your feet', W2.rocketJump > 5, W2);
+  ok('melee deflects orbs back into enemies', W2.deflect.mine && W2.deflect.lancerDmg > 20 && W2.deflect.hp === 100, W2.deflect);
+  ok('world slows at high speed', W2.tsFast < .55 && W2.tsSlow > .95, W2);
   await shot('05-weapons');
 
   // --- step 3: enemies, getting hit, waves
   const E3 = await R(() => {
-    const r = __redline, { P, input, enemies, spawnEnemy, WS, tick } = r;
+    const r = __redline, { P, input, enemies, spawnEnemy, tick, MEL } = r;
     const out = {};
     const reset = () => {
       enemies.length = 0; for (const q of r.puddles) q.life = 0;
       P.pos.set(-20, 0, 40); P.pos.y = r.terrainH(-20, 40); P.vel.set(0, 0, 0); P.yaw = -Math.PI / 2; P.pitch = 0;
       P.onGround = true; P.wall = null; P.dashActive = 0; P.sliding = false; P.slamming = false; P.grabbed = null;
-      P.hp = P.maxHp; P.invuln = 0; WS.idx = 0; WS.cd = 0; WS.swap = 0; WS.windup = 0; WS.buf = 0;
+      P.hp = P.maxHp; P.invuln = 0; Object.assign(MEL, { cd: 0, hold: 0, charging: false, lunge: 0 }); r.TIME.hitstop = 0;
       input.mx = input.my = 0;
     };
     const mk = (type, dx, dz) => { const e = spawnEnemy(type, P.pos.x + dx, P.pos.z + dz); e.spawnT = 0; return e; };
@@ -197,12 +249,12 @@ const ok = (n, c, x) => { if (c) pass++; else { fail++; console.log('FAIL: ' + n
     out.well = { vx: P.vel.x, moved: P.pos.x + 8 };
     // shielder: frontal hit below threshold is blocked, fast hit breaks it, back hit always lands
     reset(); let sh = mk('shielder', 2.2, 0); sh.yaw = Math.atan2(-(P.pos.x - sh.pos.x), -(P.pos.z - sh.pos.z)); sh.hp = sh.maxHp = 999;
-    P.vel.set(10, 0, 0); input.attackPressed = true; tick(1 / 60);
+    P.vel.set(10, 0, 0); input.meleePressed = true; tick(1 / 60);
     out.shield = { slowFront: 999 - sh.hp, still: sh.shield };
-    WS.cd = 0; P.vel.set(22, 0, 0); P.pos.x = sh.pos.x - 2.2; input.attackPressed = true; tick(1 / 60);
+    MEL.cd = 0; r.TIME.hitstop = 0; P.vel.set(22, 0, 0); P.pos.x = sh.pos.x - 2.2; input.meleePressed = true; tick(1 / 60);
     out.shield.broke = !sh.shield; out.shield.fastDmg = 999 - sh.hp;
     reset(); sh = mk('shielder', 2.2, 0); sh.yaw = Math.atan2(-(P.pos.x - sh.pos.x), -(P.pos.z - sh.pos.z)) + Math.PI; sh.hp = sh.maxHp = 999;
-    P.vel.set(8, 0, 0); input.attackPressed = true; tick(1 / 60);
+    P.vel.set(8, 0, 0); input.meleePressed = true; tick(1 / 60);
     out.shield.backDmg = 999 - sh.hp;
     // waves: spawn, clear, advance; shrink every 5
     reset(); r.startWave(1); tick(4);
@@ -216,7 +268,7 @@ const ok = (n, c, x) => { if (c) pass++; else { fail++; console.log('FAIL: ' + n
   ok('hit: brief invulnerability', E3.hit.again === false, E3.hit);
   ok('chaser damages a standing player', E3.chaser < 100, E3);
   ok('grabber latches and zeroes speed', E3.grab.grabbed && E3.grab.speed < .01 && E3.grab.stillPinned, E3.grab);
-  ok('mashing attack breaks the grab', E3.grab.free && E3.grab.freedAfter >= 6, E3.grab);
+  ok('mashing fire breaks the grab', E3.grab.free && E3.grab.freedAfter >= 6, E3.grab);
   ok('sludge puddle slows to a crawl', E3.puddle < 5.5, E3);
   ok('well pulls the player in', E3.well.vx > 1 && E3.well.moved > 0, E3.well);
   ok('shield blocks slow frontal hits', E3.shield.slowFront === 0 && E3.shield.still, E3.shield);
@@ -228,10 +280,21 @@ const ok = (n, c, x) => { if (c) pass++; else { fail++; console.log('FAIL: ' + n
   await shot('06b-upgrade');
   const before = await R(() => ({ ...__redline.mods, hp: __redline.P.maxHp }));
   await p.waitForTimeout(500);
-  await p.tap('#upCards .card >> nth=0');
-  const after = await R(() => ({ ...__redline.mods, hp: __redline.P.maxHp, n: __redline.WAVE.n, state: __redline.state, taken: Object.keys(__redline.taken).length }));
-  ok('picking an upgrade starts the next wave', after.n === 2 && after.state === 'playing', after);
-  ok('upgrade applied', after.taken === 1 && JSON.stringify(before) !== JSON.stringify(after), { before, after });
+  // pick a part card: the armory opens, install it, continue
+  const partIdx = await R(() => [...document.querySelectorAll('#upCards .card')].findIndex(c => c.classList.contains('part')));
+  ok('rewards include a gun part', partIdx >= 0);
+  await p.tap(`#upCards .card >> nth=${Math.max(0, partIdx)}`);
+  await p.waitForTimeout(150);
+  ok('picking a part opens the armory', await p.isVisible('#armory'));
+  await shot('06c-armory');
+  const newPart = await R(() => { const b = document.querySelector('#armList .pitem em'); return b && b.closest('[data-p]').dataset.p; });
+  await p.tap(`#armList [data-p="${newPart}"]`);
+  const installed = await p.evaluate(id => __redline.ARS.guns.some(g => Object.values(g).includes(id)), newPart);
+  ok('tapping a part in the armory installs it', installed, newPart);
+  await p.tap('#armDone');
+  const after = await R(() => ({ n: __redline.WAVE.n, state: __redline.state }));
+  ok('continuing from the armory starts the next wave', after.n === 2 && after.state === 'playing', after);
+  void before;
   const RF = await R(() => {
     const r = __redline, { P, enemies } = r;
     enemies.length = 0; r.mods.refund = .5;
@@ -239,7 +302,7 @@ const ok = (n, c, x) => { if (c) pass++; else { fail++; console.log('FAIL: ' + n
     r.hurtPlayer(5, P.pos.x + 1, P.pos.z);
     const afterHit = Math.hypot(P.vel.x, P.vel.z);
     const e = r.spawnEnemy('chaser', P.pos.x + 2, P.pos.z); e.spawnT = 0; e.hp = 1;
-    r.WS.idx = 0; r.WS.cd = 0; r.WS.swap = 0; r.input.attackPressed = true; r.tick(1 / 60);
+    r.MEL.cd = 0; r.MEL.lunge = 0; r.TIME.hitstop = 0; r.input.meleePressed = true; r.tick(1 / 60);
     r.mods.refund = 0;
     return { afterHit, afterKill: Math.hypot(P.vel.x, P.vel.z), dead: !e.alive };
   });
@@ -269,7 +332,7 @@ const ok = (n, c, x) => { if (c) pass++; else { fail++; console.log('FAIL: ' + n
   await touch('touchEnd', []);
   await p.waitForTimeout(100);
   await shot('04-layout');
-  const saved = await R(() => JSON.parse(localStorage.getItem('redline.layout') || 'null'));
+  const saved = await R(() => JSON.parse(localStorage.getItem('redline.layout2') || 'null'));
   ok('layout drag saved', saved && saved.dash && saved.dash.x < .7, saved);
 
   // --- game over
