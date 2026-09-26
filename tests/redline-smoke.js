@@ -290,6 +290,19 @@ const ok = (n, c, x) => { if (c) pass++; else { fail++; console.log('FAIL: ' + n
     return out;
   });
   ok('aiming slows the world', AIM.ts < .4 && AIM.focus < 1, AIM);
+  const G = await R(() => {
+    // global game speed: the player slows down with everything else, but keeps their speed value
+    const r = __redline, { P, input } = r;
+    const run = aim => {
+      P.pos.set(-20, r.terrainH(-20, 40), 40); P.vel.set(0, 0, 0); P.yaw = -Math.PI / 2; P.onGround = true; r.FOCUS.v = 1; r.TIME.scale = 1;
+      input.my = 1; r.tick(1.2); input.aimHeld = aim; r.tick(.4);
+      const x0 = P.pos.x; r.tick(.5); input.aimHeld = false; input.my = 0;
+      return { dist: P.pos.x - x0, speed: Math.hypot(P.vel.x, P.vel.z) };
+    };
+    return { normal: run(false), aimed: run(true) };
+  });
+  ok('aiming slows the player too (global game speed)', G.aimed.dist < G.normal.dist * .45, G);
+  ok('...but the speed value is unchanged', Math.abs(G.aimed.speed - G.normal.speed) < .5, G);
   ok('focus runs out, then time returns to normal', AIM.drained === 0 && AIM.tsEmpty > .9, AIM);
   ok('focus refills after letting go', AIM.refill > .3, AIM);
   const swings = () => R(() => { const r = __redline; r.MEL.cd = 0; r.MEL.charging = false; return r.__swings || 0; });
@@ -326,7 +339,7 @@ const ok = (n, c, x) => { if (c) pass++; else { fail++; console.log('FAIL: ' + n
   await touch('touchEnd', []);
   await p.waitForTimeout(100);
   await shot('04-layout');
-  const saved = await R(() => JSON.parse(localStorage.getItem('redline.layout3') || 'null'));
+  const saved = await R(() => JSON.parse(localStorage.getItem('redline.layout4') || 'null'));
   ok('layout drag saved', saved && saved.dash && saved.dash.x < .7, saved);
 
   // --- game over

@@ -917,10 +917,10 @@ const BTN_DEFS = [
   { id: 'dash',   label: 'DASH',   size: 62,  x: .82, y: .37 },
   { id: 'swap',   label: 'SWAP',   size: 52,  x: .945, y: .15 },
   { id: 'reload', label: 'RELOAD', size: 48,  x: .81, y: .13 },
-  { id: 'aim',    label: 'AIM',    size: 60,  x: .595, y: .58 },
+  { id: 'aim',    label: 'AIM',    size: 60,  x: .795, y: .9 },
 ];
 const layoutDefault = () => Object.fromEntries(BTN_DEFS.map(b => [b.id, { x: b.x, y: b.y, s: 1 }]));
-let layout = Object.assign(layoutDefault(), store.get('layout3', {}));
+let layout = Object.assign(layoutDefault(), store.get('layout4', {}));
 const touchUI = document.createElement('div');
 touchUI.id = 'touchUI';
 touchUI.innerHTML = `
@@ -1306,15 +1306,15 @@ editor.addEventListener('pointermove', e => {
   L.y = clamp((e.clientY + edDrag.dy - safe.t) / safe.h, .02, .98);
   placeButtons(editor);
 });
-const edEnd = e => { if (edDrag && e.pointerId === edDrag.pid) { edDrag = null; store.set('layout3', layout); } };
+const edEnd = e => { if (edDrag && e.pointerId === edDrag.pid) { edDrag = null; store.set('layout4', layout); } };
 editor.addEventListener('pointerup', edEnd); editor.addEventListener('pointercancel', edEnd);
 editor.addEventListener('click', e => {
   const b = e.target.closest('[data-ed]'); if (!b) return;
   const a = b.dataset.ed;
   if (a === 'minus' || a === 'plus') { const L = layout[edSel]; L.s = clamp(L.s + (a === 'plus' ? .1 : -.1), .6, 1.8); }
   else if (a === 'reset') layout = layoutDefault();
-  else if (a === 'done') { editor.classList.add('hidden'); store.set('layout3', layout); placeButtons(); show(edPrevScreen); return; }
-  store.set('layout3', layout); placeButtons(editor);
+  else if (a === 'done') { editor.classList.add('hidden'); store.set('layout4', layout); placeButtons(); show(edPrevScreen); return; }
+  store.set('layout4', layout); placeButtons(editor);
 });
 
 /* =====================================================================
@@ -1633,7 +1633,7 @@ function updateEnemies(dt) {
 }
 
 /* =====================================================================
-   Time — the faster you move, the slower the world runs
+   Time — a global game-speed multiplier: going fast or aiming slows the whole game
    ===================================================================== */
 const TIME = { scale: 1, hitstop: 0, slowmo: 0, wdt: 0 };
 // Aiming (RMB / AIM) zooms in and drops the world to 30% speed while focus lasts
@@ -2102,7 +2102,7 @@ function applyCoreFx(fx, e, pt, dealt, spd, hitSet) {
   }
 }
 
-/* ---------- rockets (player projectiles, real time) */
+/* ---------- rockets (player projectiles) */
 const ROCKET_MAX = 24;
 const rocketMesh = new THREE.InstancedMesh(new THREE.OctahedronGeometry(.16, 0).scale(1, 1, 2.8),
   new THREE.MeshBasicMaterial({ color: 0xffd08a, fog: false }), ROCKET_MAX);
@@ -2125,7 +2125,7 @@ function updateRockets(dt) {
       if (pointBlocked(r.pos) || Math.hypot(r.pos.x, r.pos.z) > edgeR) boom = true;
       else for (const e of enemies) { if (e.alive && e.spawnT <= 0 && eCenter(e, _v2).distanceTo(r.pos) < e.d.r + .35) { boom = true; break; } }
     }
-    if (Math.random() < .7) spawnPart(r.pos.x, r.pos.y, r.pos.z, rand(-1, 1), rand(-1, 1), rand(-1, 1), .35, .7, 0xffa040, 0);
+    if (Math.random() < 42 * dt) spawnPart(r.pos.x, r.pos.y, r.pos.z, rand(-1, 1), rand(-1, 1), rand(-1, 1), .35, .7, 0xffa040, 0);
     if (boom) { r.life = 0; explode(r.pos, r.blast, r.dmg, { self: true, spd: r.spd, fx: r.fx }); continue; }
     _q.setFromUnitVectors(_zNeg, _v1.copy(r.vel).normalize());
     rocketMesh.setMatrixAt(n++, _m4.compose(r.pos, _q, _s3.set(1, 1, 1)));
@@ -2163,7 +2163,7 @@ function explode(pos, R, dmg, o = {}) {
   emit('onExplode', !!o.small);
 }
 
-/* ---------- orbs: enemy projectiles (world time) that melee can deflect back (real time) */
+/* ---------- orbs: enemy projectiles that melee can deflect back */
 const ORB_MAX = 48;
 const orbMesh = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(.34, 1), new THREE.MeshBasicMaterial({ color: 0xffffff, fog: false }), ORB_MAX);
 orbMesh.setColorAt(0, new THREE.Color()); orbMesh.frustumCulled = false; scene.add(orbMesh);
@@ -3068,11 +3068,11 @@ function updateJuice(dt) {
   const tk = ts < .97 ? `TIME ×${ts.toFixed(2)}` : '';
   if (timeEl.textContent !== tk) timeEl.textContent = tk;
   // sparks: slide scrape, wall-run grind
-  if (P.sliding && hs > 8 && Math.random() < .8) {
+  if (P.sliding && hs > 8 && Math.random() < 48 * dt) {
     const bx = P.pos.x - P.vel.x / hs * .6 + rand(-.3, .3), bz = P.pos.z - P.vel.z / hs * .6 + rand(-.3, .3);
     spawnPart(bx, P.pos.y + .05, bz, -P.vel.x * .15 + rand(-2, 2), rand(1.5, 4), -P.vel.z * .15 + rand(-2, 2), .35, .5, hs > 25 ? 0x7fe0ff : 0xffb050, 1);
   }
-  if (P.wall && Math.random() < .9) {
+  if (P.wall && Math.random() < 54 * dt) {
     spawnPart(P.pos.x - P.wall.nx * .45, P.pos.y + rand(.2, 1.2), P.pos.z - P.wall.nz * .45, -P.vel.x * .1 + P.wall.nx * 2, rand(-1, 2), -P.vel.z * .1 + P.wall.nz * 2, .3, .45, 0xff4a5a, .6);
   }
 }
@@ -3141,23 +3141,25 @@ function simulate(dt) {
   const lk = 1 - .45 * FOCUS.aim;                          // finer look while aiming
   P.yaw = wrapAngle(P.yaw + input.lookX * lk);
   P.pitch = clamp(P.pitch + input.lookY * lk, -1.45, 1.45);
+  // real-time bookkeeping: focus drains by real seconds, time scale eases in by real seconds
   updateFocus(dt);
-  // hitstop: a few frames of near-freeze on impact sell the hit
-  if (TIME.hitstop > 0) { TIME.hitstop -= dt; dt *= .06; }
   TIME.slowmo = Math.max(0, TIME.slowmo - dt);
-  // the world runs slower the faster you go; you run in real time
   TIME.scale = damp(TIME.scale, targetTimeScale(), 7, dt);
-  const wdt = dt * TIME.scale;
-  TIME.wdt = wdt;
-  stepPlayer(dt);
-  updateMelee(dt);
-  updateGuns(dt);
-  updateRockets(dt);
-  updateOrbs(wdt, dt);
-  updateEnemies(wdt);
-  updateTimers(wdt);
-  updateWaves(wdt);
-  edgeR = damp(edgeR, edgeTarget, 1.2, dt);
+  // one global game-speed multiplier: player, weapons, projectiles, enemies — everything.
+  // Speeds keep their values (the meter still reads 30 m/s); the whole game just runs slower.
+  let gdt = dt * TIME.scale;
+  // hitstop: a few frames of near-freeze on impact sell the hit
+  if (TIME.hitstop > 0) { TIME.hitstop -= dt; gdt *= .06; }
+  TIME.wdt = gdt;
+  stepPlayer(gdt);
+  updateMelee(gdt);
+  updateGuns(gdt);
+  updateRockets(gdt);
+  updateOrbs(gdt, gdt);
+  updateEnemies(gdt);
+  updateTimers(gdt);
+  updateWaves(gdt);
+  edgeR = damp(edgeR, edgeTarget, 1.2, gdt);
 }
 function adaptQuality(dt) {
   frameAcc += dt; frameN++;
@@ -3174,19 +3176,22 @@ function frame(now) {
   shadowCount = 0;
   if (state === 'playing') {
     if (!debug.manual) simulate(dt);
-    updateCamera(dt);
+    // presentation follows game time too, so bob, swings and effects slow down with everything else
+    const gd = debug.manual ? dt : TIME.wdt;
+    updateCamera(gd);
     updateHUD();
     updateHUD2(dt);
     updateHUD3(dt);
-    updateJuice(dt);
+    updateJuice(gd);
     pushShadow(P.pos.x, P.pos.z, P.pos.y, 1.1);
-    updateViewmodel(dt);
+    updateViewmodel(gd);
   }
   if (state !== 'title') {
     const wd = state === 'playing' ? (debug.manual ? dt : TIME.wdt) : 0;
     updateParticles(wd);
-    updateTracers(state === 'playing' ? dt : 0);
-    updateFlash(state === 'playing' ? dt : 1);
+    const gd2 = state === 'playing' ? (debug.manual ? dt : TIME.wdt) : 0;
+    updateTracers(gd2);
+    updateFlash(state === 'playing' ? gd2 : 1);
     updateEnemyMeshes();
     updateEnemyExtras();
     updatePuddles(wd);
