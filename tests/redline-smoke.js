@@ -171,15 +171,15 @@ const ok = (n, c, x) => { if (c) pass++; else { fail++; console.log('FAIL: ' + n
     // swap
     ARS.idx = 0; input.swapPressed = true; tick(1 / 60); out.swap = ARS.idx; ARS.idx = 0;
     // parts change stats
-    const base = ARS.guns[0].st.mult; ARS.owned.longBarrel = (ARS.owned.longBarrel || 0) + 1; r.install(0, 'longBarrel');
+    const base = ARS.guns[0].st.mult; r.install(0, 'longBarrel');
     out.long = { mult: ARS.guns[0].st.mult / base, name: ARS.guns[0].st.name };
     // railcaster: hold to charge, release to fire, pierces two in a row
-    ARS.owned.rail = 1; r.install(0, 'rail'); ARS.idx = 0;
+    r.install(0, 'rail'); ARS.idx = 0;
     e = setup(20, 25); const e2 = spawnEnemy('dummy', -20 + 29, 40, { home: { x: 0, z: 0 } }); e2.spawnT = 0; e2.hp = e2.maxHp = 5000;
     input.attackHeld = true; input.attackPressed = true; tick(.8); const chargeHeld = hit(e); input.attackHeld = false; tick(1 / 60);
     out.rail = { chargeHeld, dmg: hit(e), dmg2: e2.maxHp - e2.hp, speed: Math.hypot(P.vel.x, P.vel.z) };
     // launcher: explosion + rocket jump off your own feet
-    ARS.owned.launcher = 1; r.install(0, 'launcher');
+    r.install(0, 'launcher');
     e = setup(15, 7); P.pitch = 0; input.attackPressed = true; tick(.4); out.rocket = hit(e);
     e = setup(0, 30); P.pitch = -1.4; input.attackPressed = true; tick(.12);
     out.rocketJump = P.vel.y;
@@ -259,8 +259,8 @@ const ok = (n, c, x) => { if (c) pass++; else { fail++; console.log('FAIL: ' + n
     // waves: spawn, clear, advance; shrink every 5
     reset(); r.startWave(1); tick(4);
     out.wave1 = { n: r.WAVE.n, spawned: enemies.length };
-    for (const e of enemies) e.hp = -1, e.alive = false; r.WAVE.queue.length = 0; tick(.1); tick(2.5);
-    out.upgradeScreen = r.state;
+    for (const e of enemies) e.hp = -1, e.alive = false; r.WAVE.queue.length = 0; tick(.1); tick(3.5);
+    out.afterClear = { state: r.state, n: r.WAVE.n };
     const edge0 = r.WAVE.n; void edge0;
     return out;
   });
@@ -275,39 +275,33 @@ const ok = (n, c, x) => { if (c) pass++; else { fail++; console.log('FAIL: ' + n
   ok('fast frontal hit breaks the shield', E3.shield.broke && E3.shield.fastDmg > 20, E3.shield);
   ok('hits from behind bypass the shield', E3.shield.backDmg > 6, E3.shield);
   ok('wave 1 spawns enemies', E3.wave1.n === 1 && E3.wave1.spawned > 0, E3.wave1);
-  ok('clearing a wave offers upgrades', E3.upgradeScreen === 'upgrade', E3);
-  ok('three upgrade cards shown', await p.locator('#upCards .card').count() === 3);
-  await shot('06b-upgrade');
-  const before = await R(() => ({ ...__redline.mods, hp: __redline.P.maxHp }));
-  await p.waitForTimeout(500);
-  // pick a part card: the armory opens, install it, continue
-  const partIdx = await R(() => [...document.querySelectorAll('#upCards .card')].findIndex(c => c.classList.contains('part')));
-  ok('rewards include a gun part', partIdx >= 0);
-  await p.tap(`#upCards .card >> nth=${Math.max(0, partIdx)}`);
-  await p.waitForTimeout(150);
-  ok('picking a part opens the armory', await p.isVisible('#armory'));
-  await shot('06c-armory');
-  const newPart = await R(() => { const b = document.querySelector('#armList .pitem em'); return b && b.closest('[data-p]').dataset.p; });
-  await p.tap(`#armList [data-p="${newPart}"]`);
-  const installed = await p.evaluate(id => __redline.ARS.guns.some(g => Object.values(g).includes(id)), newPart);
-  ok('tapping a part in the armory installs it', installed, newPart);
-  await p.tap('#armDone');
-  const after = await R(() => ({ n: __redline.WAVE.n, state: __redline.state }));
-  ok('continuing from the armory starts the next wave', after.n === 2 && after.state === 'playing', after);
-  void before;
-  const RF = await R(() => {
-    const r = __redline, { P, enemies } = r;
-    enemies.length = 0; r.mods.refund = .5;
-    P.pos.set(-20, r.terrainH(-20, 40), 40); P.vel.set(20, 0, 0); P.yaw = -Math.PI / 2; P.pitch = -.1; P.invuln = 0; P.onGround = true;
-    r.hurtPlayer(5, P.pos.x + 1, P.pos.z);
-    const afterHit = Math.hypot(P.vel.x, P.vel.z);
-    const e = r.spawnEnemy('chaser', P.pos.x + 2, P.pos.z); e.spawnT = 0; e.hp = 1;
-    r.MEL.cd = 0; r.MEL.lunge = 0; r.TIME.hitstop = 0; r.input.meleePressed = true; r.tick(1 / 60);
-    r.mods.refund = 0;
-    return { afterHit, afterKill: Math.hypot(P.vel.x, P.vel.z), dead: !e.alive };
-  });
-  ok('kills refund lost momentum (upgrade)', RF.dead && RF.afterKill > RF.afterHit + 3, RF);
+  ok('clearing a wave goes straight into the next (no perks)', E3.afterClear.state === 'playing' && E3.afterClear.n === 2, E3.afterClear);
   await shot('06-enemies');
+
+  // --- aim (RMB) slows time on a focus meter; V is the only melee key
+  const AIM = await R(() => {
+    const r = __redline, { P, input, enemies } = r;
+    enemies.length = 0; r.WAVE.active = false; r.WAVE.queue.length = 0; r.WAVE.next = 1e9;
+    P.pos.set(-20, r.terrainH(-20, 40), 40); P.vel.set(0, 0, 0); r.FOCUS.v = 1;
+    input.aimHeld = true; r.tick(.5);
+    const out = { ts: r.TIME.scale, focus: r.FOCUS.v };
+    r.tick(3.5); out.drained = r.FOCUS.v; r.tick(.5); out.tsEmpty = r.TIME.scale;
+    input.aimHeld = false; r.tick(3); out.refill = r.FOCUS.v;
+    return out;
+  });
+  ok('aiming slows the world', AIM.ts < .4 && AIM.focus < 1, AIM);
+  ok('focus runs out, then time returns to normal', AIM.drained === 0 && AIM.tsEmpty > .9, AIM);
+  ok('focus refills after letting go', AIM.refill > .3, AIM);
+  const swings = () => R(() => { const r = __redline; r.MEL.cd = 0; r.MEL.charging = false; return r.__swings || 0; });
+  await R(() => { const r = __redline; r.__swings = 0; r.hooks.onSwing.push(() => r.__swings++); });
+  await p.mouse.move(400, 200);
+  for (const k of ['f', 'e']) { await p.keyboard.down(k); await R(() => __redline.tick(1 / 60)); await p.keyboard.up(k); }
+  const s0 = await swings();
+  await p.keyboard.down('v'); await R(() => __redline.tick(1 / 60)); await p.keyboard.up('v'); await R(() => __redline.tick(1 / 60));
+  const s1 = await swings();
+  ok('only V melees (F/E do nothing)', s0 === 0 && s1 === 1, { s0, s1 });
+  await p.keyboard.down('r'); await R(() => { const r = __redline; r.ARS.guns[r.ARS.idx].ammo = 1; r.tick(1 / 60); }); await p.keyboard.up('r');
+  ok('R reloads', await R(() => __redline.curGun().reloadT > 0));
 
   const shrink = await R(() => { const r = __redline; const before = r.edgeTarget(); r.startWave(6); return [before, r.edgeTarget()]; });
   ok('arena edge shrinks every 5 waves', shrink[1] < shrink[0], shrink);
@@ -332,7 +326,7 @@ const ok = (n, c, x) => { if (c) pass++; else { fail++; console.log('FAIL: ' + n
   await touch('touchEnd', []);
   await p.waitForTimeout(100);
   await shot('04-layout');
-  const saved = await R(() => JSON.parse(localStorage.getItem('redline.layout2') || 'null'));
+  const saved = await R(() => JSON.parse(localStorage.getItem('redline.layout3') || 'null'));
   ok('layout drag saved', saved && saved.dash && saved.dash.x < .7, saved);
 
   // --- game over
@@ -342,6 +336,23 @@ const ok = (n, c, x) => { if (c) pass++; else { fail++; console.log('FAIL: ' + n
   ok('game over screen', await p.isVisible('#over') && await R(() => __redline.state) === 'gameover');
   await shot('08-over');
   ok('best wave saved', await R(() => (JSON.parse(localStorage.getItem('redline.best')) || {}).wave >= 1));
+  const scrap = await R(() => JSON.parse(localStorage.getItem('redline.meta')).scrap);
+  ok('runs earn scrap', scrap > 0, scrap);
+  // Armory between runs: unlock a part with scrap, equip it, and it's in the next run
+  await R(() => { const r = __redline; r.META.scrap = 1000; r.saveMeta(); });
+  await p.tap('#over [data-act=armoryOver]');
+  await p.waitForTimeout(150);
+  ok('armory opens from game over', await p.isVisible('#armory'));
+  await p.tap('#armSockets [data-s=barrel]');
+  await p.tap('#armList [data-p=coil]');
+  await shot('09-armory');
+  const meta = await R(() => ({ ...JSON.parse(localStorage.getItem('redline.meta')), cost: __redline.partCost('coil') }));
+  ok('unlocking spends scrap and equips the part', meta.owned.includes('coil') && meta.builds[0].barrel === 'coil' && meta.scrap === 1000 - meta.cost, meta);
+  await p.tap('#armDone');
+  await p.waitForTimeout(200);
+  ok('next run uses the saved build', await R(() => __redline.state === 'playing' && __redline.ARS.guns[0].barrel === 'coil'));
+  await R(() => { __redline.P.hp = 100; __redline.P.invuln = 0; __redline.hurtPlayer(500); });
+  await p.waitForTimeout(900);
   await p.tap('[data-act=retry]');
   await p.waitForTimeout(200);
   ok('retry restarts', await R(() => __redline.state) === 'playing' && await R(() => __redline.P.hp) === 100);

@@ -119,26 +119,22 @@ button.b.ghost{border-color:#4a3a44; background:transparent}
 #wpills{display:flex; gap:6px; justify-content:center; margin-top:4px}
 #wpills span{font-size:9px; letter-spacing:.2em; padding:2px 6px; border:1px solid rgba(255,255,255,.2); color:var(--muted); transform:skewX(-14deg)}
 #wpills span.on{color:#140306; background:var(--c); border-color:var(--c); font-weight:900}
-#refund{position:absolute; left:50%; bottom:calc(var(--sab) + 120px); transform:translateX(-50%); font-weight:900; letter-spacing:.2em; font-size:13px; color:#5ee1ff; opacity:0; text-shadow:0 0 10px #5ee1ff}
-#refund.show{animation:refundUp 1.1s ease-out forwards}
-@keyframes refundUp{0%{opacity:0; transform:translate(-50%,10px)}15%{opacity:1; transform:translate(-50%,0)}75%{opacity:1}100%{opacity:0; transform:translate(-50%,-14px)}}
+
+
+
 .rule{margin:0; font-size:12px; letter-spacing:.14em; color:var(--ink); opacity:.85; text-align:center}
 .rule b{color:var(--red)}
-#upCards{gap:14px; align-items:stretch}
-.card{appearance:none; font:inherit; color:var(--ink); cursor:pointer; touch-action:manipulation; width:clamp(150px,26vw,230px); min-height:clamp(120px,34vh,180px);
   background:linear-gradient(160deg, rgba(60,14,24,.95), rgba(18,8,16,.95)); border:2px solid #5a2a38; border-radius:6px; padding:14px 12px;
   display:flex; flex-direction:column; gap:8px; align-items:center; justify-content:center; text-align:center; position:relative; transform:skewX(-4deg); transition:transform .08s, border-color .08s}
-.card:hover,.card:active{border-color:var(--red); transform:skewX(-4deg) translateY(-3px)}
-.card .n{font-weight:900; font-style:italic; letter-spacing:.1em; font-size:clamp(14px,4.2vh,19px); text-transform:uppercase}
-.card .d{font-size:13px; color:#d9cbd3; line-height:1.4}
-.card .k{position:absolute; top:6px; left:10px; font-size:11px; color:var(--muted)}
-.card .lv{position:absolute; top:6px; right:10px; font-size:10px; color:#ffd24a; letter-spacing:.15em}
 #chrono{position:absolute; inset:0; opacity:0; pointer-events:none;
   background:radial-gradient(ellipse at center, transparent 50%, rgba(60,150,255,.22) 80%, rgba(120,220,255,.45) 100%);
   box-shadow:inset 0 0 0 2px rgba(127,224,255,.35)}
 #crosshair.crit::before,#crosshair.crit::after{background:#7fe0ff}
 #ring{position:absolute; left:50%; top:50%; width:44px; height:44px; margin:-22px 0 0 -22px; transform:rotate(-90deg); overflow:visible}
 #ring circle{fill:none; stroke-width:2.5; stroke-dasharray:106.8; stroke-dashoffset:106.8; opacity:0; filter:drop-shadow(0 0 3px rgba(0,0,0,.8))}
+#focus{position:absolute; left:50%; top:calc(50% + 30px); width:64px; height:4px; margin-left:-32px; background:rgba(255,255,255,.15); opacity:0; transition:opacity .2s}
+#focus i{display:block; height:100%; width:100%; background:#ffd24a; box-shadow:0 0 6px #ffd24a}
+#focus.on{opacity:1} #focus.empty i{background:#ff5a5a}
 #ammo{position:absolute; left:calc(50% + 34px); top:calc(50% + 18px); font-weight:900; font-style:italic; font-variant-numeric:tabular-nums; text-shadow:0 1px 0 #000, 0 0 6px rgba(0,0,0,.8)}
 #ammo b{font-size:18px} #ammo b.low{color:#ff5a5a} #ammo i{font-size:11px; color:var(--muted); font-style:italic}
 #ammo .rl{font-size:10px; letter-spacing:.2em; color:#ffd24a}
@@ -153,11 +149,12 @@ button.b.ghost{border-color:#4a3a44; background:transparent}
 #tier.pop{animation:tierPop .45s ease-out}
 @keyframes tierPop{0%{transform:scale(2); opacity:0}40%{opacity:1}100%{transform:scale(1)}}
 #timeTxt{color:#7fe0ff; margin-left:8px}
-.card .tagp{font-size:10px; letter-spacing:.2em; color:var(--muted)}
-.card.part{border-color:#3a5060; background:linear-gradient(160deg, rgba(16,40,56,.95), rgba(10,10,20,.95))}
-.card.part.r2{border-color:#4a7aff} .card.part.r3{border-color:#c07aff; box-shadow:0 0 18px rgba(192,122,255,.35)}
 /* armory */
 #armory{justify-content:flex-start; gap:8px}
+.armHead .scrap{font-weight:900; letter-spacing:.2em; font-size:13px; color:#ffd24a} .armHead .scrap b{font-size:20px}
+.pitem.buy{border-color:#ffd24a55} .pitem.buy .ps{color:#ffd24a}
+.pitem .pn small{font-size:8px; letter-spacing:.14em; color:var(--muted); margin-left:4px}
+.scrapv{color:#ffd24a !important}
 .armHead{display:flex; align-items:baseline; gap:14px; flex-wrap:wrap; justify-content:center}
 .armHead h2{font-size:clamp(20px,5vh,34px)}
 .armWrap{display:flex; gap:12px; width:min(980px,100%); flex:1; min-height:0}
@@ -200,11 +197,11 @@ button.b.ghost{border-color:#4a3a44; background:transparent}
   <div id="crosshair"></div>
   <svg id="ring" viewBox="0 0 40 40"><circle cx="20" cy="20" r="17"/></svg>
   <div id="ammo"></div>
+  <div id="focus"><i></i></div>
   <div id="combo"></div>
   <div id="styleFeed"></div>
   <div id="dashPips"></div>
   <div id="speedo"><div id="tier" data-t="0"></div><div class="num">0</div><div class="unit">M/S <span id="timeTxt"></span></div><div class="bar"><div class="fill"></div><i class="tick" id="tickShield"></i><i class="tick decay" id="tickDecay"></i></div><div class="wpn"></div><div id="wpills"></div></div>
-  <div id="refund"></div>
 </div>
 
 <div id="title" class="screen">
@@ -214,20 +211,15 @@ button.b.ghost{border-color:#4a3a44; background:transparent}
   <p class="rule" style="opacity:.6">THE FASTER YOU GO, THE SLOWER THE WORLD</p>
   <div class="row">
     <button class="b primary" data-act="play">Play</button>
+    <button class="b ghost" data-act="armory">Armory</button>
     <button class="b ghost" data-act="settings">Settings</button>
   </div>
   <div class="tag" id="bestTxt"></div>
   <div class="hint" id="titleHint"></div>
 </div>
 
-<div id="upgrade" class="screen hidden">
-  <p class="tag" id="upWave">WAVE CLEARED</p>
-  <h2>CHOOSE A REWARD</h2>
-  <div class="row" id="upCards"></div>
-</div>
-
 <div id="armory" class="screen hidden">
-  <div class="armHead"><h2>ARMORY</h2><span class="tag">build your guns · damage is still speed × multiplier</span></div>
+  <div class="armHead"><h2>ARMORY</h2><span class="scrap"><b id="armScrap">0</b> SCRAP</span><span class="tag">unlock parts with scrap from your runs · damage is still speed × multiplier</span></div>
   <div class="armWrap">
     <div class="armL">
       <div id="armTabs"></div>
@@ -239,7 +231,7 @@ button.b.ghost{border-color:#4a3a44; background:transparent}
       <div id="armList"></div>
     </div>
   </div>
-  <button class="b primary" id="armDone" data-act="armDone">Continue</button>
+  <div class="row"><button class="b ghost" data-act="armBack">Back</button><button class="b primary" id="armDone" data-act="armDone">Play</button></div>
 </div>
 
 <div id="over" class="screen hidden">
@@ -247,16 +239,15 @@ button.b.ghost{border-color:#4a3a44; background:transparent}
   <div class="stats" id="overStats"></div>
   <div class="row">
     <button class="b primary" data-act="retry">Retry</button>
+    <button class="b ghost" data-act="armoryOver">Armory</button>
     <button class="b ghost" data-act="quit">Menu</button>
   </div>
 </div>
 
 <div id="pause" class="screen hidden">
   <h2>PAUSED</h2>
-  <div class="tag" id="pauseUps" style="max-width:640px;text-align:center;line-height:1.8"></div>
   <div class="row">
     <button class="b primary" data-act="resume">Resume</button>
-    <button class="b ghost" data-act="armory">Armory</button>
     <button class="b ghost" data-act="settings">Settings</button>
     <button class="b ghost" data-act="quit">Quit</button>
   </div>
@@ -324,11 +315,11 @@ const T = {
   DECAY_START: 20, DECAY: .12,
   EYE: 1.6, EYE_SLIDE: .85, RADIUS: .45, HEIGHT: 1.8, STEP: .55, SNAP: .5, LAUNCH_REL: 3,
 };
-// run modifiers (upgrades write into this)
+// base modifiers the systems read (kept as a single place to tune)
 const mods = {};
 function resetMods() {
   Object.assign(mods, { wallBuild: 1, dashMax: 2, dashRecharge: 1, slamRadius: 1, decayBonus: 0, wjBoost: 1,
-    bladeMult: 1, hammerKeep: 0, recoilMul: 1, shieldBreak: 1, hitKnock: 1, refund: 0, leech: 0,
+    bladeMult: 1, hammerKeep: 0, recoilMul: 1, shieldBreak: 1, hitKnock: 1,
     gunMult: 1, magMul: 1, chrono: 0, slideReload: 0, deflect: 1, lunge: 1 });
 }
 resetMods();
@@ -614,7 +605,7 @@ const input = {
   lookX: 0, lookY: 0,        // accumulated look delta in radians
   jumpPressed: false, slideHeld: false, slidePressed: false, dashPressed: false,
   attackHeld: false, attackPressed: false, swapPressed: false,
-  meleeHeld: false, meleePressed: false, reloadPressed: false,
+  meleeHeld: false, meleePressed: false, reloadPressed: false, aimHeld: false,
   touchAttack: false,
 };
 function clearEdges() {
@@ -910,7 +901,7 @@ function updateCamera(dt) {
   camera.rotation.set(P.pitch + P.kick + sh * Math.sin(t * 61) * .02, P.yaw, P.roll);
   P.fovKick = damp(P.fovKick, 0, 5, dt);
   const fx = settings.fovFx ? clamp((hs - 10) / 30, 0, 1) * 18 + P.fovKick * 6 : 0;
-  const fov = baseFov + fx;
+  const fov = baseFov * (1 - .3 * FOCUS.aim) + fx * (1 - .7 * FOCUS.aim);
   if (Math.abs(camera.fov - fov) > .05) { camera.fov = damp(camera.fov, fov, 8, dt); camera.updateProjectionMatrix(); }
   updateSpeedLines(dt, settings.fovFx ? hs : Math.min(hs, 26));
 }
@@ -926,9 +917,10 @@ const BTN_DEFS = [
   { id: 'dash',   label: 'DASH',   size: 62,  x: .82, y: .37 },
   { id: 'swap',   label: 'SWAP',   size: 52,  x: .945, y: .15 },
   { id: 'reload', label: 'RELOAD', size: 48,  x: .81, y: .13 },
+  { id: 'aim',    label: 'AIM',    size: 60,  x: .595, y: .58 },
 ];
 const layoutDefault = () => Object.fromEntries(BTN_DEFS.map(b => [b.id, { x: b.x, y: b.y, s: 1 }]));
-let layout = Object.assign(layoutDefault(), store.get('layout2', {}));
+let layout = Object.assign(layoutDefault(), store.get('layout3', {}));
 const touchUI = document.createElement('div');
 touchUI.id = 'touchUI';
 touchUI.innerHTML = `
@@ -941,6 +933,7 @@ touchUI.innerHTML = `
 #touchUI .tb[data-id=attack]{border-color:rgba(255,42,61,.8); font-size:13px}
 #touchUI .tb[data-id=melee]{border-color:rgba(94,225,255,.75)}
 #touchUI .tb[data-id=reload]{font-size:9px}
+#touchUI .tb[data-id=aim]{border-color:rgba(255,210,74,.7)}
 #touchUI .tb .cd{position:absolute; inset:-2px; border-radius:50%; pointer-events:none}
 #joyBase,#joyKnob{position:absolute; border-radius:50%; pointer-events:none; transform:translate(-50%,-50%)}
 #joyBase{width:130px; height:130px; border:2px solid rgba(255,255,255,.25); background:rgba(255,255,255,.05)}
@@ -1006,6 +999,7 @@ function pressButton(id, down) {
   else if (id === 'swap') { if (down) input.swapPressed = true; }
   else if (id === 'melee') { input.meleeHeld = down; if (down) input.meleePressed = true; }
   else if (id === 'reload') { if (down) input.reloadPressed = true; }
+  else if (id === 'aim') input.aimHeld = down;
   else if (id === 'pause' && down) pauseGame();
   if (down) haptic(8);
 }
@@ -1039,7 +1033,7 @@ function onTouchMove(e) {
       joyKnob.style.left = x + 'px'; joyKnob.style.top = y + 'px';
       let m = d / JOY_R; m = m < .12 ? 0 : Math.min(1, (m - .12) / .76);
       input.mx = d > 0 ? dx / d * m : 0; input.my = d > 0 ? -dy / d * m : 0;
-    } else if (rec.role === 'look' || (rec.role === 'btn' && (rec.id === 'attack' || rec.id === 'melee'))) {
+    } else if (rec.role === 'look' || (rec.role === 'btn' && (rec.id === 'attack' || rec.id === 'melee' || rec.id === 'aim'))) {
       input.lookX -= (x - rec.x) * k; input.lookY -= (y - rec.y) * k;
       rec.x = x; rec.y = y;
     }
@@ -1104,25 +1098,25 @@ addEventListener('keydown', e => {
   if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') { input.dashPressed = true; e.preventDefault(); }
   if (e.code === 'KeyQ') input.swapPressed = true;
   if (e.code === 'KeyR') input.reloadPressed = true;
-  if (e.code === 'KeyF' || e.code === 'KeyV' || e.code === 'KeyE') { input.meleeHeld = true; input.meleePressed = true; }
+  if (e.code === 'KeyV') { input.meleeHeld = true; input.meleePressed = true; }
   input.touchAttack = false;
 });
 addEventListener('keyup', e => {
   keys.delete(e.code);
   if (KEYMAP[e.code]) keyMove();
   if (e.code === 'ControlLeft' || e.code === 'ControlRight' || e.code === 'KeyC') input.slideHeld = keys.has('ControlLeft') || keys.has('ControlRight') || keys.has('KeyC');
-  if (e.code === 'KeyF' || e.code === 'KeyV' || e.code === 'KeyE') input.meleeHeld = keys.has('KeyF') || keys.has('KeyV') || keys.has('KeyE');
+  if (e.code === 'KeyV') input.meleeHeld = false;
 });
-addEventListener('blur', () => { keys.clear(); keyMove(); input.slideHeld = input.attackHeld = input.meleeHeld = false; if (state === 'playing') pauseGame(); });
+addEventListener('blur', () => { keys.clear(); keyMove(); input.slideHeld = input.attackHeld = input.meleeHeld = input.aimHeld = false; if (state === 'playing') pauseGame(); });
 const pointerLocked = () => document.pointerLockElement === canvas;
 canvas.addEventListener('mousedown', e => {
   unlockAudio();
   if (state !== 'playing' || IS_TOUCH_ACTIVE) return;
   if (!pointerLocked()) { try { const p = canvas.requestPointerLock(); if (p && p.catch) p.catch(() => {}); } catch (err) {} return; }
   if (e.button === 0) { input.attackHeld = true; input.attackPressed = true; input.touchAttack = false; }
-  if (e.button === 2) { input.meleeHeld = true; input.meleePressed = true; input.touchAttack = false; }
+  if (e.button === 2) { input.aimHeld = true; input.touchAttack = false; }
 });
-addEventListener('mouseup', e => { if (IS_TOUCH_ACTIVE) return; if (e.button === 0) input.attackHeld = false; if (e.button === 2) input.meleeHeld = false; });
+addEventListener('mouseup', e => { if (IS_TOUCH_ACTIVE) return; if (e.button === 0) input.attackHeld = false; if (e.button === 2) input.aimHeld = false; });
 addEventListener('wheel', e => { if (state === 'playing' && pointerLocked() && Math.abs(e.deltaY) > 4) input.swapPressed = true; }, { passive: true });
 addEventListener('mousemove', e => {
   if (state !== 'playing' || !pointerLocked()) return;
@@ -1175,7 +1169,7 @@ function updateHUD() {
    Game state, screens
    ===================================================================== */
 let state = 'title', settingsReturn = 'title';
-const screens = { title: $('#title'), pause: $('#pause'), settings: $('#settings'), over: $('#over'), upgrade: $('#upgrade'), armory: $('#armory') };
+const screens = { title: $('#title'), pause: $('#pause'), settings: $('#settings'), over: $('#over'), armory: $('#armory') };
 function show(name) {
   for (const k in screens) screens[k].classList.toggle('hidden', k !== name);
 }
@@ -1202,13 +1196,11 @@ function setupRun() {
   Object.assign(WAVE, { n: 0, queue: [], active: false, next: 1.2, dmgMul: 1, hpMul: 1 });
   for (const q of puddles) q.life = 0;
   lastHpKey = lastWaveKey = '';
-  for (const k in taken) delete taken[k];
-  bank = 0;
   bannerEl.classList.remove('show');
 }
 function pauseGame() {
   if (state !== 'playing') return;
-  state = 'paused'; releaseAllTouches(); showRunUpgrades(); show('pause'); setPlayingUI(false);
+  state = 'paused'; releaseAllTouches(); show('pause'); setPlayingUI(false);
   if (pointerLocked()) document.exitPointerLock();
 }
 function resumeGame() {
@@ -1239,8 +1231,10 @@ document.addEventListener('click', e => {
   else if (act === 'settings') { settingsReturn = state === 'paused' ? 'pause' : 'title'; buildSettings(); show('settings'); }
   else if (act === 'settingsBack') show(settingsReturn);
   else if (act === 'layout') openLayoutEditor();
-  else if (act === 'armory') openArmory('pause');
-  else if (act === 'armDone') closeArmory();
+  else if (act === 'armory') openArmory('title');
+  else if (act === 'armoryOver') openArmory('over');
+  else if (act === 'armDone') startGame();
+  else if (act === 'armBack') { show(ARM.from); if (ARM.from === 'title') showBest(); }
 });
 
 /* ---------- settings screen */
@@ -1312,15 +1306,15 @@ editor.addEventListener('pointermove', e => {
   L.y = clamp((e.clientY + edDrag.dy - safe.t) / safe.h, .02, .98);
   placeButtons(editor);
 });
-const edEnd = e => { if (edDrag && e.pointerId === edDrag.pid) { edDrag = null; store.set('layout2', layout); } };
+const edEnd = e => { if (edDrag && e.pointerId === edDrag.pid) { edDrag = null; store.set('layout3', layout); } };
 editor.addEventListener('pointerup', edEnd); editor.addEventListener('pointercancel', edEnd);
 editor.addEventListener('click', e => {
   const b = e.target.closest('[data-ed]'); if (!b) return;
   const a = b.dataset.ed;
   if (a === 'minus' || a === 'plus') { const L = layout[edSel]; L.s = clamp(L.s + (a === 'plus' ? .1 : -.1), .6, 1.8); }
   else if (a === 'reset') layout = layoutDefault();
-  else if (a === 'done') { editor.classList.add('hidden'); store.set('layout2', layout); placeButtons(); show(edPrevScreen); return; }
-  store.set('layout2', layout); placeButtons(editor);
+  else if (a === 'done') { editor.classList.add('hidden'); store.set('layout3', layout); placeButtons(); show(edPrevScreen); return; }
+  store.set('layout3', layout); placeButtons(editor);
 });
 
 /* =====================================================================
@@ -1340,12 +1334,11 @@ if (window.visualViewport) visualViewport.addEventListener('resize', resize);
 
 function showBest() {
   const b = store.get('best', null);
-  $('#bestTxt').innerHTML = b && b.wave ? `BEST · WAVE <b>${b.wave}</b> · TOP SPEED <b>${b.speed.toFixed(1)}</b> M/S` : '';
+  $('#bestTxt').innerHTML = (b && b.wave ? `BEST · WAVE <b>${b.wave}</b> · TOP SPEED <b>${b.speed.toFixed(1)}</b> M/S · ` : '') + `<b>${META.scrap}</b> SCRAP`;
 }
-showBest();
 $('#titleHint').innerHTML = IS_TOUCH
-  ? 'Left thumb: move · Right thumb: look · MELEE: tap to slash, hold to charge the hammer · SLIDE in the air to SLAM'
-  : 'WASD move · Mouse look · Space jump · Ctrl/C slide (slam in air) · Shift dash · LMB fire · RMB/F melee (hold = hammer) · R reload · Q/wheel swap · Esc pause';
+  ? 'Left thumb: move · Right thumb: look · AIM slows time · MELEE: tap to slash, hold for the hammer · SLIDE in the air to SLAM'
+  : 'WASD move · Mouse look · Space jump · Ctrl/C slide (slam in air) · Shift dash · LMB fire · RMB aim (slows time) · V melee (hold = hammer) · R reload · Q/wheel swap · Esc pause';
 
 /* =====================================================================
    Geometry helper: merge non-indexed geometries (keeps low-poly flat look)
@@ -1643,9 +1636,21 @@ function updateEnemies(dt) {
    Time — the faster you move, the slower the world runs
    ===================================================================== */
 const TIME = { scale: 1, hitstop: 0, slowmo: 0, wdt: 0 };
+// Aiming (RMB / AIM) zooms in and drops the world to 30% speed while focus lasts
+const FOCUS = { v: 1, aim: 0, delay: 0, slow: false, DRAIN: 3.5, REFILL: 6 };
+function updateFocus(dt) {
+  const aiming = input.aimHeld && !P.grabbed;
+  FOCUS.aim = damp(FOCUS.aim, aiming ? 1 : 0, 14, dt);
+  if (aiming && FOCUS.v > 0) { FOCUS.v = Math.max(0, FOCUS.v - dt / FOCUS.DRAIN); FOCUS.delay = .6; }
+  else if ((FOCUS.delay -= dt) <= 0) FOCUS.v = Math.min(1, FOCUS.v + dt / FOCUS.REFILL);
+  const was = FOCUS.slow;
+  FOCUS.slow = aiming && FOCUS.v > 0;
+  if (FOCUS.slow !== was) emit(FOCUS.slow ? 'onFocusIn' : 'onFocusOut');
+}
 function targetTimeScale() {
   const k = clamp((hspeed() - 13) / 27, 0, 1);            // 13 m/s → full effect at 40
   let ts = 1 - k * (.56 + mods.chrono);
+  if (FOCUS.slow) ts = Math.min(ts, .3);
   if (TIME.slowmo > 0) ts = Math.min(ts, .2);
   return clamp(ts, .18, 1);
 }
@@ -1921,28 +1926,19 @@ function gunStats(g) {
   st.name = (adj ? adj + ' ' : '') + rc.name;
   return st;
 }
-const ARS = { guns: [], idx: 0, owned: {}, fresh: {}, swapT: 0, buf: 0, idle: 0 };
+const ARS = { guns: [], idx: 0, swapT: 0, buf: 0, idle: 0 };
 function refreshGun(g) { g.st = gunStats(g); if (g.ammo < 0 || g.ammo > g.st.mag) g.ammo = g.st.mag; }
 function refreshGuns() { for (const g of ARS.guns) refreshGun(g); }
 const curGun = () => ARS.guns[ARS.idx];
 function resetArsenal() {
-  ARS.guns = [newGun('sidearm'), newGun('scatter')];
+  refreshBuilds();
   ARS.idx = 0; ARS.swapT = 0; ARS.buf = 0; ARS.idle = 0;
-  for (const k in ARS.owned) delete ARS.owned[k];
-  for (const k in ARS.fresh) delete ARS.fresh[k];
-  ARS.owned.sidearm = 1; ARS.owned.scatter = 1;
-  // one random attachment to tease the workshop
-  const starters = ['longBarrel', 'sawnOff', 'extMag', 'quickMag', 'kicker', 'stabilizer', 'pierce', 'leech'];
-  const s = starters[Math.floor(Math.random() * starters.length)]; ARS.owned[s] = 1; ARS.fresh[s] = 1;
-  refreshGuns();
   resetMelee();
+  FOCUS.v = 1; FOCUS.aim = 0;
 }
-function installedCount(id) { let n = 0; for (const g of ARS.guns) for (const s of SLOTS) if (g[s] === id) n++; return n; }
-function available(id) { return PARTS[id].std ? Infinity : (ARS.owned[id] || 0) - installedCount(id); }
+// test/debug helper: put a part on a gun for this run (the Armory does it for real between runs)
 function install(gi, id) {
   const g = ARS.guns[gi], p = PARTS[id];
-  if (g[p.slot] === id) return true;
-  if (available(id) <= 0) return false;
   g[p.slot] = id; g.ammo = -1; g.reloadT = 0; g.charge = 0; refreshGun(g);
   return true;
 }
@@ -2012,7 +2008,7 @@ function fire(g, chargeMul) {
   _frt.crossVectors(_fd, _up); if (_frt.lengthSq() < 1e-6) _frt.set(1, 0, 0); _frt.normalize();
   _fup.crossVectors(_frt, _fd);
   _fmz.copy(_fo).addScaledVector(_frt, .2).addScaledVector(_fup, -.14).addScaledVector(_fd, .55);
-  const spread = st.spread * (P.onGround ? 1 : 1.15);
+  const spread = st.spread * (P.onGround ? 1 : 1.15) * (1 - .65 * FOCUS.aim);
   if (st.mode === 'rocket') {
     for (let i = 0; i < st.pellets; i++) {
       _fdir.copy(_fd).addScaledVector(_frt, (Math.random() - .5) * 2 * spread + (st.pellets > 1 ? (i - (st.pellets - 1) / 2) * .05 : 0)).addScaledVector(_fup, (Math.random() - .5) * 2 * spread).normalize();
@@ -2365,8 +2361,9 @@ function updateViewmodel(dt) {
   const swapK = clamp(ARS.swapT / .22, 0, 1);
   const rl = g.reloadT > 0 ? Math.sin((1 - g.reloadT / st.reload) * Math.PI) : 0;
   gunRoot.scale.setScalar(sc);
-  gunRoot.position.set(Math.min(ghw * .5, .62) + vm.swayX + bobX, -ghh * .56 + vm.swayY + bob - swapK * .4 - rl * .1 - (P.sliding ? .03 : 0), -GD);
-  gunRoot.rotation.set(-.04, .16, tilt);
+  const ak = FOCUS.aim;                                  // aiming pulls the gun toward the center
+  gunRoot.position.set(lerp(Math.min(ghw * .5, .62), .1, ak) + vm.swayX * (1 - ak * .7) + bobX, lerp(-ghh * .56, -ghh * .4, ak) + vm.swayY * (1 - ak * .7) + bob - swapK * .4 - rl * .1 - (P.sliding ? .03 : 0), -GD);
+  gunRoot.rotation.set(-.04 * (1 - ak), .16 * (1 - ak) + .03 * ak, tilt);
   const shake = g.charge > 0 ? (Math.random() - .5) * .012 * g.charge : 0;
   m.position.set(shake, shake, vm.kick * .11);
   m.rotation.set(vm.kick * .32 - rl * .5, .05, rl * .9);
@@ -2377,7 +2374,7 @@ function updateViewmodel(dt) {
   const showHammer = charging || MEL.smashT < 1;
   bladeModel.visible = !showHammer; hammerModel.visible = showHammer;
   meleeRoot.scale.setScalar(sc);
-  meleeRoot.position.set(-Math.min(mhw * .6, .7) + vm.swayX + bobX, -mhh * .92 + vm.swayY + bob, -MD);
+  meleeRoot.position.set(-Math.min(mhw * .6, .7) + vm.swayX + bobX, -mhh * .92 + vm.swayY + bob - FOCUS.aim * .35, -MD);
   meleeRoot.rotation.set(0, 0, tilt);
   if (showHammer) {
     let rx = .7;
@@ -2740,11 +2737,10 @@ function updateWaves(dt) {
     P.hp = Math.min(P.maxHp, P.hp + 15);
     banner('WAVE CLEAR', '+15 HP');
     emit('onWaveClear', WAVE.n);
-    WAVE.next = 1.6;
+    WAVE.next = 3;
   }
 }
-// between waves: step 4 offers upgrades here
-function betweenWaves() { startWave(WAVE.n + 1); }
+function betweenWaves() { startWave(WAVE.n + 1); }   // a short breather, then straight into the next wave
 
 /* =====================================================================
    Banner, HP, wave, grab prompt
@@ -2787,6 +2783,7 @@ function gameOver() {
   if (pointerLocked()) document.exitPointerLock();
   const best = store.get('best', { wave: 0, speed: 0, damage: 0 });
   const reached = WAVE.n, isBest = reached > best.wave;
+  const earned = scrapForRun(); META.scrap += earned; saveMeta();
   const nb = { wave: Math.max(best.wave, reached), speed: Math.max(best.speed, P.topSpeed), damage: Math.max(best.damage, stats.damage) };
   store.set('best', nb);
   $('#overStats').innerHTML = `
@@ -2795,6 +2792,7 @@ function gameOver() {
     <span>Total damage</span><b>${Math.round(stats.damage).toLocaleString()}</b>
     <span>Kills</span><b>${stats.kills}</b>
     <span>Best combo</span><b>×${STYLE.best}</b>
+    <span>Scrap earned</span><b class="scrapv">+${earned}</b>
     <span>Best wave</span><b>${nb.wave}</b>`;
   $('#overTitle').textContent = isBest ? 'NEW BEST' : 'WIPED OUT';
   emit('onGameOver');
@@ -2802,99 +2800,23 @@ function gameOver() {
 }
 
 /* =====================================================================
-   Rewards — between waves pick 1 of 3: a perk or a gun part
+   Meta progression — runs earn scrap; between runs you unlock parts and
+   build your two guns in the Armory. Nothing is chosen mid-run.
    ===================================================================== */
-const UPGRADES = [
-  { id: 'wallrun', name: 'Wall Burner', desc: 'Wall-runs build 2× speed', max: 1, apply() { mods.wallBuild *= 2; } },
-  { id: 'refund', name: 'Momentum Refund', desc: 'Kills refund 50% of the momentum you lost', max: 1, apply() { mods.refund = .5; } },
-  { id: 'dash', name: 'Extra Dash', desc: '+1 dash charge', max: 2, apply() { mods.dashMax++; P.dash++; } },
-  { id: 'slam', name: 'Crater', desc: 'Slam radius +50%', max: 2, apply() { mods.slamRadius += .5; } },
-  { id: 'hammerKeep', name: 'Follow-Through', desc: 'Hammer keeps 25% of your speed', max: 2, apply() { mods.hammerKeep += .25; } },
-  { id: 'recharge', name: 'Quick Charge', desc: 'Dashes recharge 35% faster', max: 2, apply() { mods.dashRecharge *= 1.35; } },
-  { id: 'hp', name: 'Plating', desc: '+25 max HP and a full heal', max: 3, apply() { P.maxHp += 25; P.hp = P.maxHp; } },
-  { id: 'footing', name: 'Sure Footing', desc: 'Hits knock off half as much speed', max: 1, apply() { mods.hitKnock *= .5; } },
-  { id: 'edge', name: 'Kinetic Edge', desc: 'Blade multiplier +0.4', max: 2, apply() { mods.bladeMult += .4; } },
-  { id: 'hot', name: 'Hot Barrels', desc: 'All guns +20% multiplier', max: 3, apply() { mods.gunMult += .2; refreshGuns(); } },
-  { id: 'mag', name: 'Deep Pockets', desc: '+35% magazine size on all guns', max: 2, apply() { mods.magMul += .35; refreshGuns(); } },
-  { id: 'chrono', name: 'Bullet Time', desc: 'The world slows even more when you\'re fast', max: 2, apply() { mods.chrono += .12; } },
-  { id: 'slideReload', name: 'Slide Loader', desc: 'Reload 3× faster while sliding or wall-running', max: 1, apply() { mods.slideReload = 1; } },
-  { id: 'deflect', name: 'Mirror Edge', desc: 'Deflected orbs deal 2× damage', max: 1, apply() { mods.deflect = 2; } },
-  { id: 'lunge', name: 'Long Reach', desc: 'Blade lunges reach twice as far', max: 1, apply() { mods.lunge = 2; } },
-  { id: 'slip', name: 'Slipstream', desc: 'Speed decay starts 6 m/s later', max: 2, apply() { mods.decayBonus += 6; } },
-  { id: 'launch', name: 'Launch Pad', desc: 'Wall-jump speed boost +60%', max: 2, apply() { mods.wjBoost += .6; } },
-  { id: 'breaker', name: 'Shield Breaker', desc: 'Shields break at 30% lower speed', max: 1, apply() { mods.shieldBreak *= .7; } },
-  { id: 'leech', name: 'Velocity Leech', desc: 'Kills heal 1 HP per 8 m/s of speed', max: 1, apply() { mods.leech = 1; } },
-];
-const taken = {};
-let offer = [];
-function rollRewards() {
-  const perks = UPGRADES.filter(u => (taken[u.id] || 0) < u.max);
-  const partIds = Object.keys(PARTS).filter(id => !PARTS[id].std);
-  const out = [];
-  const nParts = WAVE.n <= 1 ? 2 : Math.random() < .55 ? 2 : 1;
-  const w = id => { const r = PARTS[id].r; let x = r === 1 ? 6 : r === 2 ? 3.2 : 1.4 + WAVE.n * .08; if (ARS.owned[id]) x /= 3; return x; };
-  const pool = partIds.slice();
-  for (let i = 0; i < nParts && pool.length; i++) {
-    let tot = 0; for (const id of pool) tot += w(id);
-    let r = Math.random() * tot, pick = pool[0];
-    for (const id of pool) { r -= w(id); if (r <= 0) { pick = id; break; } }
-    pool.splice(pool.indexOf(pick), 1);
-    out.push({ kind: 'part', id: pick });
-  }
-  while (out.length < 3 && perks.length) out.push({ kind: 'perk', u: perks.splice(Math.floor(Math.random() * perks.length), 1)[0] });
-  for (let i = out.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [out[i], out[j]] = [out[j], out[i]]; }
-  return out;
-}
-function offerUpgrades() {
-  offer = rollRewards();
-  if (!offer.length) { startWave(WAVE.n + 1); return; }
-  state = 'upgrade';
-  releaseAllTouches(); setPlayingUI(false);
-  if (pointerLocked()) document.exitPointerLock();
-  $('#upCards').innerHTML = offer.map((o, i) => {
-    const k = IS_TOUCH_ACTIVE ? '' : i + 1;
-    if (o.kind === 'part') {
-      const p = PARTS[o.id];
-      return `<button class="card part r${p.r}" data-up="${i}"><span class="k">${k}</span><span class="tagp">${SLOT_LABEL[p.slot]} · ${RARITY[p.r]}</span>
-        <span class="n">${p.name}</span><span class="d">${p.desc}</span>${ARS.owned[o.id] ? `<span class="lv">OWNED ×${ARS.owned[o.id]}</span>` : ''}</button>`;
-    }
-    return `<button class="card" data-up="${i}"><span class="k">${k}</span><span class="tagp">PERK</span><span class="n">${o.u.name}</span><span class="d">${o.u.desc}</span>
-      ${(taken[o.u.id] || 0) ? `<span class="lv">LV ${(taken[o.u.id] || 0) + 1}</span>` : ''}</button>`;
-  }).join('');
-  $('#upWave').textContent = `WAVE ${WAVE.n} CLEARED`;
-  upgradeOpenedAt = performance.now();
-  show('upgrade');
-  sfx.waveClear();
-}
-let upgradeOpenedAt = 0;
-function pickUpgrade(i, fromTap) {
-  const o = offer[i]; if (!o || state !== 'upgrade') return;
-  if (fromTap && performance.now() - upgradeOpenedAt < 450) return;   // a thumb still mid-fight shouldn't pick blindly
-  sfx.pick();
-  if (o.kind === 'perk') { o.u.apply(); taken[o.u.id] = (taken[o.u.id] || 0) + 1; nextWaveFromMenu(); return; }
-  ARS.owned[o.id] = (ARS.owned[o.id] || 0) + 1; ARS.fresh[o.id] = 1;
-  const p = PARTS[o.id];
-  // new receivers go to whichever slot isn't the one you're holding; attachments to the current gun
-  openArmory('wave', p.slot === 'receiver' ? ARS.idx ^ 1 : ARS.idx, p.slot);
-}
-function nextWaveFromMenu() {
-  state = 'playing'; show(null); setPlayingUI(true); clearEdges(); last = performance.now();
-  if (!IS_TOUCH_ACTIVE) { try { const p = canvas.requestPointerLock(); if (p && p.catch) p.catch(() => {}); } catch (e) {} }
-  startWave(WAVE.n + 1);
-}
-document.addEventListener('click', e => { const c = e.target.closest && e.target.closest('[data-up]'); if (c) pickUpgrade(+c.dataset.up, true); });
-addEventListener('keydown', e => { if (state === 'upgrade' && /^Digit[123]$/.test(e.code)) pickUpgrade(+e.code.slice(5) - 1); });
-betweenWaves = offerUpgrades;
+const PART_COST = { receiver: [0, 180, 320, 520], other: [0, 70, 150, 280] };
+const partCost = id => { const p = PARTS[id]; return p.std ? 0 : PART_COST[p.slot === 'receiver' ? 'receiver' : 'other'][p.r || 1]; };
+const META_DEFAULT = () => ({ scrap: 0, owned: ['sidearm', 'scatter'], builds: [{ receiver: 'sidearm', ...STD }, { receiver: 'scatter', ...STD }] });
+const META = Object.assign(META_DEFAULT(), store.get('meta', {}));
+function saveMeta() { store.set('meta', { scrap: META.scrap, owned: META.owned, builds: META.builds }); }
+const owns = id => PARTS[id] && (PARTS[id].std || META.owned.includes(id));
+// sanitize a saved build against the current part list
+for (const b of META.builds) for (const s of SLOTS) if (!owns(b[s]) || PARTS[b[s]].slot !== s) b[s] = s === 'receiver' ? 'sidearm' : STD[s];
+function scrapForRun() { return Math.round(WAVE.n * 12 + stats.kills * 2 + stats.damage / 150); }
 
-/* =====================================================================
-   Armory — build your two guns from the parts you've found
-   ===================================================================== */
-const ARM = { gun: 0, slot: 'receiver', from: 'wave' };
-function openArmory(from, gun, slot) {
-  ARM.from = from; ARM.gun = gun ?? ARS.idx; ARM.slot = slot || 'receiver';
-  if (from !== 'pause') state = 'armory';
-  releaseAllTouches(); setPlayingUI(false);
-  if (pointerLocked()) document.exitPointerLock();
+/* ---------- Armory: title / game-over only */
+const ARM = { gun: 0, slot: 'receiver', from: 'title' };
+function openArmory(from) {
+  ARM.from = from || 'title';
   renderArmory(); show('armory');
 }
 function fmt(n, d = 1) { return (+n.toFixed(d)).toString(); }
@@ -2909,27 +2831,27 @@ function statRows(st) {
     <span>RATE</span><b>${fmt(st.rate)}/s</b>
     <span>MAG</span><b>${st.mag}</b>
     <span>RELOAD</span><b>${fmt(st.reload, 2)}s</b>
-    <span>RECOIL</span><b>${fmt(st.recoil * mods.recoilMul)}</b>
+    <span>RECOIL</span><b>${fmt(st.recoil)}</b>
     <span>EFFECT</span><b>${fx}</b>
-    ${extra ? `<span>PERK</span><b>${extra}</b>` : ''}`;
+    ${extra ? `<span>TRAIT</span><b>${extra}</b>` : ''}`;
 }
 function renderArmory() {
+  refreshBuilds();
   const g = ARS.guns[ARM.gun];
+  $('#armScrap').textContent = META.scrap;
   $('#armTabs').innerHTML = ARS.guns.map((x, i) => `<button class="gtab ${i === ARM.gun ? 'on' : ''}" data-g="${i}"><i style="background:#${new THREE.Color(x.st.color).getHexString()}"></i>${'AB'[i]} · ${x.st.name}</button>`).join('');
-  $('#armSockets').innerHTML = SLOTS.map(s => {
-    const p = PARTS[g[s]];
-    return `<button class="sock ${s === ARM.slot ? 'on' : ''}" data-s="${s}"><span>${SLOT_LABEL[s]}</span><b>${p.name}</b></button>`;
-  }).join('');
+  $('#armSockets').innerHTML = SLOTS.map(s => `<button class="sock ${s === ARM.slot ? 'on' : ''}" data-s="${s}"><span>${SLOT_LABEL[s]}</span><b>${PARTS[g[s]].name}</b></button>`).join('');
   $('#armStats').innerHTML = statRows(g.st);
-  const ids = Object.keys(PARTS).filter(id => PARTS[id].slot === ARM.slot && (PARTS[id].std || ARS.owned[id]));
   $('#armListTitle').textContent = SLOT_LABEL[ARM.slot] + ' PARTS';
+  const ids = Object.keys(PARTS).filter(id => PARTS[id].slot === ARM.slot)
+    .sort((a, b) => (owns(b) - owns(a)) || (partCost(a) - partCost(b)));
   $('#armList').innerHTML = ids.map(id => {
-    const p = PARTS[id], eq = g[ARM.slot] === id, other = ARS.guns[ARM.gun ^ 1][ARM.slot] === id, av = available(id);
-    const status = eq ? 'EQUIPPED' : av > 0 ? (p.std ? 'TAP TO EQUIP' : `×${av} FREE`) : other ? `IN GUN ${'AB'[ARM.gun ^ 1]}` : 'IN USE';
-    return `<button class="pitem r${p.r || 0} ${eq ? 'eq' : ''} ${!eq && av <= 0 ? 'dis' : ''}" data-p="${id}">
-      <span class="pn">${p.name}${ARS.fresh[id] ? ' <em>NEW</em>' : ''}</span><span class="pd">${p.desc}</span><span class="ps">${status}</span></button>`;
-  }).join('') || '<div class="hint">Nothing found for this slot yet.</div>';
-  $('#armDone').textContent = ARM.from === 'wave' ? `START WAVE ${WAVE.n + 1}` : 'BACK';
+    const p = PARTS[id], eq = g[ARM.slot] === id, own = owns(id), cost = partCost(id), afford = META.scrap >= cost;
+    const status = eq ? 'EQUIPPED' : own ? 'TAP TO EQUIP' : afford ? `UNLOCK · ${cost} SCRAP` : `LOCKED · ${cost} SCRAP`;
+    return `<button class="pitem r${p.r || 0} ${eq ? 'eq' : ''} ${own ? '' : afford ? 'buy' : 'dis'}" data-p="${id}">
+      <span class="pn">${p.name}${p.r ? ` <small>${RARITY[p.r]}</small>` : ''}</span><span class="pd">${p.desc}</span><span class="ps">${status}</span></button>`;
+  }).join('');
+  $('#armDone').textContent = ARM.from === 'over' ? 'RETRY' : 'PLAY';
 }
 document.addEventListener('click', e => {
   if (!e.target.closest) return;
@@ -2939,35 +2861,20 @@ document.addEventListener('click', e => {
   else if (t.dataset.s) ARM.slot = t.dataset.s;
   else if (t.dataset.p) {
     const id = t.dataset.p;
-    if (!install(ARM.gun, id)) {
-      // it's in the other gun: swap it over
-      const other = ARS.guns[ARM.gun ^ 1];
-      if (other[PARTS[id].slot] === id) { other[PARTS[id].slot] = PARTS[id].slot === 'receiver' ? ARS.guns[ARM.gun].receiver : STD[PARTS[id].slot]; refreshGun(other); install(ARM.gun, id); }
-    }
-    delete ARS.fresh[id];
-    sfx.pick();
+    if (!owns(id)) {
+      if (META.scrap < partCost(id)) { sfx.empty(); return; }
+      META.scrap -= partCost(id); META.owned.push(id); sfx.unlock();
+    } else sfx.pick();
+    META.builds[ARM.gun][PARTS[id].slot] = id;
+    saveMeta();
   }
   renderArmory();
 });
-function closeArmory() {
-  gunModelKey = '';
-  if (ARM.from === 'wave') nextWaveFromMenu();
-  else if (ARM.from === 'pause') { showRunUpgrades(); show('pause'); }
+// guns in play come straight from the saved builds
+function refreshBuilds() {
+  ARS.guns = META.builds.map(b => Object.assign(newGun(b.receiver), b));
+  refreshGuns();
 }
-
-// momentum bank: speed you lose (hits, grabs, hammer) can be refunded on kills
-let bank = 0;
-on('onSpend', lost => { bank += lost; });
-on('onKill', () => {
-  if (mods.refund && bank > .5) {
-    const gain = bank * mods.refund; bank = 0;
-    const hs = hspeed();
-    if (hs > .5) setHSpeed(hs + gain); else { P.vel.x += fwd.x * gain; P.vel.z += fwd.z * gain; }
-    refundFlash(gain);
-  }
-  if (mods.leech) { P.hp = Math.min(P.maxHp, P.hp + Math.floor(hspeed() / 8)); }
-});
-function decayBank(dt) { bank *= Math.exp(-dt / 5); }
 
 /* =====================================================================
    Audio — procedural WebAudio, unlocked on the first touch (iOS)
@@ -3065,7 +2972,7 @@ const sfx = {
   pick() { tone('square', 660, 990, .1, .1); tone('triangle', 990, 1320, .15, .08, .06); },
   over() { [12, 7, 3, 0].forEach((s, i) => tone('sawtooth', 110 * Math.pow(2, s / 12), 100 * Math.pow(2, s / 12), .4, .12, i * .16)); },
   swap() { tone('square', 500, 700, .05, .06); },
-  refund() { tone('triangle', 700, 1400, .18, .12); },
+  unlock() { [0, 4, 7, 12].forEach((s, i) => tone('triangle', 520 * Math.pow(2, s / 12), 520 * Math.pow(2, s / 12), .16, .1, i * .05)); },
 };
 on('onHitEnemy', (e, amt, o) => amt > 0 ? sfx.hit(amt, o && o.crit) : sfx.zero());
 on('onKill', () => world(() => sfx.kill()));
@@ -3079,6 +2986,8 @@ on('onDeflect', () => { sfx.deflect(); haptic(20); });
 on('onOrb', () => sfx.orb());
 on('onLunge', () => sfx.lunge());
 on('onTier', ti => sfx.tier(ti));
+on('onFocusIn', () => { tone('sine', 520, 180, .25, .12); noise(.25, .12, 3000, 400, 'lowpass', .7); });
+on('onFocusOut', () => tone('sine', 200, 480, .18, .07));
 on('onExplode', small => sfx.boom(small));
 on('onHammer', n => sfx.hammer(n));
 on('onShoot', (st, spd, c) => sfx.gun(st, c));
@@ -3175,19 +3084,19 @@ on('onDash', () => { for (let k = 0; k < 14; k++) spawnPart(P.pos.x + rand(-.5, 
 /* =====================================================================
    HUD: gun + ammo, reload/charge ring, hit marker, refund flash, speed ticks
    ===================================================================== */
-const crosshair = $('#crosshair'), refundEl = $('#refund');
+const crosshair = $('#crosshair');
 let hitMarkT = 0;
 on('onHitEnemy', (e, amt, o) => { if (amt > 0) { hitMarkT = .14; crosshair.classList.add('hit'); crosshair.classList.toggle('crit', !!(o && o.crit)); } });
 on('onKill', () => { hitMarkT = .22; crosshair.classList.add('hit', 'kill'); });
-function refundFlash(g) {
-  refundEl.textContent = `+${g.toFixed(1)} M/S REFUND`;
-  refundEl.classList.remove('show'); void refundEl.offsetWidth; refundEl.classList.add('show');
-  sfx.refund();
-}
+
 const pillsEl = $('#wpills'), ammoEl = $('#ammo'), ringEl = $('#ring circle');
 let lastPill = '', lastAmmo = '', speedTickKey = '';
 const RING_LEN = 2 * Math.PI * 17;
+const focusEl = $('#focus'), focusBar = focusEl.querySelector('i');
 function updateHUD3(dt) {
+  focusEl.classList.toggle('on', input.aimHeld || FOCUS.v < .999);
+  focusEl.classList.toggle('empty', FOCUS.v <= 0);
+  focusBar.style.width = (FOCUS.v * 100).toFixed(1) + '%';
   if (hitMarkT > 0 && (hitMarkT -= dt) <= 0) crosshair.classList.remove('hit', 'kill', 'crit');
   const g = curGun(), st = g.st;
   const pk = ARS.idx + '|' + ARS.guns.map(x => x.st.name).join('|');
@@ -3221,10 +3130,7 @@ function gunLine(s) {
   const per = st.mult * st.pellets;
   return `${st.name.toUpperCase()} ×${+per.toFixed(2)} &nbsp;→&nbsp; <b>${Math.round(s * per)}</b> DMG`;
 }
-function showRunUpgrades() {
-  const list = UPGRADES.filter(u => taken[u.id]).map(u => `${u.name}${taken[u.id] > 1 ? ' ×' + taken[u.id] : ''}`);
-  $('#pauseUps').textContent = list.length ? 'PERKS: ' + list.join(' · ') : '';
-}
+
 
 /* =====================================================================
    Main loop
@@ -3232,8 +3138,10 @@ function showRunUpgrades() {
 const debug = { manual: false, freezeVm: false };
 let last = performance.now(), frameAcc = 0, frameN = 0, qualityHold = 0;
 function simulate(dt) {
-  P.yaw = wrapAngle(P.yaw + input.lookX);
-  P.pitch = clamp(P.pitch + input.lookY, -1.45, 1.45);
+  const lk = 1 - .45 * FOCUS.aim;                          // finer look while aiming
+  P.yaw = wrapAngle(P.yaw + input.lookX * lk);
+  P.pitch = clamp(P.pitch + input.lookY * lk, -1.45, 1.45);
+  updateFocus(dt);
   // hitstop: a few frames of near-freeze on impact sell the hit
   if (TIME.hitstop > 0) { TIME.hitstop -= dt; dt *= .06; }
   TIME.slowmo = Math.max(0, TIME.slowmo - dt);
@@ -3249,7 +3157,6 @@ function simulate(dt) {
   updateEnemies(wdt);
   updateTimers(wdt);
   updateWaves(wdt);
-  decayBank(dt);
   edgeR = damp(edgeR, edgeTarget, 1.2, dt);
 }
 function adaptQuality(dt) {
@@ -3303,6 +3210,7 @@ function frame(now) {
 }
 resize();
 resetPlayer();
+showBest();
 requestAnimationFrame(frame);
 
 // test / debug handle: tick() runs the sim deterministically at 60 Hz
@@ -3310,7 +3218,7 @@ function tick(seconds) {
   const n = Math.round(seconds * 60);
   for (let i = 0; i < n; i++) { simulate(1 / 60); updateCamera(1 / 60); clearEdges(); }
 }
-window.__redline = { TIME, ARS, PARTS, MEL, orbs, spawnOrb, install, curGun, refreshGuns, openArmory, STYLE, UPGRADES, taken, pickUpgrade, sfx, AU, edgeTarget: () => edgeTarget, debug, tick, hooks, WAVE, startWave, hurtPlayer, puddles, dropPuddle, releaseGrab, enemies, stats, spawnEnemy, damageEnemy, ETYPES, P, input, T, mods, get state() { return state; }, startGame, pauseGame, resumeGame, groundAt, terrainH, solids, settings, layout: () => layout };
+window.__redline = { TIME, ARS, PARTS, MEL, orbs, spawnOrb, install, curGun, refreshGuns, openArmory, STYLE, META, saveMeta, partCost, FOCUS, sfx, AU, edgeTarget: () => edgeTarget, debug, tick, hooks, WAVE, startWave, hurtPlayer, puddles, dropPuddle, releaseGrab, enemies, stats, spawnEnemy, damageEnemy, ETYPES, P, input, T, mods, get state() { return state; }, startGame, pauseGame, resumeGame, groundAt, terrainH, solids, settings, layout: () => layout };
 </script>
 </body>
 </html>
