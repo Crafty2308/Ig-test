@@ -211,6 +211,9 @@ h2{margin:0 0 14px; font-size:clamp(20px,4.5vw,30px); letter-spacing:.08em; colo
   <button data-dev="clear">Kill everything</button>
   <button data-dev="nextwave">Skip to next wave</button>
   <button data-dev="boss">Spawn a boss</button>
+  <button data-dev="sector">Jump to a new sector</button>
+  <button data-dev="pact">Offer a pact</button>
+  <button data-dev="elite">Spawn 3 elites</button>
   <button data-dev="resource">Refill essence / meter</button>
   <button data-dev="upgrades">+1 of every upgrade</button>
   <button data-dev="augment">Offer an augment</button>
@@ -273,6 +276,15 @@ h2{margin:0 0 14px; font-size:clamp(20px,4.5vw,30px); letter-spacing:.08em; colo
   </div>
 </div>
 
+<div class="overlay" id="pact">
+  <div class="panel">
+    <h2 style="color:#ff86b0">PACT</h2>
+    <p class="sub" id="pkSub">Take a bargain, or walk in clean</p>
+    <div class="cards" id="pkCards"></div>
+    <button class="btn ghost" id="pkSkip">Walk in clean</button>
+  </div>
+</div>
+
 <div class="overlay" id="augment">
   <div class="panel">
     <h2>AUGMENT</h2>
@@ -309,6 +321,7 @@ h2{margin:0 0 14px; font-size:clamp(20px,4.5vw,30px); letter-spacing:.08em; colo
       <div class="stat"><span>Time</span><b id="goTime">0:00</b></div>
     </div>
     <div class="cores">◆ <span id="goCores">0</span> CORES EARNED</div>
+    <div id="goRun" class="sub" style="text-transform:none; letter-spacing:.05em; line-height:1.7"></div>
     <div id="goLoot" class="sub" style="text-transform:none; letter-spacing:.06em; color:#ffc857"></div>
     <div id="goBest" class="sub" style="text-transform:none; letter-spacing:.06em"></div>
     <button class="btn" id="againBtn">New Run</button>
@@ -454,7 +467,7 @@ let obstacles = [];
 function buildArena(wave) {
   obstacles = [];
   const margin = 200;
-  const want = clamp(7 + Math.floor(wave / 2), 7, 16);
+  const want = clamp(Math.round((7 + Math.floor(wave / 2)) * sectorMod('cover')), 7, 30);
   const cx = WORLD.w / 2, cy = WORLD.h / 2;
   for (let attempt = 0; attempt < 400 && obstacles.length < want; attempt++) {
     const w = rand(90, 260), h = rand(90, 260);
@@ -525,6 +538,8 @@ const game = {
   wave: 0,
   waveTimer: 0,
   betweenWaves: 0, drops: 0, mats: 0, stallT: 0, stallWarned: false, waveTime: 0,
+  sector: null, sectorsSeen: [], threat: 0, elites: 0, hunterT: 0,
+  combo: 0, comboT: 0, comboBest: 0, freeze: 0, nameElite: null,
   score: 0,
   kills: 0,
   best: store('neon-overrun-best') || 0,
@@ -565,7 +580,7 @@ function makePlayer(charId) {
     // upgrade-driven stats
     dmgMul: 1, rofMul: 1, speedMul: 1, bulletSpeedMul: 1,
     pierce: 0, extra: 0, crit: 0.05, critMul: 2, lifesteal: 0,
-    magnet: 130, dashCdMul: 1, explodeAll: 0, pending: 0, xpMul: 1, augments: [],
+    magnet: 130, dashCdMul: 1, explodeAll: 0, pending: 0, xpMul: 1, augments: [], pacts: [], masteryLv: 0,
     armor: 0, regen: 0, thorns: 0, scoreMul: 1,
     upgrades: {}
   };
@@ -578,6 +593,7 @@ function makePlayer(charId) {
   player = p;            // character passives are written as upgrades, so they need `player` live
   c.apply(p);
   applyGear(p);          // then whatever is bolted to the frame
+  applyMastery(p);       // and finally what this operative has earned over every run
   player = prev;
   return p;
 }
@@ -602,7 +618,7 @@ function playerFireInterval() {
 function emitProjectiles(spec) {
   const count = Math.max(1, (spec.count || 1) + player.extra);   // multishot, every source
   const spread = spec.spread || 0;
-  const speed = (spec.speed || 900) * player.bulletSpeedMul;
+  const speed = (spec.speed || 900) * player.bulletSpeedMul * sectorMod('bulletSpeed');
   const out = [];
 
   for (let i = 0; i < count; i++) {
@@ -800,7 +816,7 @@ function healPlayer(v) {
 }
 
 function gainXp(v) {
-  player.xp += v * player.xpMul;
+  player.xp += v * player.xpMul * sectorMod('xp');
   while (player.xp >= player.xpNext) {
     player.xp -= player.xpNext;
     player.level++;
@@ -2189,15 +2205,16 @@ function spawnEnemy(type, x, y, scale) {
   const s = scale || 1;
   const e = {
     type, x, y, r: t.r * (s < 1 ? 0.78 : 1),
-    hp: t.hp * s, maxHp: t.hp * s,
-    speed: t.speed * (1 + Math.min(0.35, (game.wave - 1) * 0.018)),
-    dmg: t.dmg * Math.min(2.2, s),
+    hp: t.hp * s * (hasPact('ironclad') ? 1.55 : 1), maxHp: t.hp * s * (hasPact('ironclad') ? 1.55 : 1),
+    speed: t.speed * (1 + Math.min(0.35, (game.wave - 1) * 0.018)) * sectorMod('enemySpeed'),
+    dmg: t.dmg * Math.min(2.2, s) * sectorMod('enemyDmg'),
     color: t.color, xp: t.xp * (1 + (game.wave - 1) * 0.14), score: t.score,
     angle: rand(0, TAU), vx: 0, vy: 0,
     hitFlash: 0, contactCd: 0, riderCd: 0, fireCd: rand(0.4, t.fireRate || 1),
     state: 'chase', stateT: 0, boss: !!t.boss, dead: false,
     spawnT: 0.35
   };
+  if (!t.boss && s >= 1 && Math.random() < eliteChance(game.wave)) makeElite(e, game.wave >= 10 ? 2 : 1);
   enemies.push(e);
   return e;
 }
@@ -2248,9 +2265,29 @@ function dealDamage(target, base, source, opts) {
     if (crit) dmg *= player.critMul;
   }
 
+  /* 2b. elite armour: a plate that soaks until it is broken, and a ward you must flank */
+  if (target.ward && wardBlocks(target, opts.fromX, opts.fromY)) {
+    burst(target.x, target.y, 4, '#7ceaff', 150, 2);
+    if (!opts.silent) floatText(target.x, target.y - target.r - 8, 'WARDED', '#7ceaff', 12);
+    return { dmg: 0, crit: false, killed: false };
+  }
+  if (target.dr > 0) {
+    if (target.plate > 0) {
+      target.plate -= dmg;
+      dmg *= 1 - target.dr;
+      if (target.plate <= 0) {
+        target.dr = 0;
+        burst(target.x, target.y, 16, '#b8c6d8', 260, 2.8);
+        floatText(target.x, target.y - target.r - 20, 'PLATE BROKEN', '#eaf6ff', 15);
+      }
+    } else target.dr = 0;
+  }
+  if (target.boss && target.kind === 'hive') dmg = bossSoak(target, dmg, opts.fromX, opts.fromY);
+
   /* 3. apply */
   target.hp -= dmg;
   target.hitFlash = 0.12;
+  target.hurtT = 0;
   if (!opts.silent) {
     floatText(target.x + rand(-6, 6), target.y - target.r - 6, Math.round(dmg),
               crit ? '#ffe36b' : '#e9f6ff', crit ? 17 : 13);
@@ -2305,8 +2342,31 @@ function killEnemy(e, noKillEffects) {
   if (e.dead) return;
   e.dead = true;
   game.kills++;
-  game.score += Math.round(e.score * (player.scoreMul || 1));
+  game.combo++;
+  game.comboT = 2.6;
+  if (game.combo > game.comboBest) game.comboBest = game.combo;
+  const chain = 1 + Math.min(2, game.combo * 0.025);
+  game.score += Math.round(e.score * (player.scoreMul || 1) * sectorMod('score') * chain);
+  if (game.combo === 10 || game.combo === 25 || game.combo === 50 || game.combo === 100) {
+    floatText(player.x, player.y - 56, game.combo + ' CHAIN', '#ffe36b', 22);
+    camera.flash = 0.18; camera.flashColor = '#ffe36b';
+  }
+  // a beat of stillness on the kills that deserve one
+  if (e.boss) game.freeze = Math.max(game.freeze, 0.14);
+  else if (e.elite) game.freeze = Math.max(game.freeze, 0.055);
   if (!noKillEffects) onEnemyKilled(e);
+  if (e.elite) {
+    game.elites++;
+    if (e.volatile) explode(e.x, e.y, 130, e.volatile, false);
+    if (e.splits) for (let i = 0; i < e.splits; i++) {
+      const c = spawnEnemy('runner', e.x + rand(-26, 26), e.y + rand(-26, 26), 0.7);
+      c.color = '#5cffd0';
+    }
+    dropPickup(e.x, e.y, 'gear');
+    if (hasPact('overgrow')) dropPickup(e.x + 26, e.y, 'gear');
+    if (Math.random() < 0.5) dropPickup(e.x - 26, e.y, 'mat');
+    floatText(e.x, e.y - e.r - 26, 'ELITE DOWN', e.eliteColor || '#ffc857', 16);
+  }
   if (player.nearKillHeal > 0 && len(e.x - player.x, e.y - player.y) < 280) {
     healPlayer(player.maxHp * player.nearKillHeal);
   }
@@ -2339,9 +2399,9 @@ function killEnemy(e, noKillEffects) {
     dropPickup(e.x + 20, e.y + 30, 'mat');
     game.banner = { text: 'TARGET ELIMINATED', t: 2.2, color: '#9dff5c' };
   } else {
-    if (Math.random() < 0.12 * player.dropMul) dropPickup(e.x, e.y, 'health');
+    if (!hasPact('famine') && Math.random() < 0.12 * player.dropMul) dropPickup(e.x, e.y, 'health');
     // gear is the thing you keep, so it falls steadily rather than rarely
-    if (Math.random() < (0.032 + game.wave * 0.0018) * player.dropMul) dropPickup(e.x, e.y, 'gear');
+    if (Math.random() < (0.032 + game.wave * 0.0018) * player.dropMul * sectorMod('drop')) dropPickup(e.x, e.y, 'gear');
     else if (Math.random() < 0.022 * player.dropMul) dropPickup(e.x, e.y, 'mat');
   }
 }
@@ -2396,10 +2456,12 @@ function enemyTarget(e) {
 function updateEnemy(e, dt) {
   if (e.spawnT > 0) { e.spawnT -= dt; return; }
   e.hitFlash = Math.max(0, e.hitFlash - dt);
+  e.hurtT = (e.hurtT || 0) + dt;
   e.contactCd = Math.max(0, e.contactCd - dt);
   e.stateT += dt;
   tickEnemyStatus(e, dt);
   if (e.dead) return;
+  if (e.elite) updateElite(e, dt);
   const chilled = slowFactor(e);
 
   const tgt = enemyTarget(e);
@@ -2446,7 +2508,9 @@ function updateEnemy(e, dt) {
       break;
     }
     case 'boss': {
-      updateBoss(e, dt, d, toPlayer);
+      if (e.kind === 'hive') updateBossHive(e, dt, d, toPlayer);
+      else if (e.kind === 'siege') updateBossSiege(e, dt, d, toPlayer);
+      else updateBoss(e, dt, d, toPlayer);
       ax = Math.cos(e.moveAngle !== undefined ? e.moveAngle : toPlayer);
       ay = Math.sin(e.moveAngle !== undefined ? e.moveAngle : toPlayer);
       moving = e.state === 'dash' ? 3.6 : (e.state === 'burst' ? 0.15 : 0.9);
@@ -2556,21 +2620,25 @@ function startWave(n) {
   }
   game.betweenWaves = 0;
   game.spawnQueue = [];
+  const newSector = (n - 1) % 3 === 0;
   buildArena(n);
+  if (newSector) enterSector(n);
+  else buildHazards();
   // never trap the player inside a freshly generated crate
   collideWorld(player);
 
   const isBoss = n % 5 === 0;
   const scale = waveScale();
-  const budget = 5 + n * 2.2;
+  const budget = (5 + n * 2.2) * (hasPact('swarm') ? 1.7 : 1) * sectorMod('enemyRate');
   const roster = Object.keys(ENEMY_TYPES).filter(k => !ENEMY_TYPES[k].boss && ENEMY_TYPES[k].from <= n);
 
   if (isBoss) {
-    game.spawnQueue.push({ type: 'boss', delay: 1.0, scale: 1 + (n / 5 - 1) * 0.55 });
+    const kind = bossKindFor(n);
+    game.spawnQueue.push({ type: 'boss', delay: 1.0, scale: 1 + (n / 5 - 1) * 0.55, boss: kind.id });
     for (let i = 0; i < Math.floor(n * 0.6); i++) {
       game.spawnQueue.push({ type: pick(roster), delay: 1.4 + i * 0.35, scale });
     }
-    game.banner = { text: 'WAVE ' + n + ' — WARDEN INBOUND', t: 2.6, color: '#ff3d81' };
+    game.banner = { text: kind.name + ' INBOUND', t: 2.6, color: kind.color, sub: 'It ' + kind.blurb + '.' };
   } else {
     let spent = 0, t = 0.35;
     while (spent < budget) {
@@ -2580,8 +2648,13 @@ function startWave(n) {
       game.spawnQueue.push({ type, delay: t, scale });
       t += rand(0.12, 0.42);
     }
-    game.banner = { text: 'WAVE ' + n, t: 1.8, color: '#40e0ff' };
+    game.banner = { text: 'WAVE ' + n + '  \u00b7  ' + (game.sector ? game.sector.name : ''), t: 1.8, color: game.sector ? game.sector.color : '#40e0ff' };
   }
+  // Overgrowth promises elites whether the dice agree or not
+  if (hasPact('overgrow')) {
+    for (let i = 0; i < 3; i++) game.spawnQueue.push({ type: pick(roster), delay: 1.0 + i * 0.6, scale, elite: 1 });
+  }
+  if (newSector && n > 1) openPactOffer();
   game.waveTimer = 0;
 }
 
@@ -2590,13 +2663,15 @@ function updateWaves(dt) {
   while (game.spawnQueue.length && game.spawnQueue[0].delay <= game.waveTimer) {
     const s = game.spawnQueue.shift();
     const p = spawnPointAwayFromPlayer();
-    telegraphs.push({ x: p.x, y: p.y, t: 0.55, max: 0.55, type: s.type, scale: s.scale });
+    telegraphs.push({ x: p.x, y: p.y, t: 0.55, max: 0.55, type: s.type, scale: s.scale, boss: s.boss, elite: s.elite });
   }
   for (let i = telegraphs.length - 1; i >= 0; i--) {
     const tg = telegraphs[i];
     tg.t -= dt;
     if (tg.t <= 0) {
-      spawnEnemy(tg.type, tg.x, tg.y, tg.scale);
+      const made = spawnEnemy(tg.type, tg.x, tg.y, tg.scale);
+      if (tg.boss) setupBoss(made, BOSS_KINDS.find(k => k.id === tg.boss) || BOSS_KINDS[0]);
+      else if (tg.elite && !made.elite) makeElite(made, game.wave >= 10 ? 2 : 1);
       burst(tg.x, tg.y, 10, '#ff3d81', 200, 2.4);
       telegraphs.splice(i, 1);
     }
@@ -2606,7 +2681,7 @@ function updateWaves(dt) {
     if (game.betweenWaves === 0) {
       game.betweenWaves = 3;
       game.score += 50 + game.wave * 15;
-      healPlayer(player.maxHp * 0.12);
+      healPlayer(player.maxHp * (hasPact('famine') ? 0.21 : 0.12));
       game.banner = { text: 'WAVE CLEARED  +' + (50 + game.wave * 15), t: 2, color: '#9dff5c' };
       if (augmentDue(game.wave)) openAugmentDraft();
     } else {
@@ -2624,9 +2699,11 @@ function updateStragglers(dt) {
     game.stallT = 0; game.stallWarned = false;
     return;
   }
-  for (const e of enemies) {
-    if (len(e.x - player.x, e.y - player.y) < 520) { game.stallT = 0; game.stallWarned = false; return; }
-  }
+  // a wave is stalling if nothing is near you, or if the last few holdouts
+  // have not been touched in a long time - which is what a wall looks like
+  const near = enemies.some(e => len(e.x - player.x, e.y - player.y) < 520);
+  const traded = enemies.some(e => (e.hurtT || 0) < 9);
+  if (near && traded) { game.stallT = 0; game.stallWarned = false; return; }
   game.stallT += dt;
   if (game.stallT > 9 && !game.stallWarned) {
     game.stallWarned = true;
@@ -2635,16 +2712,17 @@ function updateStragglers(dt) {
   if (game.stallT <= 15) return;
   game.stallT = 0; game.stallWarned = false;
   for (const e of enemies) {
-    if (len(e.x - player.x, e.y - player.y) < 520) continue;
+    if (len(e.x - player.x, e.y - player.y) < 420 && (e.hurtT || 0) < 9) continue;
     let nx = e.x, ny = e.y;
     for (let tries = 0; tries < 12; tries++) {
       const a = rand(0, TAU);
-      const tx = clamp(player.x + Math.cos(a) * 400, 60, WORLD.w - 60);
-      const ty = clamp(player.y + Math.sin(a) * 400, 60, WORLD.h - 60);
+      const tx = clamp(player.x + Math.cos(a) * 330, 60, WORLD.w - 60);
+      const ty = clamp(player.y + Math.sin(a) * 330, 60, WORLD.h - 60);
+      if (!lineOfSight(player.x, player.y, tx, ty)) continue;
       if (!pointInWall(tx, ty)) { nx = tx; ny = ty; break; }
     }
     burst(e.x, e.y, 10, e.color, 200, 2.2);
-    e.x = nx; e.y = ny; e.vx = 0; e.vy = 0;
+    e.x = nx; e.y = ny; e.vx = 0; e.vy = 0; e.hurtT = 0;
     burst(nx, ny, 14, e.color, 240, 2.6);
   }
 }
@@ -2842,12 +2920,13 @@ function updatePlayer(dt) {
   const targetSpeed = player.speed * player.speedMul * rogueSpeedMul() * (player.aegisOn ? player.aegisSlow : 1);
   if (player.dashTime > 0) {
     player.dashTime -= dt;
-    player.vx = player.dashDirX * targetSpeed * 3.4;
-    player.vy = player.dashDirY * targetSpeed * 3.4;
+    player.vx = player.dashDirX * targetSpeed * 3.4 * sectorMod('dash');
+    player.vy = player.dashDirY * targetSpeed * 3.4 * sectorMod('dash');
     spawnParticle(player.x, player.y, rand(-20, 20), rand(-20, 20), 0.26, '#40e0ff', 3.2, true);
   } else {
-    player.vx = lerp(player.vx, mx * targetSpeed, Math.min(1, dt * 14));
-    player.vy = lerp(player.vy, my * targetSpeed, Math.min(1, dt * 14));
+    const grip = 14 * sectorMod('friction');     // the Cryo Vault has none
+    player.vx = lerp(player.vx, mx * targetSpeed, Math.min(1, dt * grip));
+    player.vy = lerp(player.vy, my * targetSpeed, Math.min(1, dt * grip));
   }
   player.x += player.vx * dt;
   player.y += player.vy * dt;
@@ -3125,14 +3204,15 @@ function drawPoly(x, y, r, sides, rot) {
 }
 
 function drawBackground(ox, oy) {
-  ctx.fillStyle = '#070a12';
+  const sec = game.sector || SECTORS[0];
+  ctx.fillStyle = sec.bg;
   ctx.fillRect(0, 0, VW, VH);
 
   const grid = 80;
   const startX = Math.floor(ox / grid) * grid;
   const startY = Math.floor(oy / grid) * grid;
   ctx.lineWidth = 1;
-  ctx.strokeStyle = 'rgba(64,224,255,.055)';
+  ctx.strokeStyle = sec.line;
   ctx.beginPath();
   for (let x = startX; x < ox + VW + grid; x += grid) {
     const sx = Math.round(x - ox) + 0.5;
@@ -3145,26 +3225,32 @@ function drawBackground(ox, oy) {
   ctx.stroke();
 
   // arena bounds
-  ctx.strokeStyle = 'rgba(64,224,255,.4)';
+  ctx.strokeStyle = sec.color;
+  ctx.globalAlpha = 0.4;
   ctx.lineWidth = 3;
   ctx.strokeRect(-ox, -oy, WORLD.w, WORLD.h);
+  ctx.globalAlpha = 1;
 }
 
 function drawObstacles(ox, oy) {
+  const sec = game.sector || SECTORS[0];
   for (const o of obstacles) {
     const x = o.x - ox, y = o.y - oy;
     if (x + o.w < -20 || y + o.h < -20 || x > VW + 20 || y > VH + 20) continue;
-    ctx.fillStyle = '#101a2e';
+    ctx.fillStyle = sec.wall;
+    ctx.globalAlpha = 0.55;
     ctx.fillRect(x, y, o.w, o.h);
-    ctx.strokeStyle = 'rgba(64,224,255,.35)';
+    ctx.globalAlpha = 0.35;
+    ctx.strokeStyle = sec.color;
     ctx.lineWidth = 2;
     ctx.strokeRect(x + 1, y + 1, o.w - 2, o.h - 2);
-    ctx.strokeStyle = 'rgba(64,224,255,.12)';
+    ctx.globalAlpha = 0.12;
     ctx.lineWidth = 1;
     ctx.beginPath();
     ctx.moveTo(x + 8, y + 8); ctx.lineTo(x + o.w - 8, y + o.h - 8);
     ctx.moveTo(x + o.w - 8, y + 8); ctx.lineTo(x + 8, y + o.h - 8);
     ctx.stroke();
+    ctx.globalAlpha = 1;
   }
 }
 
@@ -3240,6 +3326,45 @@ function drawEnemy(e, ox, oy) {
       ctx.beginPath(); ctx.arc(0, 0, e.r, 0, TAU); ctx.fill(); ctx.stroke();
   }
   ctx.restore();
+
+  if (e.boss) drawBossExtras(e, ox, oy);
+
+  if (e.elite) {
+    ctx.save();
+    const col = e.eliteColor || '#ffc857';
+    ctx.globalAlpha = 0.55 + Math.sin(game.time * 4 + e.r) * 0.2;
+    ctx.strokeStyle = col; ctx.lineWidth = 2;
+    ctx.shadowBlur = 14; ctx.shadowColor = col;
+    ctx.beginPath(); ctx.arc(x, y, e.r + 7, 0, TAU); ctx.stroke();
+    if (e.hunter) { ctx.globalAlpha = 0.4; ctx.beginPath(); ctx.arc(x, y, e.r + 13, 0, TAU); ctx.stroke(); }
+    if (e.dr > 0) {        // the plate, while it holds
+      ctx.globalAlpha = 0.8;
+      ctx.strokeStyle = '#eaf6ff'; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.arc(x, y, e.r + 4, -2.2, 2.2); ctx.stroke();
+    }
+    if (e.ward) {          // the face you cannot shoot through
+      ctx.globalAlpha = 0.5;
+      ctx.strokeStyle = '#7ceaff'; ctx.lineWidth = 4;
+      ctx.beginPath(); ctx.arc(x, y, e.r + 10, e.angle - e.ward, e.angle + e.ward); ctx.stroke();
+    }
+    // one pip per affix, always readable even in a pile
+    ctx.globalAlpha = 1;
+    for (let i = 0; i < e.elite.length; i++) {
+      const px = x + (i - (e.elite.length - 1) / 2) * 9;
+      ctx.fillStyle = AFFIX_BY_ID[e.elite[i]].color;
+      ctx.beginPath(); ctx.arc(px, y - e.r - 14, 3.2, 0, TAU); ctx.fill();
+    }
+    // and the names, only for the one you are pointing at
+    if (e === game.nameElite) {
+      ctx.globalAlpha = 0.95;
+      ctx.fillStyle = col;
+      ctx.font = '700 10px "Segoe UI",Roboto,sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(e.elite.map(id => AFFIX_BY_ID[id].name.toUpperCase()).join('  '), x, y - e.r - 24);
+      ctx.textAlign = 'left';
+    }
+    ctx.restore();
+  }
 
   if (e.markT > 0) {
     ctx.save();
@@ -3329,8 +3454,21 @@ function drawWorld() {
   const shakeY = camera.shake ? rand(-camera.shake, camera.shake) * 0.5 : 0;
   const ox = camera.x + shakeX, oy = camera.y + shakeY;
 
+  // the elite whose affixes get spelled out: whichever one you are aiming at
+  game.nameElite = null;
+  if (player) {
+    const ap = aimPoint();
+    let bd = 150;
+    for (const e of enemies) {
+      if (!e.elite || e.dead) continue;
+      const d = len(e.x - ap.x, e.y - ap.y);
+      if (d < bd) { bd = d; game.nameElite = e; }
+    }
+  }
   drawBackground(ox, oy);
+  drawHazards(ox, oy);
   drawObstacles(ox, oy);
+  drawMines(ox, oy);
 
   // spawn telegraphs
   for (const t of telegraphs) {
@@ -3430,7 +3568,8 @@ function drawWorld() {
   }
 
   // vignette + damage flash
-  const vg = ctx.createRadialGradient(VW / 2, VH / 2, Math.min(VW, VH) * 0.34, VW / 2, VH / 2, Math.max(VW, VH) * 0.78);
+  const dim = (player.pacts && player.pacts.indexOf('dim') !== -1) ? 0.62 : 1;
+  const vg = ctx.createRadialGradient(VW / 2, VH / 2, Math.min(VW, VH) * 0.34 * dim, VW / 2, VH / 2, Math.max(VW, VH) * 0.78 * dim);
   vg.addColorStop(0, 'rgba(0,0,0,0)');
   vg.addColorStop(1, 'rgba(0,0,0,.62)');
   ctx.fillStyle = vg;
@@ -3658,16 +3797,50 @@ function drawHUD() {
   ctx.fillStyle = '#7e9bc4';
   const left = enemies.length + telegraphs.length + game.spawnQueue.length;
   ctx.fillText(game.betweenWaves > 0 ? 'NEXT IN ' + Math.ceil(game.betweenWaves) : left + ' HOSTILE' + (left === 1 ? '' : 'S'), VW - pad, pad + 80);
+  if (game.sector) {
+    ctx.font = '700 11px "Segoe UI",Roboto,sans-serif';
+    ctx.fillStyle = game.sector.color;
+    ctx.fillText(game.sector.name, VW - pad, pad + 98);
+  }
+  if (game.threat > 0) {
+    ctx.font = '800 12px "Segoe UI",Roboto,sans-serif';
+    ctx.fillStyle = '#ff6b9d';
+    ctx.fillText('THREAT ' + game.threat + '  \u00b7  +' + Math.round(game.threat * 22) + '% CORES', VW - pad, pad + 115);
+  }
+
+  if (game.combo >= 3) {
+    const k = clamp(game.comboT / 2.6, 0, 1);
+    ctx.save();
+    ctx.textAlign = 'right';
+    ctx.globalAlpha = 0.35 + k * 0.65;
+    const sz = 20 + Math.min(26, game.combo * 0.45);
+    ctx.font = '800 ' + sz.toFixed(0) + 'px "Segoe UI",Roboto,sans-serif';
+    ctx.fillStyle = game.combo >= 50 ? '#ffe36b' : (game.combo >= 20 ? '#ff9a3d' : '#eaf6ff');
+    ctx.shadowBlur = 14; ctx.shadowColor = ctx.fillStyle;
+    ctx.fillText(game.combo + '\u00d7', VW - pad, VH - 70);
+    ctx.font = '700 10px "Segoe UI",Roboto,sans-serif';
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = '#7e9bc4';
+    ctx.fillText('CHAIN  \u00b7  +' + Math.round(Math.min(2, game.combo * 0.025) * 100) + '% SCORE', VW - pad, VH - 54);
+    ctx.globalAlpha = 0.25;
+    ctx.fillStyle = '#ffe36b';
+    ctx.fillRect(VW - pad - 110, VH - 48, 110 * k, 3);
+    ctx.restore();
+    ctx.textAlign = 'left';
+  }
 
   // boss bar
   const boss = enemies.find(e => e.boss && !e.dead && e.spawnT <= 0);
   if (boss) {
+    const kind = BOSS_KINDS.find(k => k.id === boss.kind) || BOSS_KINDS[0];
     const bw = Math.min(460, VW * 0.62);
-    bar((VW - bw) / 2, VH - 46, bw, 12, boss.hp / boss.maxHp, '#ff2d6f');
+    bar((VW - bw) / 2, VH - 46, bw, 12, boss.hp / boss.maxHp, kind.color);
     ctx.textAlign = 'center';
     ctx.font = '700 11px "Segoe UI",Roboto,sans-serif';
-    ctx.fillStyle = '#ffb9d1';
-    ctx.fillText('WARDEN', VW / 2, VH - 52);
+    ctx.fillStyle = kind.color;
+    ctx.fillText(kind.name + (boss.nodes && boss.nodes.length
+      ? '   \u00b7   ' + boss.nodes.length + ' NODE' + (boss.nodes.length === 1 ? '' : 'S') + ' HOLDING'
+      : ''), VW / 2, VH - 52);
   }
 
   drawMinimap();
@@ -3683,6 +3856,13 @@ function drawHUD() {
     ctx.fillStyle = b.color;
     ctx.shadowBlur = 18; ctx.shadowColor = b.color;
     ctx.fillText(b.text, VW / 2, VH * 0.22);
+    if (b.sub) {
+      ctx.shadowBlur = 0;
+      ctx.font = '600 clamp(11px,1.6vw,14px) "Segoe UI",Roboto,sans-serif';
+      ctx.fillStyle = '#cfe6ff';
+      ctx.globalAlpha = t * 0.9;
+      ctx.fillText(b.sub, VW / 2, VH * 0.22 + 26);
+    }
     ctx.restore();
   }
 
@@ -3761,6 +3941,8 @@ function loadSave() {
   return {
     cores: s.cores || 0,
     unlocked: Array.isArray(s.unlocked) && s.unlocked.length ? s.unlocked : ['vanguard', 'nyx'],
+    mastery: s.mastery || {},
+    deepest: s.deepest || {},
     best: Math.max(s.best || 0, legacyBest),
     bests: s.bests || {},
     runs: s.runs || 0,
@@ -3769,7 +3951,11 @@ function loadSave() {
 }
 function saveMeta() { store(SAVE_KEY, SAVE); }
 function isUnlocked(id) { return SAVE.unlocked.indexOf(id) !== -1; }
-function coresFor(score, wave) { return Math.floor(score / 25) + wave * 15; }
+function coresFor(score, wave) {
+  const threat = 1 + (game.threat || 0) * 0.22;
+  const tithe = (player && player.pacts && player.pacts.indexOf('tithe') !== -1) ? 1.75 : 1;
+  return Math.round((Math.floor(score / 25) + wave * 15) * threat * tithe);
+}
 
 /* ---------------- signature weapons ---------------- */
 Object.assign(WEAPONS, {
@@ -4300,6 +4486,9 @@ function updateRogue(dt) {
   if (player.meleeCap > 0) updateBlade(dt);
   if (anchors.length) updateThreads(dt);
   if (fields.length) updateFields(dt);
+  if (hazards.length) updateHazards(dt);
+  if (mines.length) updateMines(dt);
+  updateHunter(dt);
   updateShield(dt);
   updateOrbit(dt);
   updateDrones(dt);
@@ -4309,6 +4498,7 @@ function updateRogue(dt) {
 
   game.waveTime += dt;
   player.dashRageT = Math.max(0, player.dashRageT - dt);
+  if (game.comboT > 0) { game.comboT -= dt; if (game.comboT <= 0) game.combo = 0; }
   player.adrenalT = Math.max(0, player.adrenalT - dt);
   player.frenzyT = Math.max(0, player.frenzyT - dt);
   if (len(player.vx, player.vy) < 12) player.stillT += dt; else player.stillT = 0;
@@ -4487,6 +4677,34 @@ function drawRogueFx(ox, oy) {
   }
 }
 
+/* Hunted: one two-affix elite is always out there, and it comes back. */
+function updateHunter(dt) {
+  if (!hasPact('hunted')) return;
+  const alive = enemies.some(e => e.hunter && !e.dead);
+  if (alive) { game.hunterT = 0; return; }
+  game.hunterT += dt;
+  if (game.hunterT < 12) return;
+  game.hunterT = 0;
+  const p = spawnPointAwayFromPlayer();
+  const roster = Object.keys(ENEMY_TYPES).filter(k => !ENEMY_TYPES[k].boss && ENEMY_TYPES[k].from <= game.wave);
+  const e = spawnEnemy(pick(roster), p.x, p.y, waveScale() * 1.3);
+  if (!e.elite) makeElite(e, 2);
+  else if (e.elite.length < 2) makeElite(e, 1);
+  e.hunter = 1;
+  e.maxHp *= 1.5; e.hp = e.maxHp;
+  game.banner = { text: 'THE HUNTER HAS YOUR SCENT', t: 2, color: '#ff6b9d' };
+}
+
+function masteryBlurb(id) {
+  const lv = masteryLevel(id);
+  const next = masteryNext(id);
+  const deep = (SAVE.deepest && SAVE.deepest[id]) || 0;
+  const perk = lv > 0 ? ' \u00b7 <span style="color:#9dff5c">+' + (lv * 3) + '% damage, +' + (lv * 10) + ' max HP</span>' : '';
+  const prog = next === null ? ' \u00b7 mastered'
+    : ' \u00b7 ' + Math.round(masteryXp(id)) + ' / ' + next + ' to next';
+  return 'Level ' + lv + ' of ' + MASTERY_CAP + perk + prog + (deep ? ' \u00b7 deepest wave ' + deep : '');
+}
+
 /* ---------------- character select ---------------- */
 let selectedChar = SAVE.unlocked[0] || 'vanguard';
 
@@ -4510,6 +4728,7 @@ function buildCharGrid() {
       '<div class="oico">' + (unlocked ? c.ico : '🔒') + '</div>' +
       '<div class="onm">' + c.name + '</div>' +
       '<div class="oti">' + c.title + '</div>' +
+      (unlocked && masteryLevel(c.id) > 0 ? '<div class="bestv" style="color:#ffc857">\u2605 ' + masteryLevel(c.id) + '</div>' : '') +
       (unlocked ? (best ? '<div class="bestv">' + best + '</div>' : '')
                 : '<span class="cost' + (SAVE.cores >= c.cost ? '' : ' no') + '">◆ ' + c.cost + '</span>');
     el.addEventListener('click', () => { selectedChar = c.id; buildCharGrid(); });
@@ -4529,7 +4748,8 @@ function showCharInfo() {
     '<div class="row"><b>Weapon:</b> ' + w.ico + ' ' + w.name + ' — ' + w.dmg + ' dmg, ' + (1 / w.rof).toFixed(1) + '/s' +
       (w.count > 1 ? ', ' + w.count + ' shots' : '') + '</div>' +
     '<div class="row pass"><b>Passive:</b> ' + c.passive + '</div>' +
-    '<div class="row"><b>Gear:</b> ' + gearSummary() + '</div>';
+    '<div class="row"><b>Gear:</b> ' + gearSummary() + '</div>' +
+    '<div class="row"><b>Mastery:</b> ' + masteryBlurb(c.id) + '</div>';
 
   const btn = document.getElementById('csDeploy');
   if (unlocked) {
@@ -4565,13 +4785,15 @@ function deploySelected() {
 function rebuildPlayer(p) {
   const keep = { x: p.x, y: p.y, hp: p.hp, xp: p.xp, level: p.level, xpNext: p.xpNext,
                  weapon: p.weapon, ammo: p.ammo, upgrades: p.upgrades, pending: p.pending,
-                 augments: p.augments.slice() };
+                 augments: p.augments.slice(), pacts: p.pacts.slice() };
   const rebuilt = makePlayer(p.charId);
   for (const k in rebuilt) p[k] = rebuilt[k];
   p.x = keep.x; p.y = keep.y; p.xp = keep.xp; p.level = keep.level; p.xpNext = keep.xpNext;
   p.weapon = keep.weapon; p.ammo = keep.ammo; p.pending = keep.pending;
   p.augments = keep.augments;
+  p.pacts = keep.pacts;
   for (const a of keep.augments) { const g = AUG_BY_ID[a]; if (g) g.apply(p); }
+  for (const a of keep.pacts) { const g = PACT_BY_ID[a]; if (g) g.apply(p); }
   for (const id in keep.upgrades) {
     const u = UPGRADES.find(x => x.id === id);
     if (u) for (let i = 0; i < keep.upgrades[id]; i++) u.apply(p);
@@ -5258,10 +5480,12 @@ function rollRarity(wave) {
 }
 
 function rollDrop(wave) {
+  let w = (wave || 1) + (game.threat || 0) * 1.5;
+  if (player && player.pacts && player.pacts.indexOf('ironclad') !== -1) w += 5;
   return {
     uid: GEAR.uid++,
     slot: SLOTS[(Math.random() * SLOTS.length) | 0].id,
-    rarity: rollRarity(wave || 1),
+    rarity: rollRarity(w),
     base: null, rolls: [], rerolls: 0, ins: -1
   };
 }
@@ -5415,6 +5639,574 @@ function gearSummary() {
   return worn + ' / 4 slots filled' + (majors ? ' · ' + majors + ' major ID' + (majors === 1 ? '' : 's') : '') +
          (un ? ' · ' + un + ' sealed in the stash' : '');
 }
+
+/* ============================================================
+   SECTORS - where the fight is happening
+   Every three waves the arena changes: a different palette, a different
+   hazard on the floor, and a different set of rules for everyone in it.
+   A run is a route through six of them rather than one long corridor.
+   ============================================================ */
+const SECTORS = [
+  { id: 'grid', name: 'THE GRID', sub: 'Baseline containment', color: '#40e0ff', bg: '#070a12',
+    line: 'rgba(64,224,255,.055)', wall: '#17324a',
+    blurb: 'Clean floor, clean rules. Nothing here is trying anything clever.', mods: {} },
+
+  { id: 'furnace', name: 'THE FURNACE', sub: 'Thermal overrun', color: '#ff8a3d', bg: '#140805',
+    line: 'rgba(255,138,61,.07)', wall: '#4a2512', hazard: 'vent',
+    blurb: 'Vents erupt on a count you can learn. Everything that walks here hits 25% harder.',
+    mods: { enemyDmg: 1.25, score: 1.15 } },
+
+  { id: 'cryo', name: 'CRYO VAULT', sub: 'Coolant breach', color: '#8ad8ff', bg: '#040c15',
+    line: 'rgba(138,216,255,.07)', wall: '#17384f', hazard: 'ice',
+    blurb: 'No grip underfoot: you keep sliding past where you meant to stop. Nothing moves fast in here.',
+    mods: { enemySpeed: 0.78, friction: 0.26, xp: 1.15 } },
+
+  { id: 'scrap', name: 'THE SCRAPYARD', sub: 'Salvage tier', color: '#ffc857', bg: '#0d0a05',
+    line: 'rgba(255,200,87,.06)', wall: '#4a3a16',
+    blurb: 'Crates stacked to the ceiling. Twice as much cover, and 60% more falls off the shelves.',
+    mods: { cover: 2.1, drop: 1.6 } },
+
+  { id: 'rift', name: 'VOID RIFT', sub: 'Gravity fault', color: '#b58cff', bg: '#09051a',
+    line: 'rgba(181,140,255,.07)', wall: '#2e1f52', hazard: 'rift',
+    blurb: 'Tears in the floor drag everything toward them. Dashes carry 70% further; shots travel 20% slower.',
+    mods: { dash: 1.7, bulletSpeed: 0.8, cores: 1.25 } },
+
+  { id: 'overclock', name: 'OVERCLOCK', sub: 'Runaway tick rate', color: '#ff5c8a', bg: '#120513',
+    line: 'rgba(255,92,138,.07)', wall: '#4d1733', hazard: 'surge',
+    blurb: 'Everything runs 35% faster, including the things trying to kill you. Worth 60% more if you keep up.',
+    mods: { enemySpeed: 1.35, enemyRate: 1.3, score: 1.6, xp: 1.25 } }
+];
+const SECTOR_BY_ID = {};
+for (const s of SECTORS) SECTOR_BY_ID[s.id] = s;
+
+function sectorMod(key, dflt) {
+  const m = game.sector && game.sector.mods ? game.sector.mods[key] : undefined;
+  return m === undefined ? (dflt === undefined ? 1 : dflt) : m;
+}
+
+function enterSector(wave) {
+  let next;
+  if (wave <= 1) next = SECTORS[0];
+  else {
+    const pool = SECTORS.filter(s => s !== game.sector);
+    next = pool[(Math.random() * pool.length) | 0];
+  }
+  game.sector = next;
+  game.sectorsSeen.push(next.id);
+  buildHazards();
+  game.banner = { text: next.name, t: 2.6, color: next.color, sub: next.blurb };
+}
+
+/* ---- hazards: the thing on the floor that is not an enemy ---- */
+let hazards = [];
+
+function buildHazards() {
+  hazards = [];
+  const kind = game.sector && game.sector.hazard;
+  if (!kind) return;
+  const n = kind === 'rift' ? 5 : kind === 'vent' ? 7 : 4;
+  for (let i = 0; i < n; i++) {
+    for (let tries = 0; tries < 40; tries++) {
+      const x = rand(220, WORLD.w - 220), y = rand(220, WORLD.h - 220);
+      if (obstacles.some(o => circleHitsBox(x, y, 110, o))) continue;
+      if (len(x - WORLD.w / 2, y - WORLD.h / 2) < 300) continue;
+      hazards.push({
+        kind: kind, x: x, y: y,
+        r: kind === 'vent' ? 86 : kind === 'rift' ? 150 : 120,
+        t: rand(0, 4), phase: 'idle', a: rand(0, TAU)
+      });
+      break;
+    }
+  }
+}
+
+function updateHazards(dt) {
+  for (const h of hazards) {
+    h.t += dt;
+    if (h.kind === 'vent') {
+      // 3.4s cycle: 2.4 quiet, 0.6 telegraph, 0.4 erupting
+      const c = h.t % 3.4;
+      h.phase = c < 2.4 ? 'idle' : (c < 3.0 ? 'warn' : 'fire');
+      if (h.phase === 'fire') {
+        for (const e of enemies) {
+          if (e.dead || e.spawnT > 0) continue;
+          if (len(e.x - h.x, e.y - h.y) < h.r + e.r) {
+            dealDamage(e, 90 * dt, 'ground', { silent: true });
+            applyBurn(e, Math.max(player.burnDps, 14), 2);
+          }
+        }
+        if (len(player.x - h.x, player.y - h.y) < h.r && player.invuln <= 0) damagePlayer(26, h.x, h.y);
+      }
+    } else if (h.kind === 'rift') {
+      // a steady drag on everything with feet, you included
+      for (const e of enemies) {
+        if (e.dead || e.spawnT > 0) continue;
+        const dx = h.x - e.x, dy = h.y - e.y, d = len(dx, dy);
+        if (d > h.r || d < 10) continue;
+        const pull = 130 * (1 - d / h.r) * dt;
+        e.x += (dx / d) * pull; e.y += (dy / d) * pull;
+      }
+      const dx = h.x - player.x, dy = h.y - player.y, d = len(dx, dy);
+      if (d < h.r && d > 10 && player.dashTime <= 0) {
+        const pull = 100 * (1 - d / h.r) * dt;
+        player.x += (dx / d) * pull; player.y += (dy / d) * pull;
+      }
+    } else if (h.kind === 'surge') {
+      // a strike that walks to a new spot each time it lands
+      const c = h.t % 2.6;
+      h.phase = c < 1.9 ? 'idle' : (c < 2.4 ? 'warn' : 'fire');
+      if (h.phase === 'warn' && !h.aimed) {
+        h.aimed = 1;
+        h.tx = clamp(player.x + rand(-120, 120), 80, WORLD.w - 80);
+        h.ty = clamp(player.y + rand(-120, 120), 80, WORLD.h - 80);
+      }
+      if (h.phase === 'fire') {
+        if (h.aimed) {
+          h.aimed = 0;
+          h.x = h.tx; h.y = h.ty;
+          particles.push({ x: h.x, y: h.y, vx: 0, vy: 0, life: 0.4, max: 0.4, color: '#ff5c8a', size: h.r, glow: true, ring: true });
+          for (const e of enemies) {
+            if (!e.dead && !e.spawnT && len(e.x - h.x, e.y - h.y) < h.r + e.r) dealDamage(e, 120, 'ground', { fromX: h.x, fromY: h.y });
+          }
+          if (len(player.x - h.x, player.y - h.y) < h.r) damagePlayer(30, h.x, h.y);
+          camera.shake = Math.min(16, camera.shake + 5);
+        }
+      }
+    }
+  }
+}
+
+function drawHazards(ox, oy) {
+  if (!hazards.length) return;
+  ctx.save();
+  for (const h of hazards) {
+    const x = h.x - ox, y = h.y - oy;
+    if (x < -200 || y < -200 || x > VW + 200 || y > VH + 200) continue;
+    if (h.kind === 'vent') {
+      const hot = h.phase === 'fire', warn = h.phase === 'warn';
+      ctx.globalAlpha = hot ? 0.55 : (warn ? 0.3 + Math.sin(game.time * 26) * 0.18 : 0.14);
+      ctx.fillStyle = hot ? '#ff8a3d' : '#7a3a14';
+      ctx.beginPath(); ctx.arc(x, y, h.r, 0, TAU); ctx.fill();
+      ctx.globalAlpha = hot ? 0.9 : 0.45;
+      ctx.strokeStyle = hot ? '#ffe36b' : '#ff8a3d'; ctx.lineWidth = hot ? 4 : 2;
+      ctx.shadowBlur = hot ? 24 : 8; ctx.shadowColor = '#ff8a3d';
+      ctx.beginPath(); ctx.arc(x, y, h.r, 0, TAU); ctx.stroke();
+      if (hot) for (let i = 0; i < 3; i++) {
+        spawnParticle(h.x + rand(-h.r, h.r), h.y + rand(-h.r, h.r), rand(-20, 20), -rand(60, 160), 0.5, '#ffb45c', 3.4, true);
+      }
+    } else if (h.kind === 'rift') {
+      ctx.globalAlpha = 0.5;
+      ctx.strokeStyle = '#b58cff'; ctx.lineWidth = 2;
+      ctx.shadowBlur = 18; ctx.shadowColor = '#b58cff';
+      for (let k = 0; k < 3; k++) {
+        const rr = h.r * (0.35 + k * 0.3);
+        ctx.beginPath(); ctx.arc(x, y, rr, h.a + game.time * (0.6 + k * 0.4), h.a + game.time * (0.6 + k * 0.4) + 2.2); ctx.stroke();
+      }
+      ctx.globalAlpha = 0.85;
+      ctx.fillStyle = '#120626';
+      ctx.beginPath(); ctx.arc(x, y, 16, 0, TAU); ctx.fill();
+    } else if (h.kind === 'surge') {
+      if (h.phase === 'warn') {
+        ctx.globalAlpha = 0.3 + Math.sin(game.time * 30) * 0.2;
+        ctx.strokeStyle = '#ff5c8a'; ctx.lineWidth = 3;
+        ctx.setLineDash([8, 7]);
+        ctx.beginPath(); ctx.arc(h.tx - ox, h.ty - oy, h.r, 0, TAU); ctx.stroke();
+        ctx.setLineDash([]);
+      }
+    }
+  }
+  ctx.restore();
+}
+
+/* ============================================================
+   ELITES - the enemy that is worth looking at
+   From wave 3, some spawns come up with affixes. They are tougher, they
+   are worth far more, and they always drop something. Two affixes from
+   wave 10, so late waves stop being the same five shapes.
+   ============================================================ */
+const AFFIXES = [
+  { id: 'armored',  name: 'Armored',  color: '#b8c6d8', from: 3,
+    desc: 'takes 55% less damage until something breaks the plate',
+    apply: e => { e.dr = 0.55; e.plate = e.maxHp * 0.45; } },
+  { id: 'swift',    name: 'Swift',    color: '#9dff5c', from: 3,
+    desc: 'moves 70% faster',
+    apply: e => { e.speed *= 1.7; } },
+  { id: 'volatile', name: 'Volatile', color: '#ff8a3d', from: 4,
+    desc: 'detonates for 140 when it dies',
+    apply: e => { e.volatile = 140; } },
+  { id: 'warded',   name: 'Warded',   color: '#7ceaff', from: 5,
+    desc: 'blocks everything that hits its front, so you have to flank it',
+    apply: e => { e.ward = 1.1; } },
+  { id: 'leech',    name: 'Leeching', color: '#8affb0', from: 6,
+    desc: 'heals every enemy within 220 for 14 a second',
+    apply: e => { e.leech = 14; } },
+  { id: 'blink',    name: 'Blinking', color: '#d08bff', from: 7,
+    desc: 'teleports onto you every 3 seconds',
+    apply: e => { e.blink = 3; e.blinkCd = 3; } },
+  { id: 'splitting',name: 'Splitting',color: '#5cffd0', from: 8,
+    desc: 'breaks into 3 runners when it dies',
+    apply: e => { e.splits = 3; } },
+  { id: 'sapping',  name: 'Sapping',  color: '#ff5c8a', from: 9,
+    desc: 'drains 9 of your shield, then health, every second within 260',
+    apply: e => { e.sap = 9; } }
+];
+const AFFIX_BY_ID = {};
+for (const a of AFFIXES) AFFIX_BY_ID[a.id] = a;
+
+function makeElite(e, count) {
+  const pool = AFFIXES.filter(a => a.from <= game.wave);
+  if (!pool.length) return;
+  e.maxHp *= 2.4; e.hp = e.maxHp;
+  e.elite = [];
+  for (let i = 0; i < count && pool.length; i++) {
+    const a = pool.splice((Math.random() * pool.length) | 0, 1)[0];
+    a.apply(e);
+    e.elite.push(a.id);
+  }
+  e.dmg *= 1.35;
+  e.xp *= 2.6; e.score *= 3;
+  e.r *= 1.18;
+  e.eliteColor = AFFIX_BY_ID[e.elite[0]].color;
+}
+
+function eliteChance(wave) {
+  if (wave < 3) return 0;
+  return Math.min(0.26, 0.05 + (wave - 3) * 0.012) * (1 + game.threat * 0.12);
+}
+
+function updateElite(e, dt) {
+  if (e.leech) {
+    e.leechT = (e.leechT || 0) + dt;
+    if (e.leechT >= 0.5) {
+      e.leechT = 0;
+      for (const o of enemies) {
+        if (o.dead || o === e || len(o.x - e.x, o.y - e.y) > 220) continue;
+        o.hp = Math.min(o.maxHp, o.hp + e.leech * 0.5);
+      }
+      particles.push({ x: e.x, y: e.y, vx: 0, vy: 0, life: 0.3, max: 0.3, color: '#8affb0', size: 220, glow: true, ring: true });
+    }
+  }
+  if (e.sap && len(e.x - player.x, e.y - player.y) < 260) {
+    e.sapT = (e.sapT || 0) + dt;
+    if (e.sapT >= 1) {
+      e.sapT = 0;
+      if (player.shield > 0) player.shield = Math.max(0, player.shield - e.sap);
+      else damagePlayer(e.sap, e.x, e.y);
+      arcs.push({ x1: e.x, y1: e.y, x2: player.x, y2: player.y, life: 0.2, max: 0.2 });
+    }
+  }
+  if (e.blink) {
+    e.blinkCd -= dt;
+    if (e.blinkCd <= 0) {
+      e.blinkCd = e.blink;
+      const a = rand(0, TAU);
+      const nx = clamp(player.x + Math.cos(a) * 130, 50, WORLD.w - 50);
+      const ny = clamp(player.y + Math.sin(a) * 130, 50, WORLD.h - 50);
+      burst(e.x, e.y, 10, '#d08bff', 220, 2.4);
+      e.x = nx; e.y = ny;
+      burst(e.x, e.y, 10, '#d08bff', 220, 2.4);
+    }
+  }
+}
+
+/* a Warded elite only takes damage from behind */
+function wardBlocks(e, fromX, fromY) {
+  if (!e.ward || fromX === undefined) return false;
+  const a = Math.atan2(fromY - e.y, fromX - e.x);
+  let d = ((a - e.angle + Math.PI) % TAU + TAU) % TAU - Math.PI;
+  return Math.abs(d) < e.ward;
+}
+
+/* ============================================================
+   PACTS - you choose how hard this gets
+   Entering a new sector offers three bargains. Each is a real cost for a
+   real gain, and each raises Threat, which multiplies what the run pays
+   out and pushes every drop table upward. Declining is always allowed.
+   ============================================================ */
+const PACTS = [
+  { id: 'blood',   ico: '🩸', name: 'Blood Price',    threat: 1,
+    desc: 'Enemies deal 30% more damage. You deal 35% more.',
+    apply: p => { p.fragile += 0.30; p.dmgMul *= 1.35; } },
+  { id: 'glass',   ico: '💎', name: 'Glass',          threat: 2,
+    desc: 'Your maximum health is halved. You deal 55% more damage.',
+    apply: p => { p.maxHp = Math.max(20, Math.round(p.maxHp * 0.5)); p.hp = Math.min(p.hp, p.maxHp); p.dmgMul *= 1.55; } },
+  { id: 'swarm',   ico: '🐜', name: 'Swarm',          threat: 2,
+    desc: '70% more enemies in every wave. +45% experience and +60% drop rate.',
+    apply: p => { p.xpMul *= 1.45; p.dropMul += 0.6; } },
+  { id: 'ironclad',ico: '🛡', name: 'Ironclad Foes',  threat: 2,
+    desc: 'Enemies have 55% more health. Every drop rolls as if you were 5 waves deeper.',
+    apply: p => {} },
+  { id: 'hunted',  ico: '👁', name: 'Hunted',         threat: 2,
+    desc: 'A two-affix elite stalks you from now on and returns 12 seconds after you kill it. +55% score.',
+    apply: p => { p.scoreMul += 0.55; } },
+  { id: 'fragile', ico: '⚡', name: 'Fragile Arsenal', threat: 1,
+    desc: 'You hold one dash charge at most. +30% fire rate.',
+    apply: p => { p.dashMax = 1; p.dashCharge = 1; p.rofMul *= 1.30; } },
+  { id: 'dim',     ico: '🌑', name: 'Blackout',       threat: 1,
+    desc: 'You can see 35% less of the arena. +35% critical hit chance and +80% critical damage.',
+    apply: p => { p.crit += 0.35; p.critMul += 0.8; } },
+  { id: 'famine',  ico: '🦴', name: 'Famine',         threat: 2,
+    desc: 'Health pickups stop dropping. You heal 9% of your maximum on every wave cleared and gain 7% life steal.',
+    apply: p => { p.lifesteal += 0.07; } },
+  { id: 'tithe',   ico: '◆', name: 'Tithe',          threat: 1,
+    desc: 'You bank 75% more cores at the end of the run and score 25% higher, with nothing else given back.',
+    apply: p => { p.scoreMul += 0.25; } },
+  { id: 'overgrow',ico: '🌿', name: 'Overgrowth',     threat: 2,
+    desc: 'Every wave carries 3 guaranteed elites. Elites drop two pieces of gear instead of one.',
+    apply: p => {} }
+];
+const PACT_BY_ID = {};
+for (const p of PACTS) PACT_BY_ID[p.id] = p;
+
+function hasPact(id) { return player && player.pacts.indexOf(id) !== -1; }
+
+function openPactOffer() {
+  if (!player) return;
+  const pool = PACTS.filter(p => player.pacts.indexOf(p.id) === -1);
+  if (!pool.length) return;
+  const roll = [];
+  while (roll.length < 3 && pool.length) roll.push(pool.splice((Math.random() * pool.length) | 0, 1)[0]);
+
+  document.getElementById('pkSub').textContent =
+    game.sector.name + ' — threat ' + game.threat + '. Take a bargain, or walk in clean.';
+  const box = document.getElementById('pkCards');
+  box.innerHTML = '';
+  for (const pc of roll) {
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.tabIndex = 0;
+    card.innerHTML =
+      '<div class="ico">' + pc.ico + '</div>' +
+      '<div class="nm">' + pc.name + '</div>' +
+      '<div class="ds">' + pc.desc + '</div>' +
+      '<div class="rare" style="color:#ff6b9d">+' + pc.threat + ' threat</div>';
+    const take = () => {
+      pc.apply(player);
+      player.pacts.push(pc.id);
+      game.threat += pc.threat;
+      closeOverlay('pact');
+      game.state = 'play';
+      game.banner = { text: pc.ico + ' ' + pc.name, t: 2.2, color: '#ff6b9d' };
+      floatText(player.x, player.y - 42, 'THREAT ' + game.threat, '#ff6b9d', 18);
+    };
+    card.addEventListener('click', take);
+    card.addEventListener('keydown', ev => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); take(); } });
+    box.appendChild(card);
+  }
+  game.state = 'pact';
+  showOverlay('pact');
+  mouse.down = false;
+}
+
+function declinePact() {
+  closeOverlay('pact');
+  game.state = 'play';
+}
+
+/* ============================================================
+   MASTERY - the long chase
+   Every run banks mastery for the operative you played. Each level is a
+   permanent, small, visible edge for that one operative, so putting a
+   hundred waves into ROOK means something a new ROOK does not have.
+   ============================================================ */
+const MASTERY_CAP = 12;
+function masteryXp(id) { return (SAVE.mastery && SAVE.mastery[id]) || 0; }
+function masteryLevel(id) { return Math.min(MASTERY_CAP, Math.floor(Math.sqrt(masteryXp(id) / 55))); }
+function masteryNext(id) {
+  const lv = masteryLevel(id);
+  return lv >= MASTERY_CAP ? null : Math.ceil((lv + 1) * (lv + 1) * 55);
+}
+function grantMastery(id, amount) {
+  if (!SAVE.mastery) SAVE.mastery = {};
+  const before = masteryLevel(id);
+  SAVE.mastery[id] = masteryXp(id) + amount;
+  return masteryLevel(id) - before;
+}
+function applyMastery(p) {
+  const lv = masteryLevel(p.charId);
+  if (lv <= 0) return;
+  p.dmgMul *= 1 + lv * 0.03;
+  p.maxHp += lv * 10;
+  p.hp += lv * 10;
+  p.masteryLv = lv;
+}
+
+/* ============================================================
+   WARDENS - three of them, in rotation
+   Every fifth wave sends a boss, and which one depends on how deep you
+   are. They do not share a pattern: one closes and bursts, one hides
+   behind nodes you have to break, one holds ground and sweeps.
+   ============================================================ */
+const BOSS_KINDS = [
+  { id: 'warden', name: 'WARDEN',   color: '#ff2d6f', blurb: 'closes, bursts, calls in help' },
+  { id: 'hive',   name: 'BROODNEST', color: '#8affb0', blurb: 'three nodes keep it armoured' },
+  { id: 'siege',  name: 'SIEGE FRAME', color: '#ffc857', blurb: 'mines the floor and sweeps it' }
+];
+
+function bossKindFor(wave) { return BOSS_KINDS[Math.floor(wave / 5 - 1) % BOSS_KINDS.length]; }
+
+function setupBoss(e, kind) {
+  e.kind = kind.id;
+  e.color = kind.color;
+  if (kind.id === 'hive') {
+    e.nodes = [];
+    for (let i = 0; i < 3; i++) e.nodes.push({ a: (i / 3) * TAU, hp: e.maxHp * 0.18, max: e.maxHp * 0.18 });
+    e.nodeSpin = 0;
+    e.broodCd = 2.2;
+  } else if (kind.id === 'siege') {
+    e.laserA = 0; e.laserOn = 0; e.mineCd = 3.2; e.speed *= 0.55;
+  }
+}
+
+/* nodes soak for the Broodnest: while any stand, it barely feels a hit */
+function bossSoak(e, dmg, fromX, fromY) {
+  if (e.kind !== 'hive' || !e.nodes || !e.nodes.length) return dmg;
+  let best = null, bd = 1e9;
+  for (const n of e.nodes) {
+    const nx = e.x + Math.cos(n.a + e.nodeSpin) * 92;
+    const ny = e.y + Math.sin(n.a + e.nodeSpin) * 92;
+    const d = fromX === undefined ? 0 : len(fromX - nx, fromY - ny);
+    if (d < bd) { bd = d; best = n; }
+  }
+  if (best) {
+    best.hp -= dmg * 0.8;
+    if (best.hp <= 0) {
+      e.nodes.splice(e.nodes.indexOf(best), 1);
+      const nx = e.x + Math.cos(best.a + e.nodeSpin) * 92;
+      const ny = e.y + Math.sin(best.a + e.nodeSpin) * 92;
+      particles.push({ x: nx, y: ny, vx: 0, vy: 0, life: 0.4, max: 0.4, color: '#8affb0', size: 120, glow: true, ring: true });
+      burst(nx, ny, 24, '#8affb0', 320, 3.2);
+      floatText(e.x, e.y - e.r - 30, e.nodes.length ? (e.nodes.length + ' NODES LEFT') : 'SHELL DOWN',
+                e.nodes.length ? '#8affb0' : '#ffe36b', 17);
+      camera.shake = Math.min(20, camera.shake + 8);
+    }
+  }
+  return dmg * 0.2;
+}
+
+function updateBossHive(e, dt, d, toPlayer) {
+  e.nodeSpin += dt * 1.1;
+  e.moveAngle = angleLerp(e.moveAngle === undefined ? toPlayer : e.moveAngle, toPlayer, dt * 1.1);
+  e.broodCd -= dt;
+  if (e.broodCd <= 0) {
+    e.broodCd = e.nodes.length ? 2.6 : 1.5;         // it panics once the shell is gone
+    const n = e.nodes.length ? 2 : 4;
+    for (let i = 0; i < n; i++) {
+      const a = rand(0, TAU);
+      summonAt(e.x + Math.cos(a) * 110, e.y + Math.sin(a) * 110, game.wave < 12 ? 'runner' : 'splitter');
+    }
+    burst(e.x, e.y, 16, '#8affb0', 260, 2.6);
+  }
+  // a slow spiral of spit, always on
+  e.spitCd = (e.spitCd || 0) - dt;
+  if (e.spitCd <= 0) {
+    e.spitCd = 0.55;
+    e.spitA = (e.spitA || 0) + 0.7;
+    for (let i = 0; i < 3; i++) enemyBullet(e.x, e.y, e.spitA + (i / 3) * TAU, 250, e.dmg * 0.45, '#8affb0', 7);
+  }
+  e.state = 'chase';
+}
+
+function updateBossSiege(e, dt, d, toPlayer) {
+  e.moveAngle = angleLerp(e.moveAngle === undefined ? toPlayer : e.moveAngle, toPlayer, dt * 0.5);
+  e.mineCd -= dt;
+  if (e.mineCd <= 0) {
+    e.mineCd = 4.4;
+    for (let i = 0; i < 7; i++) {
+      const a = rand(0, TAU), rr = rand(70, 240);
+      mines.push({ x: clamp(player.x + Math.cos(a) * rr, 50, WORLD.w - 50),
+                   y: clamp(player.y + Math.sin(a) * rr, 50, WORLD.h - 50),
+                   t: 1.5, dmg: e.dmg * 1.1 });
+    }
+    game.banner = { text: 'MINES ARMED', t: 1.2, color: '#ffc857' };
+  }
+  // sweeping laser: winds up, then rotates through a full turn
+  e.laserCd = (e.laserCd || 5) - dt;
+  if (e.laserOn > 0) {
+    e.laserOn -= dt;
+    e.laserA += dt * 1.5;
+    const dx = Math.cos(e.laserA), dy = Math.sin(e.laserA);
+    const t = (player.x - e.x) * dx + (player.y - e.y) * dy;
+    if (t > 0 && t < 1100) {
+      const perp = Math.abs((player.x - e.x) * -dy + (player.y - e.y) * dx);
+      if (perp < player.r + 12) damagePlayer(e.dmg * 0.55, e.x, e.y);
+    }
+    if (e.laserOn <= 0) e.laserCd = rand(4.5, 6.5);
+  } else if (e.laserCd <= 0) {
+    e.laserOn = 4.2;
+    e.laserA = toPlayer;
+    game.banner = { text: 'SWEEP', t: 1, color: '#ffc857' };
+    camera.shake = 12;
+  }
+  e.state = 'chase';
+}
+
+let mines = [];      // SIEGE FRAME: armed floor, briefly
+
+function updateMines(dt) {
+  for (let i = mines.length - 1; i >= 0; i--) {
+    const m = mines[i];
+    m.t -= dt;
+    if (m.t > 0) continue;
+    mines.splice(i, 1);
+    explode(m.x, m.y, 92, m.dmg, false);
+  }
+}
+
+function drawMines(ox, oy) {
+  if (!mines.length) return;
+  ctx.save();
+  for (const m of mines) {
+    const k = clamp(m.t / 1.5, 0, 1);
+    ctx.globalAlpha = 0.35 + (1 - k) * 0.5;
+    ctx.strokeStyle = '#ffc857'; ctx.lineWidth = 2;
+    ctx.shadowBlur = 10; ctx.shadowColor = '#ffc857';
+    ctx.beginPath(); ctx.arc(m.x - ox, m.y - oy, 92 * (1 - k * 0.55), 0, TAU); ctx.stroke();
+    ctx.beginPath(); ctx.arc(m.x - ox, m.y - oy, 6, 0, TAU); ctx.fillStyle = '#ffc857'; ctx.fill();
+  }
+  ctx.restore();
+}
+
+function drawBossExtras(e, ox, oy) {
+  const x = e.x - ox, y = e.y - oy;
+  if (e.kind === 'hive' && e.nodes) {
+    ctx.save();
+    for (const n of e.nodes) {
+      const nx = x + Math.cos(n.a + e.nodeSpin) * 92;
+      const ny = y + Math.sin(n.a + e.nodeSpin) * 92;
+      ctx.globalAlpha = 0.35;
+      ctx.strokeStyle = '#8affb0'; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(nx, ny); ctx.stroke();
+      ctx.globalAlpha = 0.95;
+      ctx.shadowBlur = 14; ctx.shadowColor = '#8affb0';
+      ctx.fillStyle = 'rgba(138,255,176,.22)';
+      ctx.lineWidth = 2.5;
+      drawPoly(nx, ny, 13, 4, game.time * 2); ctx.fill(); ctx.stroke();
+      const w = 26;
+      ctx.globalAlpha = 0.9;
+      ctx.fillStyle = 'rgba(0,0,0,.5)'; ctx.fillRect(nx - w / 2, ny - 22, w, 3);
+      ctx.fillStyle = '#8affb0'; ctx.fillRect(nx - w / 2, ny - 22, w * clamp(n.hp / n.max, 0, 1), 3);
+    }
+    ctx.restore();
+  }
+  if (e.kind === 'siege' && e.laserOn > 0) {
+    ctx.save();
+    ctx.globalAlpha = 0.85;
+    ctx.strokeStyle = '#ffc857'; ctx.lineWidth = 9;
+    ctx.shadowBlur = 26; ctx.shadowColor = '#ffc857';
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.lineTo(x + Math.cos(e.laserA) * 1100, y + Math.sin(e.laserA) * 1100);
+    ctx.stroke();
+    ctx.globalAlpha = 1; ctx.strokeStyle = '#fff6d8'; ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.lineTo(x + Math.cos(e.laserA) * 1100, y + Math.sin(e.laserA) * 1100);
+    ctx.stroke();
+    ctx.restore();
+  }
+}
+
 
 /* ---------------- the Forge screen ---------------- */
 let fgSel = 0;          // uid of the item being looked at
@@ -5665,7 +6457,7 @@ function forgeAction(act, it) {
 /* ---------------- shell ---------------- */
 function showOverlay(id) { document.getElementById(id).classList.add('show'); }
 function closeOverlay(id) { document.getElementById(id).classList.remove('show'); }
-function closeAllOverlays() { for (const id of ['menu', 'levelup', 'paused', 'gameover', 'charsel', 'forge', 'augment']) closeOverlay(id); }
+function closeAllOverlays() { for (const id of ['menu', 'levelup', 'paused', 'gameover', 'charsel', 'forge', 'augment', 'pact']) closeOverlay(id); }
 
 function togglePause() {
   if (game.state === 'forge') { closeForge(); return; }
@@ -5682,10 +6474,14 @@ function togglePause() {
 function startRun(charId) {
   bullets = []; enemies = []; pickups = []; particles = []; texts = []; telegraphs = [];
   arcs = []; fuses = []; minions = []; fires = []; stickies = []; prisms = []; wells = []; anchors = []; fields = [];
+  hazards = []; mines = [];
   player = makePlayer(charId || selectedChar);
   game.time = 0; game.score = 0; game.kills = 0; game.wave = 0;
   game.betweenWaves = 0; game.spawnQueue = []; game.banner = null;
   game.drops = 0; game.mats = 0; game.stallT = 0; game.stallWarned = false;
+  game.threat = 0; game.elites = 0; game.sectorsSeen = []; game.sector = SECTORS[0];
+  game.combo = 0; game.comboT = 0; game.comboBest = 0; game.freeze = 0;
+  game.hunterT = 0; hazards = []; mines = [];
   camera.shake = 0; camera.flash = 0;
   camera.x = player.x - VW / 2; camera.y = player.y - VH / 2;
   closeAllOverlays();
@@ -5713,6 +6509,19 @@ function endRun() {
   saveMeta();
   game.best = SAVE.best;
   document.getElementById('goCores').textContent = earned;
+  const gained = grantMastery(player.charId, Math.round(game.score / 55) + game.wave * 3);
+  const chr = CHAR_BY_ID[player.charId];
+  const lv = masteryLevel(player.charId);
+  if (game.wave > (SAVE.deepest[player.charId] || 0)) SAVE.deepest[player.charId] = game.wave;
+  const pactNames = player.pacts.map(id => PACT_BY_ID[id].name).join(', ');
+  document.getElementById('goRun').innerHTML =
+    '<span style="color:' + chr.color + '">' + chr.name + '</span> \u00b7 mastery ' + lv +
+      (gained > 0 ? ' <span style="color:#9dff5c">(+' + gained + ')</span>' : '') +
+      ' \u00b7 ' + player.augments.length + ' augment' + (player.augments.length === 1 ? '' : 's') +
+      ' \u00b7 ' + game.elites + ' elite' + (game.elites === 1 ? '' : 's') + ' down' +
+      ' \u00b7 best chain ' + game.comboBest + '<br>' +
+    'Sectors: ' + (game.sectorsSeen.map(id => SECTOR_BY_ID[id].name).join(' \u2192 ') || '-') +
+    (game.threat ? '<br><span style="color:#ff6b9d">Threat ' + game.threat + ' \u00b7 ' + pactNames + '</span>' : '');
   document.getElementById('goLoot').textContent =
     (game.drops || game.mats)
       ? 'Kept: ' + game.drops + ' piece' + (game.drops === 1 ? '' : 's') + ' of gear and ' +
@@ -5758,6 +6567,7 @@ document.getElementById('forgeBtn').addEventListener('click', openForge);
 document.getElementById('fgBack').addEventListener('click', closeForge);
 document.getElementById('csForge').addEventListener('click', openForge);
 document.getElementById('goForge').addEventListener('click', openForge);
+document.getElementById('pkSkip').addEventListener('click', declinePact);
 document.getElementById('resumeBtn').addEventListener('click', togglePause);
 document.getElementById('quitBtn').addEventListener('click', () => {
   closeAllOverlays(); game.state = 'menu'; refreshMenu(); showOverlay('menu');
@@ -5781,7 +6591,7 @@ function devNote(msg) { document.getElementById('devNote').textContent = msg; }
 
 function devAction(kind) {
   // a run is a run even while the level-up or augment cards are open
-  const inRun = player && ['play', 'pause', 'levelup', 'draft'].includes(game.state);
+  const inRun = player && ['play', 'pause', 'levelup', 'draft', 'pact'].includes(game.state);
   switch (kind) {
     case 'unlockAll':
       SAVE.unlocked = CHARACTERS.map(c => c.id);
@@ -5799,6 +6609,25 @@ function devAction(kind) {
       for (const k of ['amp1', 'amp2', 'amp3', 'amp4', 'sim', 'ins']) GEAR.mats[k] = (GEAR.mats[k] || 0) + 5;
       saveGear(); if (forgeOpen()) renderForge();
       devNote('8 unidentified drops and 5 of every material');
+      break;
+    case 'sector':
+      if (inRun) { enterSector(game.wave); devNote('now in ' + game.sector.name); }
+      else devNote('start a run first');
+      break;
+    case 'pact':
+      if (inRun) { openPactOffer(); devNote('pact offered'); }
+      else devNote('start a run first');
+      break;
+    case 'elite':
+      if (inRun) {
+        for (let i = 0; i < 3; i++) {
+          const pt = spawnPointAwayFromPlayer();
+          const roster = Object.keys(ENEMY_TYPES).filter(k => !ENEMY_TYPES[k].boss && ENEMY_TYPES[k].from <= game.wave);
+          const e = spawnEnemy(pick(roster), pt.x, pt.y, waveScale());
+          if (!e.elite) makeElite(e, 2);
+        }
+        devNote('3 elites inbound');
+      } else devNote('start a run first');
       break;
     case 'augment':
       if (inRun) { openAugmentDraft(); devNote('augment draft opened'); }
@@ -5832,8 +6661,15 @@ function devAction(kind) {
       break;
     case 'boss':
       if (!inRun) return devNote('start a run first');
-      summonAt(player.x + 320, player.y, 'boss');
-      devNote('boss inbound');
+      {
+        const kind = BOSS_KINDS[(game.devBoss = ((game.devBoss || 0) + 1) % BOSS_KINDS.length)];
+        const pt = spawnPointAwayFromPlayer();
+        const e = spawnEnemy('boss', pt.x, pt.y, 1 + Math.max(0, game.wave / 5 - 1) * 0.55);
+        setupBoss(e, kind);
+        e.spawnT = 0.35;
+        game.banner = { text: kind.name + ' INBOUND', t: 2, color: kind.color };
+        devNote(kind.name + ' inbound');
+      }
       break;
     case 'resource':
       if (!inRun) return devNote('start a run first');
@@ -5872,12 +6708,16 @@ function frame(now) {
   if (dt > 0.25) dt = 0.25;
 
   if (game.state === 'play') {
-    acc += dt;
-    let guard = 0;
-    while (acc >= STEP && guard++ < 5) { step(STEP); acc -= STEP; }
-    if (guard >= 5) acc = 0;
+    if (game.freeze > 0) { game.freeze -= dt; acc = 0; }
+    else {
+      acc += dt;
+      let guard = 0;
+      while (acc >= STEP && guard++ < 5) { step(STEP); acc -= STEP; }
+      if (guard >= 5) acc = 0;
+    }
   } else {
     acc = 0;
+    game.freeze = 0;
   }
 
   if (game.state === 'menu' || game.state === 'select' || game.state === 'forge' || !player) {

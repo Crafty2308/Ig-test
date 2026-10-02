@@ -298,6 +298,152 @@ const ok = (c, m) => { if (c) pass++; else fails.push(m); };
     console.log('  rarity mix at wave 18: ' + r.rarityMix);
   }
 
+  /* ---------- sectors, elites, pacts, wardens, mastery ---------- */
+  {
+    const r = await page.evaluate(() => {
+      const out = {};
+      SAVE.unlocked = CHARACTERS.map(c => c.id);
+
+      out.sectorCount = SECTORS.length;
+      out.sectorText = SECTORS.every(x => x.name && x.blurb && x.color && x.bg);
+      out.affixCount = AFFIXES.length;
+      out.affixText = AFFIXES.every(a => a.name && a.desc && typeof a.apply === 'function');
+      out.pactCount = PACTS.length;
+      const BANNED = /\b(enhances?|improves?|empowers?|strengthens?|boosts?|better|greatly)\b/i;
+      out.pactText = PACTS.every(p => p.desc && /\d/.test(p.desc) && !BANNED.test(p.desc) &&
+                                      /[.!]$/.test(p.desc.trim()) && p.threat >= 1);
+      out.pactIdsUnique = new Set(PACTS.map(p => p.id)).size === PACTS.length;
+      out.bossKinds = BOSS_KINDS.length;
+
+      // every sector loads, builds hazards and runs
+      const sbroke = [];
+      for (const sec of SECTORS) {
+        startRun('vanguard'); dev.god = true;
+        game.sector = sec; buildArena(4); buildHazards();
+        try {
+          for (let i = 0; i < 300; i++) {
+            mouse.down = true; keys['w'] = i % 30 < 15; keys['s'] = i % 30 >= 15;
+            if (i % 40 === 0) dashQueued = true;
+            if (i % 50 === 0) spawnEnemy('grunt');
+            step(1 / 60);
+          }
+          if (!isFinite(player.hp) || !isFinite(player.x)) sbroke.push(sec.id);
+        } catch (e) { sbroke.push(sec.id + ':' + e.message); }
+      }
+      out.sectorsRun = sbroke.length === 0;
+      out.sbroke = sbroke.join(', ');
+
+      // every affix applies and survives contact
+      const abroke = [];
+      for (const a of AFFIXES) {
+        startRun('vanguard'); dev.god = true;
+        game.wave = 12;
+        try {
+          const e = spawnEnemy('grunt', player.x + 220, player.y);
+          e.spawnT = 0; e.elite = [a.id]; e.maxHp *= 2.4; e.hp = e.maxHp; a.apply(e);
+          e.eliteColor = a.color;
+          for (let i = 0; i < 260; i++) { mouse.down = true;
+            mouse.x = e.x - camera.x; mouse.y = e.y - camera.y; step(1 / 60); }
+          if (!isFinite(player.hp)) abroke.push(a.id);
+        } catch (err) { abroke.push(a.id + ':' + err.message); }
+      }
+      out.affixesRun = abroke.length === 0;
+      out.abroke = abroke.join(', ');
+
+      // a Warded elite is immune from the front and hittable from behind
+      startRun('vanguard'); dev.god = true; game.wave = 12;
+      const w = spawnEnemy('grunt', player.x + 200, player.y);
+      w.spawnT = 0; w.hp = w.maxHp = 1e6; w.ward = 1.1; w.angle = Math.PI;   // facing the player
+      const h0 = w.hp;
+      dealDamage(w, 500, 'shot', { fromX: player.x, fromY: player.y });
+      out.wardBlocksFront = w.hp === h0;
+      dealDamage(w, 500, 'shot', { fromX: w.x + 300, fromY: w.y });
+      out.wardAllowsFlank = w.hp < h0;
+
+      // an Armored elite takes less until its plate breaks
+      const ar = spawnEnemy('grunt', player.x + 200, player.y);
+      ar.spawnT = 0; ar.hp = ar.maxHp = 10000; ar.dr = 0.55; ar.plate = 400;
+      dealDamage(ar, 100, 'shot', {});
+      out.plateSoaks = ar.hp > 9910;              // 100 -> 45
+      for (let i = 0; i < 8; i++) dealDamage(ar, 100, 'shot', {});
+      out.plateBreaks = ar.dr === 0;
+
+      // every boss kind runs its own pattern
+      const bbroke = [];
+      for (const k of BOSS_KINDS) {
+        startRun('vanguard'); dev.god = true; game.wave = 15;
+        try {
+          const e = spawnEnemy('boss', player.x + 420, player.y, 1.5);
+          setupBoss(e, k); e.spawnT = 0;
+          for (let i = 0; i < 480; i++) { mouse.down = true;
+            mouse.x = e.x - camera.x; mouse.y = e.y - camera.y;
+            keys['a'] = i % 40 < 20; keys['d'] = i % 40 >= 20;
+            step(1 / 60); }
+          if (!isFinite(player.hp) || !isFinite(e.hp)) bbroke.push(k.id);
+        } catch (err) { bbroke.push(k.id + ':' + err.message); }
+      }
+      out.bossesRun = bbroke.length === 0;
+      out.bbroke = bbroke.join(', ');
+
+      // the Broodnest shell actually soaks
+      startRun('vanguard'); dev.god = true; game.wave = 15;
+      const hv = spawnEnemy('boss', player.x + 400, player.y, 1);
+      setupBoss(hv, BOSS_KINDS.find(k => k.id === 'hive'));
+      hv.spawnT = 0; hv.hp = hv.maxHp = 1e6;
+      const n0 = hv.nodes.length, hp0 = hv.hp;
+      dealDamage(hv, 1000, 'shot', { fromX: hv.x + 100, fromY: hv.y });
+      out.hiveSoaks = (hp0 - hv.hp) < 400;
+      for (let i = 0; i < 40; i++) dealDamage(hv, 1000, 'shot', { fromX: hv.x + 100, fromY: hv.y });
+      out.hiveNodesBreak = hv.nodes.length < n0;
+
+      // every pact applies on top of a real run
+      const pbroke = [];
+      for (const pc of PACTS) {
+        startRun('vanguard'); dev.god = true;
+        try {
+          pc.apply(player); player.pacts.push(pc.id); game.threat += pc.threat;
+          for (let i = 0; i < 200; i++) { mouse.down = true;
+            if (i % 40 === 0) dashQueued = true;
+            if (i % 45 === 0) spawnEnemy('grunt');
+            step(1 / 60); }
+          if (!isFinite(player.hp) || player.maxHp <= 0) pbroke.push(pc.id);
+        } catch (err) { pbroke.push(pc.id + ':' + err.message); }
+      }
+      out.pactsRun = pbroke.length === 0;
+      out.pbroke = pbroke.join(', ');
+
+      // threat pays, and pushes the drop table deeper
+      startRun('vanguard');
+      game.threat = 0; const c0 = coresFor(10000, 20);
+      game.threat = 6; const c1 = coresFor(10000, 20);
+      out.threatPays = c1 > c0 * 1.3;
+
+      // mastery banks, levels and pays out
+      SAVE.mastery = {}; SAVE.deepest = {};
+      out.masteryStartsAtZero = masteryLevel('vanguard') === 0;
+      grantMastery('vanguard', 4000);
+      out.masteryLevels = masteryLevel('vanguard') > 0;
+      startRun('vanguard');
+      const withM = player.maxHp;
+      SAVE.mastery = {};
+      startRun('vanguard');
+      out.masteryPays = withM > player.maxHp;
+      out.masteryCaps = (grantMastery('vanguard', 1e9), masteryLevel('vanguard') === MASTERY_CAP);
+      SAVE.mastery = {};
+      return out;
+    });
+    const info = ['sectorCount', 'affixCount', 'pactCount', 'bossKinds', 'sbroke', 'abroke', 'bbroke', 'pbroke'];
+    for (const k in r) if (!info.includes(k)) ok(r[k], 'world: ' + k);
+    ok(r.sectorCount >= 6, 'world: six sectors or more (' + r.sectorCount + ')');
+    ok(r.affixCount >= 8, 'world: eight elite affixes or more (' + r.affixCount + ')');
+    ok(r.pactCount >= 10, 'world: ten pacts or more (' + r.pactCount + ')');
+    ok(r.bossKinds >= 3, 'world: three warden kinds or more (' + r.bossKinds + ')');
+    ok(!r.sbroke, 'world: every sector runs' + (r.sbroke ? ' -> ' + r.sbroke : ''));
+    ok(!r.abroke, 'world: every affix runs' + (r.abroke ? ' -> ' + r.abroke : ''));
+    ok(!r.bbroke, 'world: every warden runs' + (r.bbroke ? ' -> ' + r.bbroke : ''));
+    ok(!r.pbroke, 'world: every pact runs' + (r.pbroke ? ' -> ' + r.pbroke : ''));
+  }
+
   /* ---------- a full unassisted run from the menu ---------- */
   await page.reload();                       // back to a cold boot, the way a player arrives
   await page.waitForTimeout(400);
@@ -318,10 +464,13 @@ const ok = (c, m) => { if (c) pass++; else fails.push(m); };
       step(1 / 60);
       if (game.state === 'levelup') document.querySelector('#luCards .card').click();
       if (game.state === 'draft') document.querySelector('#agCards .card').click();
+      if (game.state === 'pact') document.querySelector('#pkCards .card').click();
     }
     return { wave: game.wave, level: player.level, augs: player.augments.length, char: player.charId,
              upg: Object.keys(player.upgrades).length, stash: GEAR.stash.length, hp: player.hp,
-             score: game.score, kills: game.kills, state: game.state };
+             score: game.score, kills: game.kills, state: game.state,
+             pacts: player.pacts.length, threat: game.threat, sectors: game.sectorsSeen.length,
+             elites: game.elites };
   });
   console.log('  run: ' + JSON.stringify(run));
   /* the bot walks a fixed pattern and never chases an orb, so what is asserted
@@ -330,6 +479,8 @@ const ok = (c, m) => { if (c) pass++; else fails.push(m); };
   ok(run.stash >= 1, 'flow: gear dropped and was banked (' + run.stash + ')');
   ok(isFinite(run.hp) && run.hp > 0, 'flow: health stayed a number');
   ok(run.state === 'play' || run.state === 'over', 'flow: no overlay deadlocked the run');
+  ok(run.sectors >= 2, 'flow: the run moved through more than one sector (' + run.sectors + ')');
+  ok(run.pacts >= 1 && run.threat >= 1, 'flow: a pact was offered and taken (threat ' + run.threat + ')');
 
   /* levels arrive all run, independent of how well anything plays */
   const curve = await page.evaluate(() => {

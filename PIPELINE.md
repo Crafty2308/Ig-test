@@ -36,7 +36,7 @@ they carry every modifier they already had plus two more multipliers.
 
 ## Where modifiers come from
 
-Four places, and all four write the same player fields, so nothing has a
+Six places, and all of them write the same player fields, so nothing has a
 private path into damage:
 
 1. **Upgrade cards**, one pick per level.
@@ -48,6 +48,25 @@ private path into damage:
    of a run, each stat rolled 0-100% of its own range.
 4. **Major identifications**, printed on a gear name from Epic upward and never
    rolled. They set the same fields everything else does.
+5. **Pacts**, taken when you enter a sector. Each is a cost and a gain, and each
+   raises Threat, which multiplies the cores a run banks and pushes every drop
+   table deeper.
+6. **Mastery**, banked per operative across every run and applied last in
+   `makePlayer()`.
+
+Sectors are the only thing that does not write the player: they multiply at the
+point of use through `sectorMod(key)` — enemy speed and damage at spawn, bullet
+speed in `emitProjectiles`, the movement lerp, dash velocity, xp, score and drop
+rate. That keeps a sector's rules out of the player's own numbers, so leaving a
+sector is as simple as pointing `game.sector` somewhere else.
+
+## Taking damage, on the other side
+
+Elite armour resolves inside `dealDamage` before anything lands: a Warded elite
+returns zero from its front arc, an Armored one soaks through a plate with its
+own health pool, and the Broodnest routes the hit into whichever node is nearest
+to the shot. None of them is a second code path — they are three early branches
+in the one function.
 
 A signature augment that needs behaviour the engine did not have gets a named
 field and one hook in the system it belongs to — `aegisArc` in `aegisCovers`,
